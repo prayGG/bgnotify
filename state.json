@@ -11,7 +11,7 @@
     "https://bgpharmadrugs.to/product/roaccutane-20-mg-30-roche/": {
       "Roaccutane 20 mg 30 Roche": {
         "found": true,
-        "in_stock": true,
+        "in_stock": false,
         "price": "45.00$"
       }
     }
