@@ -11,19 +11,38 @@ permissions:
 jobs:
   run-bot:
     runs-on: ubuntu-latest
+    
     steps:
       - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}  # explizit machen
+          fetch-depth: 0   # wichtig für pull/rebase
+
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+
       - run: pip install -r requirements.txt
-      - run: python -m src.main
+
+      - name: Run Bot
+        run: python -m src.main
         env:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
-      - name: Commit state
+
+      - name: Commit & Push state
         run: |
-          git config --global user.name "bot"
-          git config --global user.email "bot@bot.com"
+          git config --global user.name "bgnotify-bot"
+          git config --global user.email "bot@users.noreply.github.com"
+          
+          # Wichtig: Änderungen vom Remote holen
+          git pull --rebase --autostash origin main
+          
+          # Nur committen, wenn es wirklich Änderungen gibt
+          if git diff --quiet HEAD -- state.json; then
+            echo "Keine Änderungen an state.json"
+            exit 0
+          fi
+          
           git add state.json
-          git commit -m "update state" || echo "Keine Änderungen"
+          git commit -m "update state"
           git push origin main
