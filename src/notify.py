@@ -45,24 +45,22 @@ def _mentions(user_ids: list[str], role_ids: list[str]) -> tuple[str, dict]:
 
 
 def update_dashboard(webhook_url: str, embed: dict, old_message_id: str = "") -> Optional[str]:
-    """Edit the existing dashboard in place; if gone, DELETE its corpse then POST fresh.
+    """Delete the previous dashboard (if any) then POST a fresh one.
 
-    Without the DELETE step, transient PATCH failures (rate limit, network) would
-    leave the old dashboard hanging around when we create a replacement.
+    Always reposts so the message stays at the bottom of the channel. No mentions
+    in the payload, so reposting does not push @-notifications to users — they
+    only get pinged by the separate restock-alert messages.
     """
     if not webhook_url:
         return None
+    if old_message_id:
+        _request("DELETE", f"{webhook_url}/messages/{old_message_id}", quiet_404=True)
+
     payload = {
         "username": "BG Watch",
         "embeds": [embed],
-        "content": "",
         "allowed_mentions": {"parse": []},
     }
-    if old_message_id:
-        if _request("PATCH", f"{webhook_url}/messages/{old_message_id}", payload) is not None:
-            return old_message_id
-        log.info("dashboard %s un-editable, deleting and recreating", old_message_id)
-        _request("DELETE", f"{webhook_url}/messages/{old_message_id}", quiet_404=True)
     result = _request("POST", f"{webhook_url}?wait=true", payload)
     if result is None:
         return None
