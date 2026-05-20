@@ -57,7 +57,7 @@ def update_dashboard(webhook_url: str, embed: dict, old_message_id: str = "") ->
         _request("DELETE", f"{webhook_url}/messages/{old_message_id}", quiet_404=True)
 
     payload = {
-        "username": "BG Watch",
+        "username": "bgnotify by pray",
         "embeds": [embed],
         "allowed_mentions": {"parse": []},
     }
@@ -77,7 +77,7 @@ def send_restock_alert(
         return False
     prefix, allowed = _mentions(user_ids or [], role_ids or [])
     payload = {
-        "username": "BG Watch",
+        "username": "bgnotify by pray",
         "content": prefix,
         "embeds": [embed],
         "allowed_mentions": allowed,
@@ -89,7 +89,7 @@ def send(webhook_url: str, content: str) -> bool:
     """Simple unpinged message — CLI test only."""
     if not webhook_url:
         return False
-    payload = {"username": "BG Watch", "content": content[:1900], "allowed_mentions": {"parse": []}}
+    payload = {"username": "bgnotify by pray", "content": content[:1900], "allowed_mentions": {"parse": []}}
     return _request("POST", webhook_url, payload) is not None
 
 
