@@ -22,13 +22,13 @@ products:
 
   - name: "Tirzepatide"
     url: "https://bgpharmadrugs.to/product/peptides/"
-    emoji: "💉"
+    emoji: "🧪"
     watch_variants:
       - "Tirzepatide 30 mg"
 
   - name: "Retatrutide"
     url: "https://bgpharmadrugs.to/product/peptides/"
-    emoji: "💉"
+    emoji: "🧪"
     watch_variants:
       - "Retatrutide 30 mg"
 
