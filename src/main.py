@@ -306,7 +306,9 @@ def build_dashboard_embed(statuses: list[dict], usd_eur: Optional[float] = None)
             delta = _price_change_suffix(shown_prev, shown_price)
             sub = f"🟢⠀in stock{price}{delta}"
         else:
-            sub = f"🔴⠀{_oos_label(s.get('out_since', ''))}"
+            shown_last = display_price(s.get("price", ""), usd_eur)
+            last_suffix = f"⠀·⠀_zuletzt {shown_last}_" if shown_last else ""
+            sub = f"🔴⠀out of stock{last_suffix}"
 
         blocks.append(f"**{s['variant']}**\n└⠀{sub}{klick}")
 
@@ -390,7 +392,6 @@ def build_stats_embed(cfg: dict, state: dict, usd_eur: Optional[float] = None) -
         "author": {"name": "✦⠀⠀bgnotify · Stats⠀⠀✦"},
         "color": 0x5865F2,
         "description": "\n\n".join(blocks),
-        "footer": {"text": "Auto-Update · Pin diese Nachricht damit sie oben bleibt"},
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }
 
