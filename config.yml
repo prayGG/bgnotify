@@ -6,9 +6,8 @@ notifications:
   # dann Rechtsklick auf den Username → "User-ID kopieren" (~18-stellige Zahl).
   # Pro Person eine neue "- " Zeile mit der ID in Anführungszeichen.
   ping_user_ids:
-    - "DISCORDID"
-    # - "WEITERE_ID_HIER"
-    # - "NOCH_EINE_ID"
+    - "REDACTED"
+    - "REDACTED"
 
   # Optional: ganze Discord-Rollen pingen (Rechtsklick auf Rolle → ID kopieren).
   # ping_role_ids:
