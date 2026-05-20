@@ -1,0 +1,286 @@
+"""Check stock status of WooCommerce products on bgpharmadrugs.to.
+
+Supports two product types automatically:
+
+1. **Variable products** (e.g. /product/peptides/ with a peptide-name dropdown):
+   The page has 50+ variants which exceeds WC's `wc_ajax_variation_threshold`,
+   so `data-product_variations` is `"false"` and the frontend looks up each
+   chosen variant via AJAX. We POST `?wc-ajax=get_variation` with the chosen
+   attribute value and read `is_in_stock`, `is_purchasable` from the response.
+
+2. **Simple products** (e.g. /product/roaccutane-20-mg-30-roche/): no
+   dropdown — the URL IS the product. We detect stock from the body class
+   (`outofstock` toggled by WooCommerce), the `<p class="stock">` badge, and
+   the presence of an "Add to cart" button.
+"""
+from __future__ import annotations
+
+import html
+import json
+import logging
+import re
+import sys
+from typing import Optional
+from urllib.parse import quote, urlparse
+
+import requests
+from bs4 import BeautifulSoup
+
+log = logging.getLogger(__name__)
+
+UA = (
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+    "(KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
+)
+
+
+def _normalize(s: str) -> str:
+    return re.sub(r"\s+", " ", s).strip().lower()
+
+
+def _strip_html(s: str) -> str:
+    return html.unescape(re.sub(r"<[^>]+>", "", s)).strip()
+
+
+def _origin(url: str) -> str:
+    p = urlparse(url)
+    return f"{p.scheme}://{p.netloc}"
+
+
+def _not_found(deep_link: str = "") -> dict:
+    return {"found": False, "in_stock": False, "price": "", "variation_id": None, "deep_link": deep_link}
+
+
+def _deep_link(product_url: str, attr_name: str = "", option_value: str = "") -> str:
+    """Return a URL that pre-selects the variant. Falls back to product URL for simple products."""
+    if not attr_name or not option_value:
+        return product_url
+    sep = "&" if "?" in product_url else "?"
+    return f"{product_url}{sep}{attr_name}={quote(option_value)}"
+
+
+def _fetch(url: str, session: requests.Session) -> str:
+    r = session.get(
+        url,
+        headers={"User-Agent": UA, "Accept-Language": "en-US,en;q=0.9"},
+        timeout=20,
+    )
+    r.raise_for_status()
+    return r.text
+
+
+def _body_classes(soup: BeautifulSoup) -> list[str]:
+    body = soup.find("body")
+    return body.get("class") if body and body.get("class") else []
+
+
+def _is_simple_product(soup: BeautifulSoup) -> bool:
+    classes = _body_classes(soup)
+    if "product-type-simple" in classes:
+        return True
+    if "product-type-variable" in classes:
+        return False
+    # Fallback: no variations form means it's not a variable product.
+    return soup.find("form", class_="variations_form") is None
+
+
+def _extract_price(soup: BeautifulSoup) -> str:
+    el = soup.select_one("p.price, .price .woocommerce-Price-amount, .price")
+    if not el:
+        return ""
+    return _strip_html(el.decode_contents())
+
+
+def _check_simple_from_soup(soup: BeautifulSoup, url: str) -> dict:
+    classes = _body_classes(soup)
+    out_of_stock = "outofstock" in classes
+
+    if not out_of_stock:
+        stock_el = soup.find(class_=re.compile(r"\bstock\b"))
+        if stock_el and "out-of-stock" in (stock_el.get("class") or []):
+            out_of_stock = True
+
+    add_to_cart = soup.find("button", attrs={"name": "add-to-cart"}) or soup.find(
+        "button", class_=re.compile(r"single_add_to_cart_button")
+    )
+
+    in_stock = (not out_of_stock) and (add_to_cart is not None)
+    return {
+        "found": True,
+        "in_stock": in_stock,
+        "price": _extract_price(soup),
+        "variation_id": None,
+        "deep_link": url,
+    }
+
+
+def _parse_variable_form(soup: BeautifulSoup) -> tuple[Optional[int], list[dict], dict[str, dict[str, str]]]:
+    form = soup.find("form", class_="variations_form")
+    if not form:
+        return None, [], {}
+
+    pid_raw = form.get("data-product_id") or ""
+    product_id = int(pid_raw) if pid_raw.isdigit() else None
+
+    inline: list[dict] = []
+    raw = form.get("data-product_variations") or ""
+    if raw and raw not in ("false", "[]"):
+        try:
+            data = json.loads(html.unescape(raw))
+            if isinstance(data, list):
+                inline = data
+        except json.JSONDecodeError as e:
+            log.warning("inline variations JSON failed to parse: %s", e)
+
+    attr_options: dict[str, dict[str, str]] = {}
+    for sel in form.find_all("select"):
+        name = sel.get("name")
+        if not name:
+            continue
+        opts: dict[str, str] = {}
+        for o in sel.find_all("option"):
+            val = (o.get("value") or "").strip()
+            if not val:
+                continue
+            label = (o.get_text() or "").strip() or val
+            opts[_normalize(label)] = val
+            opts[_normalize(val)] = val
+        attr_options[name] = opts
+
+    return product_id, inline, attr_options
+
+
+def _match_inline(variations: list[dict], wanted: str) -> Optional[dict]:
+    needle = _normalize(wanted)
+    for v in variations:
+        label = _normalize(" ".join(str(x) for x in (v.get("attributes") or {}).values() if x))
+        if needle == label or needle in label or label in needle:
+            return v
+    return None
+
+
+def _lookup_option_value(attr_options: dict[str, dict[str, str]], wanted: str) -> Optional[tuple[str, str]]:
+    needle = _normalize(wanted)
+    for attr_name, opts in attr_options.items():
+        if needle in opts:
+            return attr_name, opts[needle]
+        for label, val in opts.items():
+            if needle in label or label in needle:
+                return attr_name, val
+    return None
+
+
+def _ajax_variation(
+    session: requests.Session,
+    base_url: str,
+    product_id: int,
+    attr_name: str,
+    option_value: str,
+    referer: str,
+) -> Optional[dict]:
+    ajax = f"{base_url}/?wc-ajax=get_variation"
+    try:
+        r = session.post(
+            ajax,
+            data={"product_id": product_id, attr_name: option_value},
+            headers={
+                "User-Agent": UA,
+                "X-Requested-With": "XMLHttpRequest",
+                "Referer": referer,
+                "Accept": "application/json, text/javascript, */*; q=0.01",
+            },
+            timeout=20,
+        )
+        if r.status_code >= 400:
+            log.warning("ajax %s returned %s", ajax, r.status_code)
+            return None
+        if not r.content:
+            return None
+        data = r.json()
+        if data is False or data is None:
+            return None
+        if isinstance(data, dict) and "variation_id" in data:
+            return data
+        return None
+    except (requests.RequestException, json.JSONDecodeError) as e:
+        log.error("ajax error for %s=%s: %s", attr_name, option_value, e)
+        return None
+
+
+def _check_variable(
+    session: requests.Session,
+    soup: BeautifulSoup,
+    url: str,
+    watch_variants: list[str],
+) -> dict[str, dict]:
+    product_id, inline, attr_options = _parse_variable_form(soup)
+    if product_id is None:
+        log.warning("no variations_form / product_id on %s", url)
+        return {n: _not_found() for n in watch_variants}
+
+    base = _origin(url)
+    out: dict[str, dict] = {}
+
+    for name in watch_variants:
+        if inline:
+            v = _match_inline(inline, name)
+            if v is not None:
+                attrs = v.get("attributes") or {}
+                attr_n, attr_v = (next(iter(attrs.items())) if attrs else ("", ""))
+                out[name] = {
+                    "found": True,
+                    "in_stock": bool(v.get("is_in_stock")) and bool(v.get("is_purchasable", True)),
+                    "price": _strip_html(v.get("price_html") or ""),
+                    "variation_id": v.get("variation_id"),
+                    "deep_link": _deep_link(url, attr_n, attr_v),
+                }
+                continue
+
+        match = _lookup_option_value(attr_options, name)
+        if match is None:
+            log.warning("no dropdown option matched %r", name)
+            out[name] = _not_found(url)
+            continue
+        attr_name, option_value = match
+        deep = _deep_link(url, attr_name, option_value)
+        data = _ajax_variation(session, base, product_id, attr_name, option_value, referer=url)
+        if data is None:
+            # No matching variation → "Sorry, no products matched your selection"
+            out[name] = {"found": True, "in_stock": False, "price": "", "variation_id": None, "deep_link": deep}
+            continue
+        out[name] = {
+            "found": True,
+            "in_stock": bool(data.get("is_in_stock")) and bool(data.get("is_purchasable", True)),
+            "price": _strip_html(data.get("price_html") or ""),
+            "variation_id": data.get("variation_id"),
+            "deep_link": deep,
+        }
+    return out
+
+
+def check(url: str, watch_variants: list[str]) -> dict[str, dict]:
+    """Return {variant_or_label: {"found", "in_stock", "price", "variation_id"}}.
+
+    For simple products, `watch_variants[0]` is used as the result key (label
+    for notifications). If no variants are provided, the URL is used.
+    """
+    session = requests.Session()
+    page = _fetch(url, session)
+    soup = BeautifulSoup(page, "html.parser")
+
+    if _is_simple_product(soup):
+        label = watch_variants[0] if watch_variants else url
+        return {label: _check_simple_from_soup(soup, url)}
+
+    return _check_variable(session, soup, url, watch_variants)
+
+
+if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
+    if len(sys.argv) < 2:
+        print("usage: python -m src.bgpharma <product_url> [<variant_name> ...]")
+        sys.exit(2)
+    url = sys.argv[1].strip()
+    variants = [v.strip() for v in sys.argv[2:]]
+    result = check(url, variants)
+    print(json.dumps(result, indent=2, ensure_ascii=False))

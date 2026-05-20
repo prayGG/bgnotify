@@ -1,0 +1,26 @@
+discord_webhook_env: DISCORD_WEBHOOK_URL
+
+notifications:
+  # Discord User-IDs die bei jedem Dashboard-Update und bei Restocks gepingt
+  # werden. Wie holen: Discord → Settings → Advanced → Developer Mode an,
+  # dann Rechtsklick auf den Username → "User-ID kopieren" (~18-stellige Zahl).
+  # Pro Person eine neue "- " Zeile mit der ID in Anführungszeichen.
+  ping_user_ids:
+    - "DISCORDID"
+    # - "WEITERE_ID_HIER"
+    # - "NOCH_EINE_ID"
+
+  # Optional: ganze Discord-Rollen pingen (Rechtsklick auf Rolle → ID kopieren).
+  # ping_role_ids:
+  #   - "ROLLEN_ID"
+
+products:
+  - name: "GHK CU"
+    url: "https://bgpharmadrugs.to/product/peptides/"
+    watch_variants:
+      - "GHK CU 100 mg"
+
+  - name: "Roaccutane 20 mg (Roche)"
+    url: "https://bgpharmadrugs.to/product/roaccutane-20-mg-30-roche/"
+    watch_variants:
+      - "Roaccutane 20 mg 30 Roche"

@@ -1,0 +1,19 @@
+{
+  "dashboard_message_id": "1506458797529501767",
+  "products": {
+    "https://bgpharmadrugs.to/product/peptides/": {
+      "GHK CU 100 mg": {
+        "found": true,
+        "in_stock": false,
+        "price": ""
+      }
+    },
+    "https://bgpharmadrugs.to/product/roaccutane-20-mg-30-roche/": {
+      "Roaccutane 20 mg 30 Roche": {
+        "found": true,
+        "in_stock": true,
+        "price": "45.00$"
+      }
+    }
+  }
+}
