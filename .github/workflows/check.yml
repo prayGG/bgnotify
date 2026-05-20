@@ -16,7 +16,10 @@ jobs:
   check:
     runs-on: ubuntu-latest
     steps:
+      # fetch-depth: 0 ist wichtig, damit Git die Historie für Konfliktlösungen hat
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
@@ -26,9 +29,19 @@ jobs:
         env:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
       - name: Commit state
-        uses: stefanzweifel/git-auto-commit-action@v5
-        with:
-          commit_message: "state update [skip ci]"
-          file_pattern: 'state.json'
-          commit_user_name: "bgnotify-bot"
-          commit_user_email: "actions@users.noreply.github.com"
+        run: |
+          git config user.name "bgnotify-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add state.json
+          
+          if git diff --staged --quiet; then
+            echo "no state change"
+          else
+            git commit -m "state update [skip ci]"
+            
+            # Die magische Zeile: Holt den neuesten Stand von GitHub und
+            # erzwingt bei Konflikten IMMER den frisch generierten Bot-Stand (-X theirs)
+            git pull --rebase origin main -X theirs
+            
+            git push origin main
+          fi
