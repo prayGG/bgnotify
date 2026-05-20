@@ -1,16 +1,47 @@
 {
   "bot_stats": {
     "first_check_at": "2026-05-20T18:50:44.075159+00:00",
-    "last_check_at": "2026-05-20T20:00:36.127749+00:00",
-    "total_checks": 8
+    "last_check_at": "2026-05-20T20:10:25.108710+00:00",
+    "total_checks": 9
   },
   "dashboard_message_id": "1506730928561590465",
   "products": {
+    "https://bgpharmadrugs.to/product/modafinil/": {
+      "ASPENDOS tablets 100 mg * 30 Medochemie": {
+        "found": true,
+        "highest_price": "€ 42.20",
+        "highest_price_at": "2026-05-20T20:10:30.624120+00:00",
+        "in_stock": true,
+        "lowest_price": "€ 42.20",
+        "lowest_price_at": "2026-05-20T20:10:30.624120+00:00",
+        "price": "€ 42.20",
+        "price_history": [
+          42.2
+        ]
+      }
+    },
     "https://bgpharmadrugs.to/product/peptides/": {
       "GHK CU 100 mg": {
         "found": true,
         "in_stock": false,
         "out_since": "2026-05-20T18:50:45.448321+00:00"
+      },
+      "Retatrutide 30 mg": {
+        "found": true,
+        "in_stock": false,
+        "out_since": "2026-05-20T20:10:29.439659+00:00"
+      },
+      "Tirzepatide 30 mg": {
+        "found": true,
+        "highest_price": "€ 43.06",
+        "highest_price_at": "2026-05-20T20:10:28.063486+00:00",
+        "in_stock": true,
+        "lowest_price": "€ 43.06",
+        "lowest_price_at": "2026-05-20T20:10:28.063486+00:00",
+        "price": "€ 43.06",
+        "price_history": [
+          43.06
+        ]
       }
     },
     "https://bgpharmadrugs.to/product/roaccutane-20-mg-30-roche/": {
