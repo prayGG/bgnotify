@@ -67,6 +67,30 @@ def update_dashboard(webhook_url: str, embed: dict, old_message_id: str = "") ->
     return str(result.get("id") or "") or None
 
 
+def edit_in_place(webhook_url: str, embed: dict, message_id: str = "") -> Optional[str]:
+    """Update one persistent message silently. POST on first run, PATCH after.
+
+    Falls back to POST on 404 so a manually-deleted message self-heals. Webhook
+    edits don't push Discord notifications, so this can be called every run.
+    """
+    if not webhook_url:
+        return None
+    payload = {"embeds": [embed], "allowed_mentions": {"parse": []}}
+
+    if message_id:
+        result = _request("PATCH", f"{webhook_url}/messages/{message_id}", payload, quiet_404=True)
+        if result is None:
+            return message_id
+        if result.get("id"):
+            return str(result["id"])
+
+    post_payload = {"username": "bgnotify by pray", **payload}
+    result = _request("POST", f"{webhook_url}?wait=true", post_payload)
+    if result is None:
+        return None
+    return str(result.get("id") or "") or None
+
+
 def send_restock_alert(
     webhook_url: str,
     embed: dict,

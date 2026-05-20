@@ -42,6 +42,20 @@ def fetch_usd_eur_rate() -> Optional[float]:
 
 
 _USD_PATTERN = re.compile(r"\$\s*([\d,]+\.?\d*)")
+_PRICE_VALUE_PATTERN = re.compile(r"([\d,]+\.?\d*)")
+
+
+def _price_value(raw: str) -> Optional[float]:
+    """Extract numeric amount from any price string (handles `$X.XX`, `€ X.XX`)."""
+    if not raw:
+        return None
+    m = _PRICE_VALUE_PATTERN.search(raw.replace(" ", ""))
+    if not m:
+        return None
+    try:
+        return float(m.group(1).replace(",", ""))
+    except ValueError:
+        return None
 
 
 def display_price(raw: str, rate: Optional[float]) -> str:
@@ -82,6 +96,11 @@ def save_state(state: dict) -> None:
 
 def check_products(cfg: dict, state: dict) -> tuple[list[dict], list[dict]]:
     products_state = state.setdefault("products", {})
+    bot_stats = state.setdefault("bot_stats", {})
+    run_iso = datetime.now(timezone.utc).isoformat()
+    bot_stats.setdefault("first_check_at", run_iso)
+    bot_stats["last_check_at"] = run_iso
+    bot_stats["total_checks"] = bot_stats.get("total_checks", 0) + 1
     statuses: list[dict] = []
     restocks: list[dict] = []
 
@@ -110,6 +129,7 @@ def check_products(cfg: dict, state: dict) -> tuple[list[dict], list[dict]]:
             new_price = info.get("price", "")
             prev_price = entry.get("price", "")
             now_iso = datetime.now(timezone.utc).isoformat()
+            out_since_before = entry.get("out_since")
 
             # OOS bookkeeping: stamp out_since when going (or staying) out of stock.
             if not in_stock_now and not entry.get("out_since"):
@@ -120,6 +140,23 @@ def check_products(cfg: dict, state: dict) -> tuple[list[dict], list[dict]]:
             # Price-change bookkeeping: remember the last different price.
             if in_stock_now and new_price and prev_price and new_price != prev_price:
                 entry["previous_price"] = prev_price
+
+            # Low/high tracking + price history (numeric, deduped, last 30).
+            new_val = _price_value(new_price)
+            if new_val is not None:
+                low_val = _price_value(entry.get("lowest_price", ""))
+                if low_val is None or new_val < low_val:
+                    entry["lowest_price"] = new_price
+                    entry["lowest_price_at"] = now_iso
+                high_val = _price_value(entry.get("highest_price", ""))
+                if high_val is None or new_val > high_val:
+                    entry["highest_price"] = new_price
+                    entry["highest_price_at"] = now_iso
+                history = entry.setdefault("price_history", [])
+                if not history or history[-1] != new_val:
+                    history.append(new_val)
+                    if len(history) > 30:
+                        entry["price_history"] = history[-30:]
 
             statuses.append({
                 "product_name": name,
@@ -142,6 +179,14 @@ def check_products(cfg: dict, state: dict) -> tuple[list[dict], list[dict]]:
                     "product_name": name, "product_url": url, "deep_link": deep,
                     "variant": variant, "price": new_price,
                 })
+                entry["restock_count"] = entry.get("restock_count", 0) + 1
+                entry["last_restock_at"] = now_iso
+                bot_stats["total_restocks"] = bot_stats.get("total_restocks", 0) + 1
+                if out_since_before:
+                    periods = entry.setdefault("oos_periods", [])
+                    periods.append({"start": out_since_before, "end": now_iso})
+                    if len(periods) > 20:
+                        entry["oos_periods"] = periods[-20:]
             elif not in_stock_now and in_stock_prev:
                 log.info("[%s] %s: out of stock again", name, variant)
 
@@ -181,6 +226,69 @@ def _price_change_suffix(prev_price: str, current_price: str) -> str:
     return f"⠀·⠀_war {prev_price}_"
 
 
+def _humanize_duration(seconds: float) -> str:
+    """Compact human-readable duration: '12 s', '4 min', '3 h', '2 T 14 h', '3 Wo'."""
+    seconds = int(seconds)
+    if seconds < 60:
+        return f"{seconds} s"
+    minutes = seconds // 60
+    if minutes < 60:
+        return f"{minutes} min"
+    hours = minutes // 60
+    if hours < 24:
+        return f"{hours} h"
+    days = hours // 24
+    if days < 14:
+        hours_rem = hours % 24
+        if hours_rem and days < 7:
+            return f"{days} T {hours_rem} h"
+        return f"{days} T"
+    return f"{days // 7} Wo"
+
+
+def _humanize_ago(iso: str) -> str:
+    if not iso:
+        return ""
+    try:
+        when = datetime.fromisoformat(iso.replace("Z", "+00:00"))
+    except (ValueError, TypeError):
+        return ""
+    delta = (datetime.now(timezone.utc) - when).total_seconds()
+    if delta < 60:
+        return "gerade eben"
+    return f"vor {_humanize_duration(delta)}"
+
+
+def _avg_oos_duration(periods: list) -> str:
+    total = 0.0
+    count = 0
+    for p in periods or []:
+        try:
+            start = datetime.fromisoformat(p["start"].replace("Z", "+00:00"))
+            end = datetime.fromisoformat(p["end"].replace("Z", "+00:00"))
+        except (ValueError, KeyError, TypeError):
+            continue
+        total += (end - start).total_seconds()
+        count += 1
+    if not count:
+        return "—"
+    return _humanize_duration(total / count)
+
+
+_SPARK_CHARS = "▁▂▃▄▅▆▇█"
+
+
+def _sparkline(values: list) -> str:
+    if not values or len(values) < 2:
+        return ""
+    lo, hi = min(values), max(values)
+    if hi == lo:
+        return _SPARK_CHARS[3] * len(values)
+    span = hi - lo
+    step = len(_SPARK_CHARS) - 1
+    return "".join(_SPARK_CHARS[min(int((v - lo) / span * step), step)] for v in values)
+
+
 def build_dashboard_embed(statuses: list[dict], usd_eur: Optional[float] = None) -> dict:
     blocks: list[str] = []
     for s in statuses:
@@ -212,6 +320,77 @@ def build_dashboard_embed(statuses: list[dict], usd_eur: Optional[float] = None)
         "color": color,
         "description": "\n\n".join(blocks) if blocks else "_keine Produkte konfiguriert_",
         "footer": {"text": "Letzter Check"},
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }
+
+
+def build_stats_embed(cfg: dict, state: dict, usd_eur: Optional[float] = None) -> dict:
+    """Persistent stats card — edited in place each run. Pin manually once."""
+    bot_stats = state.get("bot_stats", {})
+    products_state = state.get("products", {})
+
+    checks = bot_stats.get("total_checks", 0)
+    restocks = bot_stats.get("total_restocks", 0)
+    bot_lines = [
+        "📊⠀**Bot**",
+        f"├⠀Checks gesamt: **{checks:,}**".replace(",", " "),
+        f"├⠀Restocks erkannt: **{restocks}**",
+    ]
+    first_ago = _humanize_ago(bot_stats.get("first_check_at", ""))
+    last_ago = _humanize_ago(bot_stats.get("last_check_at", ""))
+    if first_ago and last_ago:
+        bot_lines.append(f"└⠀Aktiv seit: {first_ago}⠀·⠀letzter Check: {last_ago}")
+    elif last_ago:
+        bot_lines.append(f"└⠀Letzter Check: {last_ago}")
+    blocks = ["\n".join(bot_lines)]
+
+    for product in cfg.get("products") or []:
+        url = product["url"]
+        watch = product.get("watch_variants") or []
+        product_data = products_state.get(url, {})
+        for variant in watch:
+            e = product_data.get(variant)
+            if not e:
+                continue
+            lines = [f"💊⠀**{variant}**"]
+
+            if e.get("in_stock"):
+                cur = display_price(e.get("price", ""), usd_eur)
+                lines.append(f"├⠀aktuell: 🟢⠀**{cur}**" if cur else "├⠀aktuell: 🟢")
+            else:
+                lines.append(f"├⠀aktuell: 🔴⠀{_oos_label(e.get('out_since', ''))}")
+
+            low = display_price(e.get("lowest_price", ""), usd_eur)
+            high = display_price(e.get("highest_price", ""), usd_eur)
+            low_ago = _humanize_ago(e.get("lowest_price_at", ""))
+            high_ago = _humanize_ago(e.get("highest_price_at", ""))
+            if low or high:
+                low_str = f"{low} ({low_ago})" if low and low_ago else low or "—"
+                high_str = f"{high} ({high_ago})" if high and high_ago else high or "—"
+                lines.append(f"├⠀tief / hoch: {low_str} / {high_str}")
+
+            spark = _sparkline(e.get("price_history", []))
+            if spark:
+                lines.append(f"├⠀Verlauf: `{spark}`")
+
+            rc = e.get("restock_count", 0)
+            last_restock = _humanize_ago(e.get("last_restock_at", ""))
+            if rc:
+                rline = f"├⠀Restocks: **{rc}**"
+                if last_restock:
+                    rline += f"⠀·⠀letzter: {last_restock}"
+                lines.append(rline)
+
+            avg = _avg_oos_duration(e.get("oos_periods", []))
+            lines.append(f"└⠀OOS-Dauer Ø: {avg}")
+
+            blocks.append("\n".join(lines))
+
+    return {
+        "author": {"name": "✦⠀⠀bgnotify · Stats⠀⠀✦"},
+        "color": 0x5865F2,
+        "description": "\n\n".join(blocks),
+        "footer": {"text": "Auto-Update · Pin diese Nachricht damit sie oben bleibt"},
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }
 
@@ -249,6 +428,14 @@ def main() -> int:
         notif = cfg.get("notifications") or {}
         user_ids = [str(u) for u in (notif.get("ping_user_ids") or [])]
         role_ids = [str(r) for r in (notif.get("ping_role_ids") or [])]
+
+        new_stats_id = notify.edit_in_place(
+            webhook,
+            build_stats_embed(cfg, state, usd_eur=usd_eur),
+            message_id=state.get("stats_message_id", ""),
+        )
+        if new_stats_id:
+            state["stats_message_id"] = new_stats_id
 
         new_id = notify.update_dashboard(
             webhook,
