@@ -1,40 +1,28 @@
-"""Send a TEST restock alert for every configured variant.
+"""Send a restock alert per configured variant — using live BG Pharma data
+and the IDENTICAL embed/format as a real restock.
 
-Triggered via the `test-ping.yml` workflow in GitHub Actions — no need to run
-the bot locally to verify the @-mention setup. Each variant gets one alert
-embed clearly marked as a test (yellow sidebar, 🧪 header).
+Triggered via the `test-ping.yml` workflow in GitHub Actions. Use this to verify
+that:
+1. The @-mentions (`ping_user_ids` in config) are valid Discord IDs.
+2. The visual design matches what you'll see when a real restock happens.
+
+If the embed arrives but you don't get pinged: your User-ID in config is wrong.
 """
 from __future__ import annotations
 
 import logging
 import os
 import sys
-from datetime import datetime, timezone
 from pathlib import Path
 
 import yaml
 
-from . import notify
+from . import bgpharma, notify
+from .main import build_restock_embed
 
 log = logging.getLogger(__name__)
 ROOT = Path(__file__).resolve().parent.parent
 CONFIG_PATH = ROOT / "config.yml"
-
-COLOR_TEST = 0xFEE75C  # Discord yellow
-
-
-def build_test_embed(product_name: str, variant: str, link: str) -> dict:
-    return {
-        "author": {"name": "🧪⠀⠀TEST PING⠀⠀🧪"},
-        "title": variant,
-        "description": (
-            "_Dies ist ein Test der Ping- und Embed-Funktion — keine echte Verfügbarkeit._\n\n"
-            f"**[→⠀⠀Zum Produkt]({link})**"
-        ),
-        "color": COLOR_TEST,
-        "footer": {"text": product_name},
-        "timestamp": datetime.now(timezone.utc).isoformat(),
-    }
 
 
 def main() -> int:
@@ -49,21 +37,37 @@ def main() -> int:
     notif = cfg.get("notifications") or {}
     user_ids = [str(u) for u in (notif.get("ping_user_ids") or [])]
     role_ids = [str(r) for r in (notif.get("ping_role_ids") or [])]
+    log.info("pinging users=%s roles=%s", user_ids, role_ids)
 
     sent = 0
     for product in cfg.get("products") or []:
-        for variant in product.get("watch_variants") or []:
-            embed = build_test_embed(
-                product_name=product.get("name") or variant,
-                variant=variant,
-                link=product["url"],
-            )
+        url = product["url"]
+        name = product.get("name") or url
+        watch = product.get("watch_variants") or []
+        if not watch:
+            continue
+        try:
+            current = bgpharma.check(url, watch)
+        except Exception as e:
+            log.error("live check failed for %s: %s — sending fallback embed", url, e)
+            current = {v: {"deep_link": url, "price": ""} for v in watch}
+
+        for variant, info in current.items():
+            restock = {
+                "product_name": name,
+                "product_url": url,
+                "deep_link": info.get("deep_link") or url,
+                "variant": variant,
+                "price": info.get("price", ""),
+            }
+            embed = build_restock_embed(restock)
             ok = notify.send_restock_alert(webhook, embed, user_ids, role_ids)
-            log.info("test ping %s: %s", variant, "ok" if ok else "FAILED")
+            log.info("alert %s: %s", variant, "ok" if ok else "FAILED")
             if ok:
                 sent += 1
-    log.info("sent %s test alerts", sent)
-    return 0
+
+    log.info("sent %s alerts", sent)
+    return 0 if sent else 1
 
 
 if __name__ == "__main__":
