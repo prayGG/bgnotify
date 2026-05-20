@@ -33,14 +33,21 @@ jobs:
         run: |
           git config --global user.name "bgnotify-bot"
           git config --global user.email "bot@users.noreply.github.com"
-          
-          git pull --rebase --autostash origin main
-          
+
+          # Sync to latest origin without rebasing the bot's just-written state.
+          # Save state.json aside, hard-reset (gets any code commits), restore.
+          # Avoids merge conflicts entirely — the bot's freshly computed state
+          # is always the source of truth.
+          cp state.json /tmp/bot-state.json
+          git fetch origin main
+          git reset --hard origin/main
+          cp /tmp/bot-state.json state.json
+
           if git diff --quiet HEAD -- state.json; then
             echo "Keine Änderungen an state.json"
             exit 0
           fi
-          
+
           git add state.json
           git commit -m "update state"
           git push origin main
