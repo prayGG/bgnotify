@@ -45,7 +45,11 @@ def _mentions(user_ids: list[str], role_ids: list[str]) -> tuple[str, dict]:
 
 
 def update_dashboard(webhook_url: str, embed: dict, old_message_id: str = "") -> Optional[str]:
-    """Edit the existing dashboard in place; if gone, POST fresh. Returns id."""
+    """Edit the existing dashboard in place; if gone, DELETE its corpse then POST fresh.
+
+    Without the DELETE step, transient PATCH failures (rate limit, network) would
+    leave the old dashboard hanging around when we create a replacement.
+    """
     if not webhook_url:
         return None
     payload = {
@@ -57,7 +61,8 @@ def update_dashboard(webhook_url: str, embed: dict, old_message_id: str = "") ->
     if old_message_id:
         if _request("PATCH", f"{webhook_url}/messages/{old_message_id}", payload) is not None:
             return old_message_id
-        log.info("dashboard message %s gone, recreating", old_message_id)
+        log.info("dashboard %s un-editable, deleting and recreating", old_message_id)
+        _request("DELETE", f"{webhook_url}/messages/{old_message_id}", quiet_404=True)
     result = _request("POST", f"{webhook_url}?wait=true", payload)
     if result is None:
         return None
