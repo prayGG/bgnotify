@@ -76,13 +76,28 @@ def check_products(cfg: dict, state: dict) -> tuple[list[dict], list[dict]]:
             entry = prev.setdefault(variant, {})
             in_stock_prev = entry.get("in_stock")
             deep = info.get("deep_link") or url
+            new_price = info.get("price", "")
+            prev_price = entry.get("price", "")
+            now_iso = datetime.now(timezone.utc).isoformat()
+
+            # OOS bookkeeping: stamp out_since when going (or staying) out of stock.
+            if not in_stock_now and not entry.get("out_since"):
+                entry["out_since"] = now_iso
+            elif in_stock_now:
+                entry.pop("out_since", None)
+
+            # Price-change bookkeeping: remember the last different price.
+            if in_stock_now and new_price and prev_price and new_price != prev_price:
+                entry["previous_price"] = prev_price
 
             statuses.append({
                 "product_name": name,
                 "product_url": url,
                 "variant": variant,
                 "in_stock": in_stock_now,
-                "price": info.get("price", ""),
+                "price": new_price,
+                "previous_price": entry.get("previous_price", ""),
+                "out_since": entry.get("out_since", ""),
                 "found": info.get("found", False),
                 "deep_link": deep,
                 "error": False,
@@ -94,16 +109,43 @@ def check_products(cfg: dict, state: dict) -> tuple[list[dict], list[dict]]:
                 log.info("notify restock: %s", variant)
                 restocks.append({
                     "product_name": name, "product_url": url, "deep_link": deep,
-                    "variant": variant, "price": info.get("price", ""),
+                    "variant": variant, "price": new_price,
                 })
             elif not in_stock_now and in_stock_prev:
                 log.info("[%s] %s: out of stock again", name, variant)
 
             entry["in_stock"] = in_stock_now
-            entry["price"] = info.get("price", "")
+            entry["price"] = new_price
             entry["found"] = info["found"]
 
     return statuses, restocks
+
+
+def _days_since(iso: str) -> int:
+    try:
+        when = datetime.fromisoformat(iso.replace("Z", "+00:00"))
+    except ValueError:
+        return -1
+    return max(0, (datetime.now(timezone.utc) - when).days)
+
+
+def _oos_suffix(iso: str) -> str:
+    if not iso:
+        return ""
+    days = _days_since(iso)
+    if days < 0:
+        return ""
+    if days == 0:
+        return "⠀·⠀OOS seit heute"
+    if days == 1:
+        return "⠀·⠀OOS seit 1 Tag"
+    return f"⠀·⠀OOS seit {days} Tagen"
+
+
+def _price_change_suffix(prev_price: str, current_price: str) -> str:
+    if not prev_price or not current_price or prev_price == current_price:
+        return ""
+    return f"⠀·⠀_war {prev_price}_"
 
 
 def build_dashboard_embed(statuses: list[dict]) -> dict:
@@ -117,9 +159,11 @@ def build_dashboard_embed(statuses: list[dict]) -> dict:
             lines.append(f"⚠️⠀⠀{s['variant']}⠀·⠀*nicht gefunden*")
         elif s["in_stock"]:
             price = f"⠀·⠀**{s['price']}**" if s["price"] else ""
-            lines.append(f"🟢⠀⠀{s['variant']}{price}{klick}")
+            delta = _price_change_suffix(s.get("previous_price", ""), s.get("price", ""))
+            lines.append(f"🟢⠀⠀{s['variant']}{price}{delta}{klick}")
         else:
-            lines.append(f"🔴⠀⠀{s['variant']}{klick}")
+            oos = _oos_suffix(s.get("out_since", ""))
+            lines.append(f"🔴⠀⠀{s['variant']}{oos}{klick}")
 
     any_in_stock = any(s["in_stock"] for s in statuses if not s.get("error"))
     any_error = any(s.get("error") or not s.get("found") for s in statuses)

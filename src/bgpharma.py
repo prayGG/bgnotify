@@ -59,12 +59,30 @@ def _deep_link(product_url: str, attr_name: str = "", option_value: str = "") ->
     return f"{product_url}{sep}{attr_name}={quote(option_value)}"
 
 
+def _force_eur_kwargs() -> dict:
+    """GitHub Actions runners hit BG Pharma from US IPs, which auto-switches the
+    shop to USD. We override by sending cookies for the most common WooCommerce
+    currency-switcher plugins (one of them sticks) plus a `currency=EUR` query.
+    """
+    cookies = {
+        "aelia_cs_selected_currency": "EUR",
+        "wmc_current_currency": "EUR",
+        "curcy_currency": "EUR",
+        "WOOCS_CURRENT_CURRENCY": "EUR",
+        "yith_wcmcs_currency": "EUR",
+        "wc_currency": "EUR",
+    }
+    headers = {"User-Agent": UA, "Accept-Language": "de-DE,de;q=0.9,en;q=0.7"}
+    return {"headers": headers, "cookies": cookies, "timeout": 20}
+
+
+def _with_currency_param(url: str) -> str:
+    sep = "&" if "?" in url else "?"
+    return f"{url}{sep}currency=EUR"
+
+
 def _fetch(url: str, session: requests.Session) -> str:
-    r = session.get(
-        url,
-        headers={"User-Agent": UA, "Accept-Language": "en-US,en;q=0.9"},
-        timeout=20,
-    )
+    r = session.get(_with_currency_param(url), **_force_eur_kwargs())
     r.raise_for_status()
     return r.text
 
@@ -178,18 +196,19 @@ def _ajax_variation(
     option_value: str,
     referer: str,
 ) -> Optional[dict]:
-    ajax = f"{base_url}/?wc-ajax=get_variation"
+    ajax = f"{base_url}/?wc-ajax=get_variation&currency=EUR"
+    kwargs = _force_eur_kwargs()
+    kwargs["headers"] = {
+        **kwargs["headers"],
+        "X-Requested-With": "XMLHttpRequest",
+        "Referer": referer,
+        "Accept": "application/json, text/javascript, */*; q=0.01",
+    }
     try:
         r = session.post(
             ajax,
             data={"product_id": product_id, attr_name: option_value},
-            headers={
-                "User-Agent": UA,
-                "X-Requested-With": "XMLHttpRequest",
-                "Referer": referer,
-                "Accept": "application/json, text/javascript, */*; q=0.01",
-            },
-            timeout=20,
+            **kwargs,
         )
         if r.status_code >= 400:
             log.warning("ajax %s returned %s", ajax, r.status_code)
