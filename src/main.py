@@ -342,17 +342,17 @@ def build_stats_embed(cfg: dict, state: dict, usd_eur: Optional[float] = None) -
 
     checks = bot_stats.get("total_checks", 0)
     restocks = bot_stats.get("total_restocks", 0)
-    bot_lines = [
-        "📊⠀**Bot**",
-        f"├⠀Checks gesamt: **{checks:,}**".replace(",", " "),
-        f"├⠀Restocks erkannt: **{restocks}**",
-    ]
     first_ago = _humanize_ago(bot_stats.get("first_check_at", ""))
-    last_ago = _humanize_ago(bot_stats.get("last_check_at", ""))
-    if first_ago and last_ago:
-        bot_lines.append(f"└⠀Aktiv seit: {first_ago}⠀·⠀letzter Check: {last_ago}")
-    elif last_ago:
-        bot_lines.append(f"└⠀Letzter Check: {last_ago}")
+    bot_sub = [
+        f"Checks gesamt: **{checks:,}**".replace(",", " "),
+        f"Restocks erkannt: **{restocks}**",
+    ]
+    if first_ago:
+        bot_sub.append(f"Aktiv seit: {first_ago}")
+    bot_lines = ["📊⠀**Bot**"]
+    for i, line in enumerate(bot_sub):
+        prefix = "└⠀" if i == len(bot_sub) - 1 else "├⠀"
+        bot_lines.append(prefix + line)
     blocks = ["\n".join(bot_lines)]
 
     for product in cfg.get("products") or []:
