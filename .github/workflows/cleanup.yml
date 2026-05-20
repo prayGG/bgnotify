@@ -1,0 +1,22 @@
+name: cleanup
+
+on:
+  workflow_dispatch:
+    inputs:
+      message_ids:
+        description: 'Discord-Message-IDs (Komma-getrennt) — kommen aus Rechtsklick → Nachrichten-ID kopieren'
+        required: true
+        type: string
+
+jobs:
+  delete:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install -r requirements.txt
+      - run: python -m src.cleanup "${{ inputs.message_ids }}"
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}

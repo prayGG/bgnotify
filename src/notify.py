@@ -85,6 +85,13 @@ def send_restock_alert(
     return _request("POST", webhook_url, payload) is not None
 
 
+def delete_message(webhook_url: str, message_id: str) -> bool:
+    """Delete a single message by id. Returns True if it succeeded or was already gone."""
+    if not webhook_url or not message_id:
+        return False
+    return _request("DELETE", f"{webhook_url}/messages/{message_id}", quiet_404=True) is not None
+
+
 def send(webhook_url: str, content: str) -> bool:
     """Simple unpinged message — CLI test only."""
     if not webhook_url:
