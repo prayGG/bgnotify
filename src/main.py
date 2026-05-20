@@ -107,45 +107,27 @@ def check_products(cfg: dict, state: dict) -> tuple[list[dict], list[dict]]:
 
 
 def build_dashboard_embed(statuses: list[dict]) -> dict:
-    in_stock: list[dict] = []
-    out_of_stock: list[dict] = []
-    warn: list[dict] = []
+    lines: list[str] = []
     for s in statuses:
-        if s.get("error") or not s.get("found"):
-            warn.append(s)
+        if s.get("error"):
+            lines.append(f"⚠️⠀⠀{s['variant']}⠀·⠀*check failed*")
+        elif not s["found"]:
+            lines.append(f"⚠️⠀⠀{s['variant']}⠀·⠀*nicht gefunden*")
         elif s["in_stock"]:
-            in_stock.append(s)
+            price = f"⠀·⠀**{s['price']}**" if s["price"] else ""
+            lines.append(f"🟢⠀⠀{s['variant']}{price}")
         else:
-            out_of_stock.append(s)
+            lines.append(f"🔴⠀⠀{s['variant']}")
 
-    fields = []
-    if in_stock:
-        lines = []
-        for s in in_stock:
-            price = f"⠀⠀·⠀⠀**{s['price']}**" if s["price"] else ""
-            lines.append(f"●⠀⠀{s['variant']}{price}")
-        fields.append({"name": "⠀IN STOCK", "value": "\n".join(lines), "inline": False})
-
-    if out_of_stock:
-        lines = [f"○⠀⠀{s['variant']}" for s in out_of_stock]
-        fields.append({"name": "⠀OUT OF STOCK", "value": "\n".join(lines), "inline": False})
-
-    if warn:
-        lines = []
-        for s in warn:
-            reason = "check failed" if s.get("error") else "nicht gefunden"
-            lines.append(f"⚠⠀⠀{s['variant']}⠀·⠀*{reason}*")
-        fields.append({"name": "⠀HINWEIS", "value": "\n".join(lines), "inline": False})
-
-    if not fields:
-        fields.append({"name": "—", "value": "_keine Produkte konfiguriert_", "inline": False})
-
-    color = COLOR_IN_STOCK if in_stock else (COLOR_WARN if warn else COLOR_OUT)
+    any_in_stock = any(s["in_stock"] for s in statuses if not s.get("error"))
+    any_error = any(s.get("error") or not s.get("found") for s in statuses)
+    color = COLOR_WARN if any_error and not any_in_stock else (COLOR_IN_STOCK if any_in_stock else COLOR_OUT)
 
     return {
         "author": {"name": "bgpharmadrugs.to", "url": "https://bgpharmadrugs.to/"},
+        "title": "BG Pharma · Status",
         "color": color,
-        "fields": fields,
+        "description": "\n".join(lines) if lines else "_keine Produkte konfiguriert_",
         "footer": {"text": "Letzter Check"},
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }
