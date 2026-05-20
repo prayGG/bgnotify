@@ -163,7 +163,7 @@ def check_products(cfg: dict, state: dict) -> tuple[list[dict], list[dict]]:
                 "product_url": url,
                 "variant": variant,
                 "in_stock": in_stock_now,
-                "price": new_price,
+                "price": new_price or entry.get("price", ""),
                 "previous_price": entry.get("previous_price", ""),
                 "out_since": entry.get("out_since", ""),
                 "found": info.get("found", False),
