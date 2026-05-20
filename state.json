@@ -1,5 +1,10 @@
 {
-  "dashboard_message_id": "1506710968577556502",
+  "bot_stats": {
+    "first_check_at": "2026-05-20T17:40:25.140019+00:00",
+    "last_check_at": "2026-05-20T17:40:25.140019+00:00",
+    "total_checks": 1
+  },
+  "dashboard_message_id": "1506713232679768135",
   "products": {
     "https://bgpharmadrugs.to/product/peptides/": {
       "GHK CU 100 mg": {
@@ -12,9 +17,17 @@
     "https://bgpharmadrugs.to/product/roaccutane-20-mg-30-roche/": {
       "Roaccutane 20 mg 30 Roche": {
         "found": true,
+        "highest_price": "€ 38.75",
+        "highest_price_at": "2026-05-20T17:40:27.437966+00:00",
         "in_stock": true,
-        "price": "€ 38.75"
+        "lowest_price": "€ 38.75",
+        "lowest_price_at": "2026-05-20T17:40:27.437966+00:00",
+        "price": "€ 38.75",
+        "price_history": [
+          38.75
+        ]
       }
     }
-  }
+  },
+  "stats_message_id": "1506713231358431383"
 }
