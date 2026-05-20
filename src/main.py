@@ -383,15 +383,15 @@ def build_stats_embed(cfg: dict, state: dict, usd_eur: Optional[float] = None) -
             avg = _avg_oos_duration(e.get("oos_periods", []))
             lines.append(f"├⠀⏱⠀**OOS-Dauer Ø: {avg}**")
 
-            # Tief / hoch (Kontext)
+            # Tief / hoch (Kontext, je eigene Zeile)
             low = display_price(e.get("lowest_price", ""), usd_eur)
             high = display_price(e.get("highest_price", ""), usd_eur)
             low_ago = _humanize_ago(e.get("lowest_price_at", ""))
             high_ago = _humanize_ago(e.get("highest_price_at", ""))
-            if low or high:
-                low_str = f"{low} ({low_ago})" if low and low_ago else (low or "—")
-                high_str = f"{high} ({high_ago})" if high and high_ago else (high or "—")
-                lines.append(f"├⠀tief {low_str}⠀·⠀hoch {high_str}")
+            if low:
+                lines.append(f"├⠀tief {low}" + (f" ({low_ago})" if low_ago else ""))
+            if high:
+                lines.append(f"├⠀hoch {high}" + (f" ({high_ago})" if high_ago else ""))
 
             # Restocks (Abschluss)
             rc = e.get("restock_count", 0)
