@@ -1,8 +1,6 @@
 name: bot-run
 
 on:
-  schedule:
-    - cron: '*/10 * * * *'
   workflow_dispatch:
 
 permissions:
