@@ -361,7 +361,7 @@ def build_stats_embed(cfg: dict, state: dict, usd_eur: Optional[float] = None) -
             bot_sub.append(f"Aktiv seit: **{duration}**")
         except (ValueError, TypeError):
             pass
-    bot_lines = ["📊⠀**Bot**"]
+    bot_lines = ["🤖⠀**Bot**"]
     for i, line in enumerate(bot_sub):
         prefix = "└⠀" if i == len(bot_sub) - 1 else "├⠀"
         bot_lines.append(prefix + line)
