@@ -160,17 +160,18 @@ def _days_since(iso: str) -> int:
     return max(0, (datetime.now(timezone.utc) - when).days)
 
 
-def _oos_suffix(iso: str) -> str:
+def _oos_label(iso: str) -> str:
+    """OOS text (no leading separator). Used inside the └-line under each variant."""
     if not iso:
-        return ""
+        return "OOS"
     days = _days_since(iso)
     if days < 0:
-        return ""
+        return "OOS"
     if days == 0:
-        return "⠀·⠀OOS seit heute"
+        return "OOS seit heute"
     if days == 1:
-        return "⠀·⠀OOS seit 1 Tag"
-    return f"⠀·⠀OOS seit {days} Tagen"
+        return "OOS seit 1 Tag"
+    return f"OOS seit {days} Tagen"
 
 
 def _price_change_suffix(prev_price: str, current_price: str) -> str:
@@ -180,23 +181,25 @@ def _price_change_suffix(prev_price: str, current_price: str) -> str:
 
 
 def build_dashboard_embed(statuses: list[dict], usd_eur: Optional[float] = None) -> dict:
-    lines: list[str] = []
+    blocks: list[str] = []
     for s in statuses:
         link = s.get("deep_link") or s.get("product_url", "")
         klick = f"⠀·⠀[Klick]({link})" if link else ""
+
         if s.get("error"):
-            lines.append(f"⚠️⠀⠀{s['variant']}⠀·⠀*check failed*")
+            sub = f"⚠️⠀check failed"
         elif not s["found"]:
-            lines.append(f"⚠️⠀⠀{s['variant']}⠀·⠀*nicht gefunden*")
+            sub = f"⚠️⠀nicht gefunden"
         elif s["in_stock"]:
             shown_price = display_price(s.get("price", ""), usd_eur)
             shown_prev = display_price(s.get("previous_price", ""), usd_eur)
             price = f"⠀·⠀**{shown_price}**" if shown_price else ""
             delta = _price_change_suffix(shown_prev, shown_price)
-            lines.append(f"🟢⠀⠀{s['variant']}{price}{delta}{klick}")
+            sub = f"🟢⠀in stock{price}{delta}"
         else:
-            oos = _oos_suffix(s.get("out_since", ""))
-            lines.append(f"🔴⠀⠀{s['variant']}{oos}{klick}")
+            sub = f"🔴⠀{_oos_label(s.get('out_since', ''))}"
+
+        blocks.append(f"**{s['variant']}**\n└⠀{sub}{klick}")
 
     any_in_stock = any(s["in_stock"] for s in statuses if not s.get("error"))
     any_error = any(s.get("error") or not s.get("found") for s in statuses)
@@ -206,7 +209,7 @@ def build_dashboard_embed(statuses: list[dict], usd_eur: Optional[float] = None)
         "author": {"name": "bgpharmadrugs.to", "url": "https://bgpharmadrugs.to/"},
         "title": "BG Pharma · Status",
         "color": color,
-        "description": "\n".join(lines) if lines else "_keine Produkte konfiguriert_",
+        "description": "\n\n".join(blocks) if blocks else "_keine Produkte konfiguriert_",
         "footer": {"text": "Letzter Check"},
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }
