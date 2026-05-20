@@ -8,10 +8,13 @@ from __future__ import annotations
 import json
 import logging
 import os
+import re
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Optional
 
+import requests
 import yaml
 
 from . import bgpharma, notify
@@ -25,6 +28,34 @@ STATE_PATH = ROOT / "state.json"
 COLOR_IN_STOCK = 0x57F287    # Discord native green
 COLOR_OUT      = 0x95A5A6    # Discord native gray
 COLOR_WARN     = 0xFEE75C    # Discord native yellow
+
+
+def fetch_usd_eur_rate() -> Optional[float]:
+    """Daily USD->EUR rate from Frankfurter (ECB-backed, no key). None on error."""
+    try:
+        r = requests.get("https://api.frankfurter.app/latest?from=USD&to=EUR", timeout=10)
+        r.raise_for_status()
+        return float(r.json()["rates"]["EUR"])
+    except Exception as e:
+        log.warning("USD/EUR rate fetch failed: %s", e)
+        return None
+
+
+_USD_PATTERN = re.compile(r"\$\s*([\d,]+\.?\d*)")
+
+
+def display_price(raw: str, rate: Optional[float]) -> str:
+    """Convert `$X.XX` to `≈€Y.YY` if a USD price + rate available; pass through otherwise."""
+    if not raw:
+        return ""
+    m = _USD_PATTERN.search(raw)
+    if not m or rate is None:
+        return raw
+    try:
+        usd = float(m.group(1).replace(",", ""))
+    except ValueError:
+        return raw
+    return f"≈€{usd * rate:.2f}"
 
 
 def load_yaml(path: Path) -> dict:
@@ -148,7 +179,7 @@ def _price_change_suffix(prev_price: str, current_price: str) -> str:
     return f"⠀·⠀_war {prev_price}_"
 
 
-def build_dashboard_embed(statuses: list[dict]) -> dict:
+def build_dashboard_embed(statuses: list[dict], usd_eur: Optional[float] = None) -> dict:
     lines: list[str] = []
     for s in statuses:
         link = s.get("deep_link") or s.get("product_url", "")
@@ -158,8 +189,10 @@ def build_dashboard_embed(statuses: list[dict]) -> dict:
         elif not s["found"]:
             lines.append(f"⚠️⠀⠀{s['variant']}⠀·⠀*nicht gefunden*")
         elif s["in_stock"]:
-            price = f"⠀·⠀**{s['price']}**" if s["price"] else ""
-            delta = _price_change_suffix(s.get("previous_price", ""), s.get("price", ""))
+            shown_price = display_price(s.get("price", ""), usd_eur)
+            shown_prev = display_price(s.get("previous_price", ""), usd_eur)
+            price = f"⠀·⠀**{shown_price}**" if shown_price else ""
+            delta = _price_change_suffix(shown_prev, shown_price)
             lines.append(f"🟢⠀⠀{s['variant']}{price}{delta}{klick}")
         else:
             oos = _oos_suffix(s.get("out_since", ""))
@@ -179,8 +212,9 @@ def build_dashboard_embed(statuses: list[dict]) -> dict:
     }
 
 
-def build_restock_embed(restock: dict) -> dict:
-    price_line = f"### ⠀{restock['price']}\n\n" if restock.get("price") else ""
+def build_restock_embed(restock: dict, usd_eur: Optional[float] = None) -> dict:
+    shown = display_price(restock.get("price", ""), usd_eur)
+    price_line = f"### ⠀{shown}\n\n" if shown else ""
     return {
         "author": {"name": "✦⠀⠀RESTOCKED⠀⠀✦"},
         "title": restock["variant"],
@@ -204,6 +238,8 @@ def main() -> int:
         log.warning("env var %s is empty — Discord disabled", webhook_env)
 
     statuses, restocks = check_products(cfg, state)
+    usd_eur = fetch_usd_eur_rate()
+    log.info("USD->EUR rate: %s", usd_eur)
 
     if webhook:
         notif = cfg.get("notifications") or {}
@@ -212,14 +248,14 @@ def main() -> int:
 
         new_id = notify.update_dashboard(
             webhook,
-            build_dashboard_embed(statuses),
+            build_dashboard_embed(statuses, usd_eur=usd_eur),
             old_message_id=state.get("dashboard_message_id", ""),
         )
         if new_id:
             state["dashboard_message_id"] = new_id
 
         for r in restocks:
-            notify.send_restock_alert(webhook, build_restock_embed(r), user_ids, role_ids)
+            notify.send_restock_alert(webhook, build_restock_embed(r, usd_eur=usd_eur), user_ids, role_ids)
 
     save_state(state)
     return 0

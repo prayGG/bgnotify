@@ -18,7 +18,7 @@ from pathlib import Path
 import yaml
 
 from . import bgpharma, notify
-from .main import build_restock_embed
+from .main import build_restock_embed, fetch_usd_eur_rate
 
 log = logging.getLogger(__name__)
 ROOT = Path(__file__).resolve().parent.parent
@@ -38,6 +38,8 @@ def main() -> int:
     user_ids = [str(u) for u in (notif.get("ping_user_ids") or [])]
     role_ids = [str(r) for r in (notif.get("ping_role_ids") or [])]
     log.info("pinging users=%s roles=%s", user_ids, role_ids)
+
+    usd_eur = fetch_usd_eur_rate()
 
     sent = 0
     for product in cfg.get("products") or []:
@@ -60,7 +62,7 @@ def main() -> int:
                 "variant": variant,
                 "price": info.get("price", ""),
             }
-            embed = build_restock_embed(restock)
+            embed = build_restock_embed(restock, usd_eur=usd_eur)
             ok = notify.send_restock_alert(webhook, embed, user_ids, role_ids)
             log.info("alert %s: %s", variant, "ok" if ok else "FAILED")
             if ok:
