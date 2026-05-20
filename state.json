@@ -1,10 +1,18 @@
 {
   "bot_stats": {
+<<<<<<< Updated upstream
     "first_check_at": "2026-05-20T18:40:26.899279+00:00",
     "last_check_at": "2026-05-20T18:40:26.899279+00:00",
     "total_checks": 1
   },
   "dashboard_message_id": "1506728339828772895",
+=======
+    "first_check_at": "2026-05-20T17:40:25.140019+00:00",
+    "last_check_at": "2026-05-20T18:43:28.028718+00:00",
+    "total_checks": 6
+  },
+  "dashboard_message_id": "1506729102739247396",
+>>>>>>> Stashed changes
   "products": {
     "https://bgpharmadrugs.to/product/peptides/": {
       "GHK CU 100 mg": {
@@ -28,5 +36,9 @@
       }
     }
   },
+<<<<<<< Updated upstream
   "stats_message_id": "1506728339396624497"
+=======
+  "stats_message_id": "1506729100419530845"
+>>>>>>> Stashed changes
 }
