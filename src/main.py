@@ -109,15 +109,17 @@ def check_products(cfg: dict, state: dict) -> tuple[list[dict], list[dict]]:
 def build_dashboard_embed(statuses: list[dict]) -> dict:
     lines: list[str] = []
     for s in statuses:
+        link = s.get("deep_link") or s.get("product_url", "")
+        klick = f"⠀·⠀[Klick]({link})" if link else ""
         if s.get("error"):
             lines.append(f"⚠️⠀⠀{s['variant']}⠀·⠀*check failed*")
         elif not s["found"]:
             lines.append(f"⚠️⠀⠀{s['variant']}⠀·⠀*nicht gefunden*")
         elif s["in_stock"]:
             price = f"⠀·⠀**{s['price']}**" if s["price"] else ""
-            lines.append(f"🟢⠀⠀{s['variant']}{price}")
+            lines.append(f"🟢⠀⠀{s['variant']}{price}{klick}")
         else:
-            lines.append(f"🔴⠀⠀{s['variant']}")
+            lines.append(f"🔴⠀⠀{s['variant']}{klick}")
 
     any_in_stock = any(s["in_stock"] for s in statuses if not s.get("error"))
     any_error = any(s.get("error") or not s.get("found") for s in statuses)
