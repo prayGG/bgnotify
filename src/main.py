@@ -298,9 +298,15 @@ def _fmt_price_value(value: float, sample: str, rate: Optional[float]) -> str:
     return f"{value:.2f}"
 
 
+def _dashboard_sort_key(s: dict) -> int:
+    if s.get("error") or not s.get("found"):
+        return 2
+    return 0 if s["in_stock"] else 1
+
+
 def build_dashboard_embed(statuses: list[dict], usd_eur: Optional[float] = None) -> dict:
     blocks: list[str] = []
-    for s in statuses:
+    for s in sorted(statuses, key=_dashboard_sort_key):
         link = s.get("deep_link") or s.get("product_url", "")
         klick = f"⠀·⠀[Klick]({link})" if link else ""
 
