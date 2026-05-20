@@ -289,6 +289,15 @@ def _sparkline(values: list) -> str:
     return "".join(_SPARK_CHARS[min(int((v - lo) / span * step), step)] for v in values)
 
 
+def _fmt_price_value(value: float, sample: str, rate: Optional[float]) -> str:
+    """Format a numeric price using the currency style of `sample` (USD→EUR via rate)."""
+    if "$" in (sample or ""):
+        return display_price(f"${value:.2f}", rate)
+    if "€" in (sample or ""):
+        return f"€{value:.2f}"
+    return f"{value:.2f}"
+
+
 def build_dashboard_embed(statuses: list[dict], usd_eur: Optional[float] = None) -> dict:
     blocks: list[str] = []
     for s in statuses:
@@ -355,37 +364,45 @@ def build_stats_embed(cfg: dict, state: dict, usd_eur: Optional[float] = None) -
             e = product_data.get(variant)
             if not e:
                 continue
+            sample_price = e.get("price", "") or e.get("lowest_price", "")
             lines = [f"{emoji}⠀**{variant}**"]
 
-            if e.get("in_stock"):
-                cur = display_price(e.get("price", ""), usd_eur)
-                lines.append(f"├⠀aktuell: 🟢⠀**{cur}**" if cur else "├⠀aktuell: 🟢")
-            else:
-                lines.append(f"├⠀aktuell: 🔴⠀{_oos_label(e.get('out_since', ''))}")
+            # Preisverlauf — prominent: sparkline + endpoints
+            history = e.get("price_history", [])
+            spark = _sparkline(history)
+            if spark:
+                first_str = _fmt_price_value(history[0], sample_price, usd_eur)
+                last_str = _fmt_price_value(history[-1], sample_price, usd_eur)
+                trend = f"**{first_str} → {last_str}**" if first_str != last_str else f"**{first_str}**"
+                lines.append(f"├⠀📈⠀`{spark}`⠀{trend}")
+            elif history:
+                only_str = _fmt_price_value(history[0], sample_price, usd_eur)
+                lines.append(f"├⠀📈⠀**{only_str}**")
 
+            # OOS-Dauer Ø — prominent
+            avg = _avg_oos_duration(e.get("oos_periods", []))
+            lines.append(f"├⠀⏱⠀**OOS-Dauer Ø: {avg}**")
+
+            # Tief / hoch (Kontext)
             low = display_price(e.get("lowest_price", ""), usd_eur)
             high = display_price(e.get("highest_price", ""), usd_eur)
             low_ago = _humanize_ago(e.get("lowest_price_at", ""))
             high_ago = _humanize_ago(e.get("highest_price_at", ""))
             if low or high:
-                low_str = f"{low} ({low_ago})" if low and low_ago else low or "—"
-                high_str = f"{high} ({high_ago})" if high and high_ago else high or "—"
-                lines.append(f"├⠀tief / hoch: {low_str} / {high_str}")
+                low_str = f"{low} ({low_ago})" if low and low_ago else (low or "—")
+                high_str = f"{high} ({high_ago})" if high and high_ago else (high or "—")
+                lines.append(f"├⠀tief {low_str}⠀·⠀hoch {high_str}")
 
-            spark = _sparkline(e.get("price_history", []))
-            if spark:
-                lines.append(f"├⠀Verlauf: `{spark}`")
-
+            # Restocks (Abschluss)
             rc = e.get("restock_count", 0)
             last_restock = _humanize_ago(e.get("last_restock_at", ""))
             if rc:
-                rline = f"├⠀Restocks: **{rc}**"
+                rline = f"└⠀🔄⠀**{rc} Restocks**"
                 if last_restock:
-                    rline += f"⠀·⠀letzter: {last_restock}"
+                    rline += f"⠀·⠀letzter {last_restock}"
                 lines.append(rline)
-
-            avg = _avg_oos_duration(e.get("oos_periods", []))
-            lines.append(f"└⠀OOS-Dauer Ø: {avg}")
+            else:
+                lines.append("└⠀🔄⠀noch keine Restocks erkannt")
 
             blocks.append("\n".join(lines))
 
