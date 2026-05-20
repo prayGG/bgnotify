@@ -2,9 +2,9 @@
 
 Two message types, each with a focused job:
 
-- `update_dashboard(embed, old_id)` — persistent status board, **always edits
-  in place** (silent). Discord doesn't push notifications for edits, so this
-  never spams. If the old message is gone, falls back to a fresh POST.
+- `edit_in_place(embed, message_id)` — persistent dashboards (status + stats),
+  PATCHed silently each run. Discord doesn't push notifications for edits, so
+  this never spams. POSTs a fresh message if the saved id is missing or 404.
 
 - `send_restock_alert(embed, user_ids)` — one new POST per restocked variant.
   Includes `<@user_id>` in the content so Discord pings the listed users.
@@ -42,29 +42,6 @@ def _mentions(user_ids: list[str], role_ids: list[str]) -> tuple[str, dict]:
     role_ids = [str(r) for r in role_ids]
     parts = [f"<@{u}>" for u in user_ids] + [f"<@&{r}>" for r in role_ids]
     return " ".join(parts), {"users": user_ids, "roles": role_ids}
-
-
-def update_dashboard(webhook_url: str, embed: dict, old_message_id: str = "") -> Optional[str]:
-    """Delete the previous dashboard (if any) then POST a fresh one.
-
-    Always reposts so the message stays at the bottom of the channel. No mentions
-    in the payload, so reposting does not push @-notifications to users — they
-    only get pinged by the separate restock-alert messages.
-    """
-    if not webhook_url:
-        return None
-    if old_message_id:
-        _request("DELETE", f"{webhook_url}/messages/{old_message_id}", quiet_404=True)
-
-    payload = {
-        "username": "bgnotify by pray",
-        "embeds": [embed],
-        "allowed_mentions": {"parse": []},
-    }
-    result = _request("POST", f"{webhook_url}?wait=true", payload)
-    if result is None:
-        return None
-    return str(result.get("id") or "") or None
 
 
 def edit_in_place(webhook_url: str, embed: dict, message_id: str = "") -> Optional[str]:

@@ -462,10 +462,10 @@ def main() -> int:
         if new_stats_id:
             state["stats_message_id"] = new_stats_id
 
-        new_id = notify.update_dashboard(
+        new_id = notify.edit_in_place(
             webhook,
             build_dashboard_embed(statuses, usd_eur=usd_eur),
-            old_message_id=state.get("dashboard_message_id", ""),
+            message_id=state.get("dashboard_message_id", ""),
         )
         if new_id:
             state["dashboard_message_id"] = new_id
