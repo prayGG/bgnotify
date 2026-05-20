@@ -367,6 +367,7 @@ def build_stats_embed(cfg: dict, state: dict, usd_eur: Optional[float] = None) -
         bot_lines.append(prefix + line)
     blocks = ["\n".join(bot_lines)]
 
+    entries: list[tuple[str, str, dict]] = []
     for product in cfg.get("products") or []:
         url = product["url"]
         watch = product.get("watch_variants") or []
@@ -376,47 +377,48 @@ def build_stats_embed(cfg: dict, state: dict, usd_eur: Optional[float] = None) -
             e = product_data.get(variant)
             if not e:
                 continue
-            sample_price = e.get("price", "") or e.get("lowest_price", "")
-            lines = [f"{emoji}⠀**{variant}**"]
+            entries.append((emoji, variant, e))
 
-            # Preisverlauf — prominent: sparkline + endpoints
-            history = e.get("price_history", [])
-            spark = _sparkline(history)
-            if spark:
-                first_str = _fmt_price_value(history[0], sample_price, usd_eur)
-                last_str = _fmt_price_value(history[-1], sample_price, usd_eur)
-                trend = f"**{first_str} → {last_str}**" if first_str != last_str else f"**{first_str}**"
-                lines.append(f"├⠀📈⠀`{spark}`⠀{trend}")
-            elif history:
-                only_str = _fmt_price_value(history[0], sample_price, usd_eur)
-                lines.append(f"├⠀📈⠀**{only_str}**")
+    entries.sort(key=lambda t: 0 if t[2].get("in_stock") else 1)
 
-            # OOS-Dauer Ø — prominent
-            avg = _avg_oos_duration(e.get("oos_periods", []))
-            lines.append(f"├⠀⏱⠀**OOS-Dauer Ø: {avg}**")
+    for emoji, variant, e in entries:
+        sample_price = e.get("price", "") or e.get("lowest_price", "")
+        lines = [f"{emoji}⠀**{variant}**"]
 
-            # Tief / hoch (Kontext, je eigene Zeile)
-            low = display_price(e.get("lowest_price", ""), usd_eur)
-            high = display_price(e.get("highest_price", ""), usd_eur)
-            low_ago = _humanize_ago(e.get("lowest_price_at", ""))
-            high_ago = _humanize_ago(e.get("highest_price_at", ""))
-            if low:
-                lines.append(f"├⠀tief {low}" + (f" ({low_ago})" if low_ago else ""))
-            if high:
-                lines.append(f"├⠀hoch {high}" + (f" ({high_ago})" if high_ago else ""))
+        history = e.get("price_history", [])
+        spark = _sparkline(history)
+        if spark:
+            first_str = _fmt_price_value(history[0], sample_price, usd_eur)
+            last_str = _fmt_price_value(history[-1], sample_price, usd_eur)
+            trend = f"**{first_str} → {last_str}**" if first_str != last_str else f"**{first_str}**"
+            lines.append(f"├⠀📈⠀`{spark}`⠀{trend}")
+        elif history:
+            only_str = _fmt_price_value(history[0], sample_price, usd_eur)
+            lines.append(f"├⠀📈⠀**{only_str}**")
 
-            # Restocks (Abschluss)
-            rc = e.get("restock_count", 0)
-            last_restock = _humanize_ago(e.get("last_restock_at", ""))
-            if rc:
-                rline = f"└⠀🔄⠀**{rc} Restocks**"
-                if last_restock:
-                    rline += f"⠀·⠀letzter {last_restock}"
-                lines.append(rline)
-            else:
-                lines.append("└⠀🔄⠀noch keine Restocks erkannt")
+        avg = _avg_oos_duration(e.get("oos_periods", []))
+        lines.append(f"├⠀⏱⠀**OOS-Dauer Ø: {avg}**")
 
-            blocks.append("\n".join(lines))
+        low = display_price(e.get("lowest_price", ""), usd_eur)
+        high = display_price(e.get("highest_price", ""), usd_eur)
+        low_ago = _humanize_ago(e.get("lowest_price_at", ""))
+        high_ago = _humanize_ago(e.get("highest_price_at", ""))
+        if low:
+            lines.append(f"├⠀tief {low}" + (f" ({low_ago})" if low_ago else ""))
+        if high:
+            lines.append(f"├⠀hoch {high}" + (f" ({high_ago})" if high_ago else ""))
+
+        rc = e.get("restock_count", 0)
+        last_restock = _humanize_ago(e.get("last_restock_at", ""))
+        if rc:
+            rline = f"└⠀🔄⠀**{rc} Restocks**"
+            if last_restock:
+                rline += f"⠀·⠀letzter {last_restock}"
+            lines.append(rline)
+        else:
+            lines.append("└⠀🔄⠀noch keine Restocks erkannt")
+
+        blocks.append("\n".join(lines))
 
     return {
         "author": {"name": "✦⠀⠀bgnotify · Stats⠀⠀✦"},
