@@ -349,12 +349,13 @@ def build_stats_embed(cfg: dict, state: dict, usd_eur: Optional[float] = None) -
     for product in cfg.get("products") or []:
         url = product["url"]
         watch = product.get("watch_variants") or []
+        emoji = product.get("emoji") or "💊"
         product_data = products_state.get(url, {})
         for variant in watch:
             e = product_data.get(variant)
             if not e:
                 continue
-            lines = [f"💊⠀**{variant}**"]
+            lines = [f"{emoji}⠀**{variant}**"]
 
             if e.get("in_stock"):
                 cur = display_price(e.get("price", ""), usd_eur)

@@ -16,6 +16,7 @@ notifications:
 products:
   - name: "GHK CU"
     url: "https://bgpharmadrugs.to/product/peptides/"
+    emoji: "🧪"
     watch_variants:
       - "GHK CU 100 mg"
 
