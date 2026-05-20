@@ -146,7 +146,8 @@ def check_products(cfg: dict, state: dict) -> tuple[list[dict], list[dict]]:
                 log.info("[%s] %s: out of stock again", name, variant)
 
             entry["in_stock"] = in_stock_now
-            entry["price"] = new_price
+            if new_price:
+                entry["price"] = new_price
             entry["found"] = info["found"]
 
     return statuses, restocks
