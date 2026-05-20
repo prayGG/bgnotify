@@ -20,6 +20,24 @@ products:
     watch_variants:
       - "GHK CU 100 mg"
 
+  - name: "Tirzepatide"
+    url: "https://bgpharmadrugs.to/product/peptides/"
+    emoji: "💉"
+    watch_variants:
+      - "Tirzepatide 30 mg"
+
+  - name: "Retatrutide"
+    url: "https://bgpharmadrugs.to/product/peptides/"
+    emoji: "💉"
+    watch_variants:
+      - "Retatrutide 30 mg"
+
+  - name: "Modafinil"
+    url: "https://bgpharmadrugs.to/product/modafinil/"
+    emoji: "💊"
+    watch_variants:
+      - "ASPENDOS tablets 100 mg * 30 Medochemie"
+
   - name: "Roaccutane 20 mg (Roche)"
     url: "https://bgpharmadrugs.to/product/roaccutane-20-mg-30-roche/"
     watch_variants:
