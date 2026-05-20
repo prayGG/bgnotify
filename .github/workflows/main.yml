@@ -15,14 +15,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}  # explizit machen
-          fetch-depth: 0   # wichtig für pull/rebase
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
 
-      - uses: actions/setup-python@v5
+      - name: Setup Python
+        uses: actions/setup-python@v5
         with:
           python-version: '3.12'
 
-      - run: pip install -r requirements.txt
+      - name: Install dependencies
+        run: pip install -r requirements.txt
 
       - name: Run Bot
         run: python -m src.main
@@ -34,10 +36,8 @@ jobs:
           git config --global user.name "bgnotify-bot"
           git config --global user.email "bot@users.noreply.github.com"
           
-          # Wichtig: Änderungen vom Remote holen
           git pull --rebase --autostash origin main
           
-          # Nur committen, wenn es wirklich Änderungen gibt
           if git diff --quiet HEAD -- state.json; then
             echo "Keine Änderungen an state.json"
             exit 0
