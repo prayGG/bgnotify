@@ -342,13 +342,19 @@ def build_stats_embed(cfg: dict, state: dict, usd_eur: Optional[float] = None) -
 
     checks = bot_stats.get("total_checks", 0)
     restocks = bot_stats.get("total_restocks", 0)
-    first_ago = _humanize_ago(bot_stats.get("first_check_at", ""))
     bot_sub = [
         f"Checks gesamt: **{checks:,}**".replace(",", " "),
         f"Restocks erkannt: **{restocks}**",
     ]
-    if first_ago:
-        bot_sub.append(f"Aktiv seit: {first_ago}")
+    first_iso = bot_stats.get("first_check_at", "")
+    if first_iso:
+        try:
+            when = datetime.fromisoformat(first_iso.replace("Z", "+00:00"))
+            delta = (datetime.now(timezone.utc) - when).total_seconds()
+            duration = _humanize_duration(delta) if delta >= 60 else "<1 min"
+            bot_sub.append(f"Aktiv seit: **{duration}**")
+        except (ValueError, TypeError):
+            pass
     bot_lines = ["📊⠀**Bot**"]
     for i, line in enumerate(bot_sub):
         prefix = "└⠀" if i == len(bot_sub) - 1 else "├⠀"
