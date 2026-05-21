@@ -1,8 +1,9 @@
 {
   "bot_stats": {
     "first_check_at": "2026-05-20T18:50:44.075159+00:00",
-    "last_check_at": "2026-05-21T17:20:24.145925+00:00",
-    "total_checks": 136
+    "last_check_at": "2026-05-21T17:30:32.717886+00:00",
+    "total_checks": 137,
+    "total_restocks": 2
   },
   "dashboard_message_id": "1506829009093132288",
   "products": {
@@ -25,13 +26,43 @@
     "https://bgpharmadrugs.to/product/peptides/": {
       "GHK CU 100 mg": {
         "found": true,
-        "in_stock": false,
-        "out_since": "2026-05-20T18:50:45.448321+00:00"
+        "highest_price": "€ 17.20",
+        "highest_price_at": "2026-05-21T17:30:34.335398+00:00",
+        "in_stock": true,
+        "last_restock_at": "2026-05-21T17:30:34.335398+00:00",
+        "lowest_price": "€ 17.20",
+        "lowest_price_at": "2026-05-21T17:30:34.335398+00:00",
+        "oos_periods": [
+          {
+            "end": "2026-05-21T17:30:34.335398+00:00",
+            "start": "2026-05-20T18:50:45.448321+00:00"
+          }
+        ],
+        "price": "€ 17.20",
+        "price_history": [
+          17.2
+        ],
+        "restock_count": 1
       },
       "Retatrutide 30 mg": {
         "found": true,
-        "in_stock": false,
-        "out_since": "2026-05-20T20:10:29.439659+00:00"
+        "highest_price": "€ 68.79",
+        "highest_price_at": "2026-05-21T17:30:36.979310+00:00",
+        "in_stock": true,
+        "last_restock_at": "2026-05-21T17:30:36.979310+00:00",
+        "lowest_price": "€ 68.79",
+        "lowest_price_at": "2026-05-21T17:30:36.979310+00:00",
+        "oos_periods": [
+          {
+            "end": "2026-05-21T17:30:36.979310+00:00",
+            "start": "2026-05-20T20:10:29.439659+00:00"
+          }
+        ],
+        "price": "€ 68.79",
+        "price_history": [
+          68.79
+        ],
+        "restock_count": 1
       },
       "Tirzepatide 30 mg": {
         "found": true,
