@@ -1,8 +1,8 @@
 {
   "bot_stats": {
     "first_check_at": "2026-05-20T18:50:44.075159+00:00",
-    "last_check_at": "2026-05-22T03:10:25.251783+00:00",
-    "total_checks": 195,
+    "last_check_at": "2026-05-22T03:20:23.229838+00:00",
+    "total_checks": 196,
     "total_restocks": 2
   },
   "dashboard_message_id": "1506829009093132288",
@@ -15,19 +15,20 @@
         "in_stock": true,
         "lowest_price": "€ 42.14",
         "lowest_price_at": "2026-05-21T06:10:30.130621+00:00",
-        "previous_price": "€ 42.20",
-        "price": "€ 42.14",
+        "previous_price": "€ 42.14",
+        "price": "€ 42.16",
         "price_history": [
           42.2,
-          42.14
+          42.14,
+          42.16
         ]
       }
     },
     "https://bgpharmadrugs.to/product/peptides/": {
       "GHK CU 100 mg": {
         "found": true,
-        "highest_price": "€ 17.20",
-        "highest_price_at": "2026-05-21T17:30:34.335398+00:00",
+        "highest_price": "€ 17.21",
+        "highest_price_at": "2026-05-22T03:20:24.857295+00:00",
         "in_stock": true,
         "last_restock_at": "2026-05-21T17:30:34.335398+00:00",
         "lowest_price": "€ 17.20",
@@ -38,16 +39,18 @@
             "start": "2026-05-20T18:50:45.448321+00:00"
           }
         ],
-        "price": "€ 17.20",
+        "previous_price": "€ 17.20",
+        "price": "€ 17.21",
         "price_history": [
-          17.2
+          17.2,
+          17.21
         ],
         "restock_count": 1
       },
       "Retatrutide 30 mg": {
         "found": true,
-        "highest_price": "€ 68.79",
-        "highest_price_at": "2026-05-21T17:30:36.979310+00:00",
+        "highest_price": "€ 68.83",
+        "highest_price_at": "2026-05-22T03:20:27.865162+00:00",
         "in_stock": true,
         "last_restock_at": "2026-05-21T17:30:36.979310+00:00",
         "lowest_price": "€ 68.79",
@@ -58,9 +61,11 @@
             "start": "2026-05-20T20:10:29.439659+00:00"
           }
         ],
-        "price": "€ 68.79",
+        "previous_price": "€ 68.79",
+        "price": "€ 68.83",
         "price_history": [
-          68.79
+          68.79,
+          68.83
         ],
         "restock_count": 1
       },
@@ -71,11 +76,12 @@
         "in_stock": true,
         "lowest_price": "€ 42.99",
         "lowest_price_at": "2026-05-21T06:10:27.982793+00:00",
-        "previous_price": "€ 43.06",
-        "price": "€ 42.99",
+        "previous_price": "€ 42.99",
+        "price": "€ 43.02",
         "price_history": [
           43.06,
-          42.99
+          42.99,
+          43.02
         ]
       }
     },
@@ -87,11 +93,12 @@
         "in_stock": true,
         "lowest_price": "€ 38.70",
         "lowest_price_at": "2026-05-21T06:10:30.892917+00:00",
-        "previous_price": "€ 38.75",
-        "price": "€ 38.70",
+        "previous_price": "€ 38.70",
+        "price": "€ 38.72",
         "price_history": [
           38.75,
-          38.7
+          38.7,
+          38.72
         ]
       }
     }
