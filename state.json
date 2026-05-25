@@ -1,8 +1,8 @@
 {
   "bot_stats": {
     "first_check_at": "2026-05-20T18:50:44.075159+00:00",
-    "last_check_at": "2026-05-25T19:40:22.598477+00:00",
-    "total_checks": 724,
+    "last_check_at": "2026-05-25T19:50:24.167109+00:00",
+    "total_checks": 725,
     "total_restocks": 7
   },
   "dashboard_message_id": "1506829009093132288",
@@ -12,7 +12,7 @@
         "found": true,
         "highest_price": "€ 42.20",
         "highest_price_at": "2026-05-20T20:10:30.624120+00:00",
-        "in_stock": true,
+        "in_stock": false,
         "last_restock_at": "2026-05-23T00:00:41.820341+00:00",
         "lowest_price": "€ 42.14",
         "lowest_price_at": "2026-05-21T06:10:30.130621+00:00",
@@ -22,6 +22,7 @@
             "start": "2026-05-22T22:50:24.250066+00:00"
           }
         ],
+        "out_since": "2026-05-25T19:50:25.815231+00:00",
         "previous_price": "€ 42.14",
         "price": "€ 42.16",
         "price_history": [
@@ -37,7 +38,7 @@
         "found": true,
         "highest_price": "€ 17.21",
         "highest_price_at": "2026-05-22T03:20:24.857295+00:00",
-        "in_stock": true,
+        "in_stock": false,
         "last_restock_at": "2026-05-23T00:00:37.779988+00:00",
         "lowest_price": "€ 17.20",
         "lowest_price_at": "2026-05-21T17:30:34.335398+00:00",
@@ -51,6 +52,7 @@
             "start": "2026-05-22T22:50:22.981450+00:00"
           }
         ],
+        "out_since": "2026-05-25T19:50:24.609691+00:00",
         "previous_price": "€ 17.20",
         "price": "€ 17.21",
         "price_history": [
@@ -63,7 +65,7 @@
         "found": true,
         "highest_price": "€ 68.83",
         "highest_price_at": "2026-05-22T03:20:27.865162+00:00",
-        "in_stock": true,
+        "in_stock": false,
         "last_restock_at": "2026-05-23T00:00:40.762358+00:00",
         "lowest_price": "€ 68.79",
         "lowest_price_at": "2026-05-21T17:30:36.979310+00:00",
@@ -77,6 +79,7 @@
             "start": "2026-05-22T22:50:23.804493+00:00"
           }
         ],
+        "out_since": "2026-05-25T19:50:25.406606+00:00",
         "previous_price": "€ 68.79",
         "price": "€ 68.83",
         "price_history": [
@@ -89,7 +92,7 @@
         "found": true,
         "highest_price": "€ 43.06",
         "highest_price_at": "2026-05-20T20:10:28.063486+00:00",
-        "in_stock": true,
+        "in_stock": false,
         "last_restock_at": "2026-05-23T00:00:39.342602+00:00",
         "lowest_price": "€ 42.99",
         "lowest_price_at": "2026-05-21T06:10:27.982793+00:00",
@@ -99,6 +102,7 @@
             "start": "2026-05-22T22:50:23.396712+00:00"
           }
         ],
+        "out_since": "2026-05-25T19:50:25.045206+00:00",
         "previous_price": "€ 42.99",
         "price": "€ 43.02",
         "price_history": [
@@ -114,7 +118,7 @@
         "found": true,
         "highest_price": "€ 38.75",
         "highest_price_at": "2026-05-20T18:50:46.223098+00:00",
-        "in_stock": true,
+        "in_stock": false,
         "last_restock_at": "2026-05-23T00:00:42.883259+00:00",
         "lowest_price": "€ 38.70",
         "lowest_price_at": "2026-05-21T06:10:30.892917+00:00",
@@ -124,6 +128,7 @@
             "start": "2026-05-22T22:50:24.661515+00:00"
           }
         ],
+        "out_since": "2026-05-25T19:50:26.177976+00:00",
         "previous_price": "€ 38.70",
         "price": "€ 38.72",
         "price_history": [
