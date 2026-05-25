@@ -1,8 +1,8 @@
 {
   "bot_stats": {
     "first_check_at": "2026-05-20T18:50:44.075159+00:00",
-    "last_check_at": "2026-05-25T20:50:21.764121+00:00",
-    "total_checks": 731,
+    "last_check_at": "2026-05-25T21:00:33.437076+00:00",
+    "total_checks": 732,
     "total_restocks": 12
   },
   "dashboard_message_id": "1506829009093132288",
@@ -26,12 +26,13 @@
             "start": "2026-05-25T19:50:25.815231+00:00"
           }
         ],
-        "previous_price": "€ 42.14",
-        "price": "€ 42.16",
+        "previous_price": "€ 42.16",
+        "price": "€ 42.17",
         "price_history": [
           42.2,
           42.14,
-          42.16
+          42.16,
+          42.17
         ],
         "restock_count": 2
       }
@@ -69,8 +70,8 @@
       },
       "Retatrutide 30 mg": {
         "found": true,
-        "highest_price": "€ 68.83",
-        "highest_price_at": "2026-05-22T03:20:27.865162+00:00",
+        "highest_price": "€ 68.85",
+        "highest_price_at": "2026-05-25T21:00:37.227567+00:00",
         "in_stock": true,
         "last_restock_at": "2026-05-25T20:50:25.751727+00:00",
         "lowest_price": "€ 68.79",
@@ -89,11 +90,12 @@
             "start": "2026-05-25T19:50:25.406606+00:00"
           }
         ],
-        "previous_price": "€ 68.79",
-        "price": "€ 68.83",
+        "previous_price": "€ 68.83",
+        "price": "€ 68.85",
         "price_history": [
           68.79,
-          68.83
+          68.83,
+          68.85
         ],
         "restock_count": 3
       },
@@ -115,12 +117,13 @@
             "start": "2026-05-25T19:50:25.045206+00:00"
           }
         ],
-        "previous_price": "€ 42.99",
-        "price": "€ 43.02",
+        "previous_price": "€ 43.02",
+        "price": "€ 43.03",
         "price_history": [
           43.06,
           42.99,
-          43.02
+          43.02,
+          43.03
         ],
         "restock_count": 2
       }
@@ -144,12 +147,13 @@
             "start": "2026-05-25T19:50:26.177976+00:00"
           }
         ],
-        "previous_price": "€ 38.70",
-        "price": "€ 38.72",
+        "previous_price": "€ 38.72",
+        "price": "€ 38.73",
         "price_history": [
           38.75,
           38.7,
-          38.72
+          38.72,
+          38.73
         ],
         "restock_count": 2
       }
