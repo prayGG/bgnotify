@@ -188,6 +188,11 @@ def _lookup_option_value(attr_options: dict[str, dict[str, str]], wanted: str) -
     return None
 
 
+class AjaxError(Exception):
+    """Transient ajax failure (HTTP/network/JSON) — distinct from a legitimate
+    `null` response meaning 'no variation matched'."""
+
+
 def _ajax_variation(
     session: requests.Session,
     base_url: str,
@@ -196,6 +201,8 @@ def _ajax_variation(
     option_value: str,
     referer: str,
 ) -> Optional[dict]:
+    """Return variation dict, or None if WooCommerce confirmed no match.
+    Raises AjaxError on transient failures (HTTP error, network, bad JSON)."""
     ajax = f"{base_url}/?wc-ajax=get_variation&currency=EUR"
     kwargs = _force_eur_kwargs()
     kwargs["headers"] = {
@@ -210,20 +217,21 @@ def _ajax_variation(
             data={"product_id": product_id, attr_name: option_value},
             **kwargs,
         )
-        if r.status_code >= 400:
-            log.warning("ajax %s returned %s", ajax, r.status_code)
-            return None
-        if not r.content:
-            return None
+    except requests.RequestException as e:
+        raise AjaxError(f"network error: {e}") from e
+    if r.status_code >= 400:
+        raise AjaxError(f"http {r.status_code}")
+    if not r.content:
+        raise AjaxError("empty body")
+    try:
         data = r.json()
-        if data is False or data is None:
-            return None
-        if isinstance(data, dict) and "variation_id" in data:
-            return data
-        return None
-    except (requests.RequestException, json.JSONDecodeError) as e:
-        log.error("ajax error for %s=%s: %s", attr_name, option_value, e)
-        return None
+    except json.JSONDecodeError as e:
+        raise AjaxError(f"bad json: {e}") from e
+    if data is False or data is None:
+        return None  # legitimate "no variation matched"
+    if isinstance(data, dict) and "variation_id" in data:
+        return data
+    raise AjaxError(f"unexpected payload shape: {type(data).__name__}")
 
 
 def _check_variable(
@@ -262,7 +270,15 @@ def _check_variable(
             continue
         attr_name, option_value = match
         deep = _deep_link(url, attr_name, option_value)
-        data = _ajax_variation(session, base, product_id, attr_name, option_value, referer=url)
+        try:
+            data = _ajax_variation(session, base, product_id, attr_name, option_value, referer=url)
+        except AjaxError as e:
+            # Transient failure — flag as not-found so caller preserves last
+            # known state instead of recording a false OOS (which would later
+            # be misread as a restock when ajax recovers).
+            log.warning("ajax transient error for %r: %s", name, e)
+            out[name] = _not_found(deep)
+            continue
         if data is None:
             # No matching variation → "Sorry, no products matched your selection"
             out[name] = {"found": True, "in_stock": False, "price": "", "variation_id": None, "deep_link": deep}

@@ -122,10 +122,28 @@ def check_products(cfg: dict, state: dict) -> tuple[list[dict], list[dict]]:
             continue
 
         for variant, info in current.items():
-            in_stock_now = bool(info["in_stock"])
             entry = prev.setdefault(variant, {})
-            in_stock_prev = entry.get("in_stock")
             deep = info.get("deep_link") or url
+
+            # Variant lookup failed (missing variations_form, dropdown option
+            # gone, ajax transient error). Treat as "unknown" — preserve last
+            # known state so a partial site outage doesn't flip everything to
+            # OOS and then fire a false restock on the next successful check.
+            if not info.get("found"):
+                statuses.append({
+                    "product_name": name, "product_url": url, "variant": variant,
+                    "in_stock": bool(entry.get("in_stock")),
+                    "price": entry.get("price", ""),
+                    "previous_price": entry.get("previous_price", ""),
+                    "out_since": entry.get("out_since", ""),
+                    "found": False,
+                    "deep_link": deep,
+                    "error": True,
+                })
+                continue
+
+            in_stock_now = bool(info["in_stock"])
+            in_stock_prev = entry.get("in_stock")
             new_price = info.get("price", "")
             prev_price = entry.get("price", "")
             now_iso = datetime.now(timezone.utc).isoformat()
@@ -166,7 +184,7 @@ def check_products(cfg: dict, state: dict) -> tuple[list[dict], list[dict]]:
                 "price": new_price or entry.get("price", ""),
                 "previous_price": entry.get("previous_price", ""),
                 "out_since": entry.get("out_since", ""),
-                "found": info.get("found", False),
+                "found": True,
                 "deep_link": deep,
                 "error": False,
             })
@@ -193,7 +211,7 @@ def check_products(cfg: dict, state: dict) -> tuple[list[dict], list[dict]]:
             entry["in_stock"] = in_stock_now
             if new_price:
                 entry["price"] = new_price
-            entry["found"] = info["found"]
+            entry["found"] = True
 
     return statuses, restocks
 
