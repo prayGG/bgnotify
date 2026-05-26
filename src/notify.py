@@ -14,27 +14,57 @@ from __future__ import annotations
 import logging
 import os
 import sys
+import time
 from typing import Optional
 
 import requests
 
 log = logging.getLogger(__name__)
 
+_MAX_ATTEMPTS = 3
+
 
 def _request(method: str, url: str, payload: Optional[dict] = None, *, quiet_404: bool = False) -> Optional[dict]:
-    try:
-        r = requests.request(method, url, json=payload if payload is not None else None, timeout=15)
+    """Send Discord webhook request with retries for 429/5xx/network errors.
+
+    Returns parsed JSON on success, {} on 404 (when quiet_404) or empty body,
+    None when all attempts failed. Retries respect Discord's `retry_after` on
+    429 and use exponential backoff on 5xx and network errors.
+    """
+    for attempt in range(_MAX_ATTEMPTS):
+        try:
+            r = requests.request(method, url, json=payload if payload is not None else None, timeout=15)
+        except requests.RequestException as e:
+            if attempt < _MAX_ATTEMPTS - 1:
+                wait = 2 ** attempt
+                log.warning("discord %s network error, retry in %ds: %s", method, wait, e)
+                time.sleep(wait)
+                continue
+            log.error("discord %s failed: %s", method, e)
+            return None
+
         if r.status_code == 404 and quiet_404:
             return {}
+        if r.status_code == 429 and attempt < _MAX_ATTEMPTS - 1:
+            try:
+                wait = float(r.json().get("retry_after", 1.0))
+            except (ValueError, requests.JSONDecodeError):
+                wait = 1.0
+            log.warning("discord rate-limited, sleeping %.2fs", wait)
+            time.sleep(min(wait, 10.0))
+            continue
+        if 500 <= r.status_code < 600 and attempt < _MAX_ATTEMPTS - 1:
+            wait = 2 ** attempt
+            log.warning("discord %s %s, retry in %ds", method, r.status_code, wait)
+            time.sleep(wait)
+            continue
         if r.status_code >= 400:
             log.error("discord %s %s: %s", method, r.status_code, r.text[:300])
             return None
         if not r.content:
             return {}
         return r.json()
-    except requests.RequestException as e:
-        log.error("discord %s failed: %s", method, e)
-        return None
+    return None
 
 
 def _mentions(user_ids: list[str], role_ids: list[str]) -> tuple[str, dict]:
@@ -82,6 +112,18 @@ def send_restock_alert(
         "content": prefix,
         "embeds": [embed],
         "allowed_mentions": allowed,
+    }
+    return _request("POST", webhook_url, payload) is not None
+
+
+def send_update_announcement(webhook_url: str, embed: dict) -> bool:
+    """One-shot deploy/update announcement to the updates channel."""
+    if not webhook_url:
+        return False
+    payload = {
+        "username": "bgnotify deploys",
+        "embeds": [embed],
+        "allowed_mentions": {"parse": []},
     }
     return _request("POST", webhook_url, payload) is not None
 

@@ -9,6 +9,7 @@ import json
 import logging
 import os
 import re
+import subprocess
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -168,10 +169,17 @@ def check_products(cfg: dict, state: dict) -> tuple[list[dict], list[dict]]:
             current = _check_combined(urls, watch) if len(urls) > 1 else bgpharma.check(url, watch)
         except Exception as e:
             log.error("check failed for %s: %s", url, e)
+            # Whole-product scrape failed — surface last known state so the
+            # dashboard doesn't black out during a transient site outage.
             for variant in watch or ["(unknown)"]:
+                prev_variant = prev.get(variant, {})
                 statuses.append({
                     "product_name": name, "product_url": url, "variant": variant,
-                    "in_stock": False, "price": "", "found": False,
+                    "in_stock": bool(prev_variant.get("in_stock")),
+                    "price": prev_variant.get("price", ""),
+                    "previous_price": prev_variant.get("previous_price", ""),
+                    "out_since": prev_variant.get("out_since", ""),
+                    "found": False,
                     "deep_link": url, "error": True,
                 })
             continue
@@ -264,9 +272,24 @@ def check_products(cfg: dict, state: dict) -> tuple[list[dict], list[dict]]:
                 log.info("[%s] %s: out of stock again", name, variant)
 
             entry["in_stock"] = in_stock_now
-            if new_price:
+            # Only persist the displayed price when in stock — OOS variation
+            # pages still expose a price, but it's not the actionable
+            # "next-purchase" price and would pollute the `_war XX_` hint.
+            if in_stock_now and new_price:
                 entry["price"] = new_price
             entry["found"] = True
+
+    # Drop state for products no longer in config so state.json doesn't grow
+    # forever. Top-level keys (message ids, bot_stats, last_deploy_sha) stay.
+    expected_keys = {
+        _product_state_key(p, _product_urls(p))
+        for p in cfg.get("products") or []
+        if _product_urls(p)
+    }
+    for key in list(products_state.keys()):
+        if key not in expected_keys:
+            log.info("removing stale state entry: %s", key)
+            del products_state[key]
 
     return statuses, restocks
 
@@ -371,8 +394,14 @@ def _fmt_price_value(value: float, sample: str, rate: Optional[float]) -> str:
     return f"{value:.2f}"
 
 
+def _has_last_known_state(s: dict) -> bool:
+    return bool(s.get("price")) or bool(s.get("in_stock")) or bool(s.get("out_since"))
+
+
 def _dashboard_sort_key(s: dict) -> int:
-    if s.get("error") or not s.get("found"):
+    if s.get("error") and not _has_last_known_state(s):
+        return 2
+    if not s.get("found") and not s.get("error"):
         return 2
     return 0 if s["in_stock"] else 1
 
@@ -382,27 +411,30 @@ def build_dashboard_embed(statuses: list[dict], usd_eur: Optional[float] = None)
     for s in sorted(statuses, key=_dashboard_sort_key):
         link = s.get("deep_link") or s.get("product_url", "")
         klick = f"⠀·⠀[Klick]({link})" if link else ""
+        uncertain = s.get("error") and _has_last_known_state(s)
 
-        if s.get("error"):
+        if s.get("error") and not _has_last_known_state(s):
             sub = f"⚠️⠀check failed"
-        elif not s["found"]:
+        elif not s["found"] and not s.get("error"):
             sub = f"⚠️⠀nicht gefunden"
         elif s["in_stock"]:
             shown_price = display_price(s.get("price", ""), usd_eur)
             shown_prev = display_price(s.get("previous_price", ""), usd_eur)
             price = f"⠀·⠀**{shown_price}**" if shown_price else ""
             delta = _price_change_suffix(shown_prev, shown_price)
-            sub = f"🟢⠀in stock{price}{delta}"
+            warn = "⠀·⠀⚠️_check unsicher_" if uncertain else ""
+            sub = f"🟢⠀in stock{price}{delta}{warn}"
         else:
             shown_last = display_price(s.get("price", ""), usd_eur)
             last_suffix = f"⠀·⠀_zuletzt {shown_last}_" if shown_last else ""
-            sub = f"🔴⠀out of stock{last_suffix}"
+            warn = "⠀·⠀⚠️_check unsicher_" if uncertain else ""
+            sub = f"🔴⠀out of stock{last_suffix}{warn}"
 
         blocks.append(f"**{s['variant']}**\n└⠀{sub}{klick}")
 
-    any_in_stock = any(s["in_stock"] for s in statuses if not s.get("error"))
-    any_error = any(s.get("error") or not s.get("found") for s in statuses)
-    color = COLOR_WARN if any_error and not any_in_stock else (COLOR_IN_STOCK if any_in_stock else COLOR_OUT)
+    any_in_stock = any(s["in_stock"] for s in statuses if s.get("found") or _has_last_known_state(s))
+    any_hard_error = any(s.get("error") and not _has_last_known_state(s) for s in statuses)
+    color = COLOR_WARN if any_hard_error and not any_in_stock else (COLOR_IN_STOCK if any_in_stock else COLOR_OUT)
 
     return {
         "author": {"name": "bgpharmadrugs.to", "url": "https://bgpharmadrugs.to/"},
@@ -503,6 +535,55 @@ def build_stats_embed(cfg: dict, state: dict, usd_eur: Optional[float] = None) -
     }
 
 
+def _git(*args: str) -> str:
+    """Run `git <args>` in the repo root. Empty string on any failure."""
+    try:
+        out = subprocess.check_output(
+            ["git", *args], cwd=str(ROOT), text=True, stderr=subprocess.DEVNULL,
+        )
+        return out.strip()
+    except (subprocess.CalledProcessError, FileNotFoundError, OSError):
+        return ""
+
+
+def _commits_since(prev_sha: str) -> list[tuple[str, str]]:
+    """Return [(short_sha, subject), ...] for commits in prev_sha..HEAD.
+
+    Excludes the bot's own `update state` commits so the deploy feed only
+    shows meaningful code/config changes.
+    """
+    if not prev_sha:
+        return []
+    raw = _git("log", f"{prev_sha}..HEAD", "--pretty=format:%h|%s")
+    if not raw:
+        return []
+    out: list[tuple[str, str]] = []
+    for line in raw.splitlines():
+        if "|" not in line:
+            continue
+        sha, subject = line.split("|", 1)
+        if subject.strip().lower().startswith("update state"):
+            continue
+        out.append((sha, subject))
+    return out
+
+
+def build_updates_embed(commits: list[tuple[str, str]], head_sha: str) -> Optional[dict]:
+    if not commits:
+        return None
+    lines = [f"`{sha}`⠀{subject}" for sha, subject in commits[:15]]
+    if len(commits) > 15:
+        lines.append(f"_…und {len(commits) - 15} weitere_")
+    return {
+        "author": {"name": "✦⠀⠀Deploy⠀⠀✦"},
+        "title": f"Neuer Stand · `{head_sha[:7]}`",
+        "description": "\n".join(lines),
+        "color": 0x5865F2,
+        "footer": {"text": "github.com/prayGG/bgnotify"},
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }
+
+
 def build_restock_embed(restock: dict, usd_eur: Optional[float] = None) -> dict:
     shown = display_price(restock.get("price", ""), usd_eur)
     price_line = f"### ⠀{shown}\n\n" if shown else ""
@@ -519,6 +600,32 @@ def build_restock_embed(restock: dict, usd_eur: Optional[float] = None) -> dict:
     }
 
 
+def announce_deploy(state: dict, updates_webhook: str) -> None:
+    """Post a deploy embed to the updates channel when HEAD has moved.
+
+    Tracks the last-announced commit in `state["last_deploy_sha"]`. On first
+    run after the feature lands, we record HEAD without posting (no history
+    to diff against — would otherwise spam every old commit at once).
+    """
+    head_sha = _git("rev-parse", "HEAD")
+    if not head_sha:
+        return
+    last_sha = state.get("last_deploy_sha", "")
+    if head_sha == last_sha:
+        return
+
+    if last_sha and updates_webhook:
+        commits = _commits_since(last_sha)
+        embed = build_updates_embed(commits, head_sha)
+        if embed is not None:
+            ok = notify.send_update_announcement(updates_webhook, embed)
+            if not ok:
+                log.warning("deploy announcement failed — will retry next run")
+                return  # keep last_sha so we re-try on the next run
+
+    state["last_deploy_sha"] = head_sha
+
+
 def main() -> int:
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
     cfg = load_yaml(CONFIG_PATH)
@@ -528,9 +635,14 @@ def main() -> int:
     if not webhook:
         log.warning("env var %s is empty — Discord disabled", webhook_env)
 
+    updates_webhook_env = cfg.get("discord_updates_webhook_env", "DISCORD_UPDATES_WEBHOOK_URL")
+    updates_webhook = os.environ.get(updates_webhook_env, "")
+
     statuses, restocks = check_products(cfg, state)
     usd_eur = fetch_usd_eur_rate()
     log.info("USD->EUR rate: %s", usd_eur)
+
+    announce_deploy(state, updates_webhook)
 
     if webhook:
         notif = cfg.get("notifications") or {}

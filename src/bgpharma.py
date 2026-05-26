@@ -20,6 +20,7 @@ import json
 import logging
 import re
 import sys
+import time
 from typing import Optional
 from urllib.parse import quote, urlparse
 
@@ -27,6 +28,8 @@ import requests
 from bs4 import BeautifulSoup
 
 log = logging.getLogger(__name__)
+
+_MAX_ATTEMPTS = 3
 
 UA = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
@@ -82,9 +85,29 @@ def _with_currency_param(url: str) -> str:
 
 
 def _fetch(url: str, session: requests.Session) -> str:
-    r = session.get(_with_currency_param(url), **_force_eur_kwargs())
-    r.raise_for_status()
-    return r.text
+    """GET with retries for transient HTTP errors (timeouts, 5xx, network)."""
+    last_err: Optional[Exception] = None
+    for attempt in range(_MAX_ATTEMPTS):
+        try:
+            r = session.get(_with_currency_param(url), **_force_eur_kwargs())
+            if 500 <= r.status_code < 600 and attempt < _MAX_ATTEMPTS - 1:
+                wait = 2 ** attempt
+                log.warning("fetch %s → %s, retry in %ds", url, r.status_code, wait)
+                time.sleep(wait)
+                continue
+            r.raise_for_status()
+            return r.text
+        except requests.RequestException as e:
+            last_err = e
+            if attempt < _MAX_ATTEMPTS - 1:
+                wait = 2 ** attempt
+                log.warning("fetch %s network error, retry in %ds: %s", url, wait, e)
+                time.sleep(wait)
+                continue
+            raise
+    if last_err:
+        raise last_err
+    raise RuntimeError(f"fetch {url} exhausted retries")
 
 
 def _body_classes(soup: BeautifulSoup) -> list[str]:
@@ -211,27 +234,41 @@ def _ajax_variation(
         "Referer": referer,
         "Accept": "application/json, text/javascript, */*; q=0.01",
     }
-    try:
-        r = session.post(
-            ajax,
-            data={"product_id": product_id, attr_name: option_value},
-            **kwargs,
-        )
-    except requests.RequestException as e:
-        raise AjaxError(f"network error: {e}") from e
-    if r.status_code >= 400:
-        raise AjaxError(f"http {r.status_code}")
-    if not r.content:
-        raise AjaxError("empty body")
-    try:
-        data = r.json()
-    except json.JSONDecodeError as e:
-        raise AjaxError(f"bad json: {e}") from e
-    if data is False or data is None:
-        return None  # legitimate "no variation matched"
-    if isinstance(data, dict) and "variation_id" in data:
-        return data
-    raise AjaxError(f"unexpected payload shape: {type(data).__name__}")
+
+    last_err: Optional[Exception] = None
+    for attempt in range(_MAX_ATTEMPTS):
+        try:
+            r = session.post(
+                ajax,
+                data={"product_id": product_id, attr_name: option_value},
+                **kwargs,
+            )
+        except requests.RequestException as e:
+            last_err = AjaxError(f"network error: {e}")
+            if attempt < _MAX_ATTEMPTS - 1:
+                time.sleep(2 ** attempt)
+                continue
+            raise last_err from e
+        if 500 <= r.status_code < 600 and attempt < _MAX_ATTEMPTS - 1:
+            log.warning("ajax → %s, retrying", r.status_code)
+            time.sleep(2 ** attempt)
+            continue
+        if r.status_code >= 400:
+            raise AjaxError(f"http {r.status_code}")
+        if not r.content:
+            raise AjaxError("empty body")
+        try:
+            data = r.json()
+        except json.JSONDecodeError as e:
+            raise AjaxError(f"bad json: {e}") from e
+        if data is False or data is None:
+            return None  # legitimate "no variation matched"
+        if isinstance(data, dict) and "variation_id" in data:
+            return data
+        raise AjaxError(f"unexpected payload shape: {type(data).__name__}")
+    if last_err:
+        raise last_err
+    raise AjaxError("ajax retries exhausted")
 
 
 def _check_variable(
