@@ -32,6 +32,18 @@ products:
     watch_variants:
       - "Retatrutide 30 mg"
 
+  - name: "BPC157/TB500 Mix"
+    url: "https://bgpharmadrugs.to/product/peptides/"
+    emoji: "🧪"
+    watch_variants:
+      - "BPC157/TB500 mix 5mg each"
+
+  - name: "IGF-1 LR3"
+    url: "https://bgpharmadrugs.to/product/peptides/"
+    emoji: "🧪"
+    watch_variants:
+      - "IGF-1 LR3 1 mg"
+
   - name: "Modafinil"
     url: "https://bgpharmadrugs.to/product/modafinil/"
     emoji: "💊"
