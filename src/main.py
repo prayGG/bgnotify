@@ -94,6 +94,57 @@ def save_state(state: dict) -> None:
         f.write("\n")
 
 
+def _product_urls(product: dict) -> list[str]:
+    """Normalize `url` (str) and/or `urls` (list) into a flat list of URLs."""
+    urls: list[str] = []
+    single = product.get("url")
+    if single:
+        urls.append(single)
+    for u in product.get("urls") or []:
+        if u and u not in urls:
+            urls.append(u)
+    return urls
+
+
+def _product_state_key(product: dict, urls: list[str]) -> str:
+    """Synthetic key for combined products so per-URL data doesn't collide."""
+    if len(urls) > 1:
+        return f"combined:{product.get('name') or urls[0]}"
+    return urls[0]
+
+
+def _check_combined(urls: list[str], watch: list[str]) -> dict[str, dict]:
+    """Check each URL and merge per variant — in-stock wins, else first found."""
+    per_url: list[dict[str, dict]] = []
+    for url in urls:
+        try:
+            per_url.append(bgpharma.check(url, watch))
+        except Exception as e:
+            log.error("check failed for %s: %s", url, e)
+            per_url.append({})
+
+    merged: dict[str, dict] = {}
+    for variant in watch or [""]:
+        in_stock_info = None
+        fallback_info = None
+        for current in per_url:
+            info = current.get(variant)
+            if not info:
+                continue
+            if info.get("in_stock"):
+                in_stock_info = info
+                break
+            if info.get("found") and fallback_info is None:
+                fallback_info = info
+        if in_stock_info is not None:
+            merged[variant] = {**in_stock_info, "found": True}
+        elif fallback_info is not None:
+            merged[variant] = {**fallback_info, "found": True, "in_stock": False}
+        else:
+            merged[variant] = {"found": False, "in_stock": False, "price": "", "deep_link": urls[0]}
+    return merged
+
+
 def check_products(cfg: dict, state: dict) -> tuple[list[dict], list[dict]]:
     products_state = state.setdefault("products", {})
     bot_stats = state.setdefault("bot_stats", {})
@@ -105,12 +156,16 @@ def check_products(cfg: dict, state: dict) -> tuple[list[dict], list[dict]]:
     restocks: list[dict] = []
 
     for product in cfg.get("products") or []:
-        url = product["url"]
+        urls = _product_urls(product)
+        if not urls:
+            continue
+        url = urls[0]
+        state_key = _product_state_key(product, urls)
         name = product.get("name") or url
         watch = product.get("watch_variants") or []
-        prev = products_state.setdefault(url, {})
+        prev = products_state.setdefault(state_key, {})
         try:
-            current = bgpharma.check(url, watch)
+            current = _check_combined(urls, watch) if len(urls) > 1 else bgpharma.check(url, watch)
         except Exception as e:
             log.error("check failed for %s: %s", url, e)
             for variant in watch or ["(unknown)"]:
@@ -387,10 +442,12 @@ def build_stats_embed(cfg: dict, state: dict, usd_eur: Optional[float] = None) -
 
     entries: list[tuple[str, str, dict]] = []
     for product in cfg.get("products") or []:
-        url = product["url"]
+        urls = _product_urls(product)
+        if not urls:
+            continue
         watch = product.get("watch_variants") or []
         emoji = product.get("emoji") or "💊"
-        product_data = products_state.get(url, {})
+        product_data = products_state.get(_product_state_key(product, urls), {})
         for variant in watch:
             e = product_data.get(variant)
             if not e:

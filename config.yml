@@ -54,3 +54,11 @@ products:
     url: "https://bgpharmadrugs.to/product/roaccutane-20-mg-30-roche/"
     watch_variants:
       - "Roaccutane 20 mg 30 Roche"
+
+  - name: "Minoxidil 5 mg"
+    emoji: "💊"
+    urls:
+      - "https://bgpharmadrugs.to/product/minoxytop-5-mg-minoxidil-tablets-ip/"
+      - "https://bgpharmadrugs.to/product/minoxidil-5-mg-100-sigma-audley/"
+    watch_variants:
+      - "Minoxidil 5 mg"
