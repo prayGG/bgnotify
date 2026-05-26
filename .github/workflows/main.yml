@@ -28,6 +28,7 @@ jobs:
         run: python -m src.main
         env:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          DISCORD_UPDATES_WEBHOOK_URL: ${{ secrets.DISCORD_UPDATES_WEBHOOK_URL }}
 
       - name: Commit & Push state
         run: |
