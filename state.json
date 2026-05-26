@@ -1,12 +1,27 @@
 {
   "bot_stats": {
     "first_check_at": "2026-05-20T18:50:44.075159+00:00",
-    "last_check_at": "2026-05-26T19:30:30.402710+00:00",
-    "total_checks": 855,
+    "last_check_at": "2026-05-26T19:40:25.781810+00:00",
+    "total_checks": 856,
     "total_restocks": 17
   },
   "dashboard_message_id": "1506829009093132288",
   "products": {
+    "combined:Minoxidil 5 mg": {
+      "Minoxidil 5 mg": {
+        "found": true,
+        "highest_price": "€ 30.06",
+        "highest_price_at": "2026-05-26T19:40:37.853930+00:00",
+        "in_stock": false,
+        "lowest_price": "€ 30.06",
+        "lowest_price_at": "2026-05-26T19:40:37.853930+00:00",
+        "out_since": "2026-05-26T19:40:37.853930+00:00",
+        "price": "€ 30.06",
+        "price_history": [
+          30.06
+        ]
+      }
+    },
     "https://bgpharmadrugs.to/product/modafinil/": {
       "ASPENDOS tablets 100 mg * 30 Medochemie": {
         "found": true,
