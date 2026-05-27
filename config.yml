@@ -1,5 +1,11 @@
 discord_webhook_env: DISCORD_WEBHOOK_URL
 
+# Stock-Alerts (Restock + neue Out-of-stock-Meldungen) gehen in einen eigenen
+# Channel (bg-notify). Restocks pingen, OOS nicht. Wenn die env var leer ist,
+# fällt der Bot auf den Haupt-Webhook zurück — damit Restock-Alerts auch ohne
+# das neue Secret weiter funktionieren.
+discord_stock_webhook_env: DISCORD_STOCK_WEBHOOK_URL
+
 # Eigener Webhook für BG's Forum-Posts auf thinksteroids.com. Lautlos (kein
 # @-Mention) — landet in einem dedizierten Channel. Wenn die env var leer
 # ist, wird der Forum-Check übersprungen.

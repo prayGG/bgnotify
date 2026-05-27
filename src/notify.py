@@ -116,6 +116,19 @@ def send_restock_alert(
     return _request("POST", webhook_url, payload) is not None
 
 
+def send_oos_alert(webhook_url: str, embed: dict) -> bool:
+    """Silent out-of-stock alert — no pings, distinct username so the channel
+    visually separates restocks (loud) from OOS (informational)."""
+    if not webhook_url:
+        return False
+    payload = {
+        "username": "bgnotify · oos",
+        "embeds": [embed],
+        "allowed_mentions": {"parse": []},
+    }
+    return _request("POST", webhook_url, payload) is not None
+
+
 def send_update_announcement(webhook_url: str, embed: dict) -> bool:
     """One-shot deploy/update announcement to the updates channel."""
     if not webhook_url:

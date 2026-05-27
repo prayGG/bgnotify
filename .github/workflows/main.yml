@@ -72,6 +72,7 @@ jobs:
         run: python -m src.main
         env:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          DISCORD_STOCK_WEBHOOK_URL: ${{ secrets.DISCORD_STOCK_WEBHOOK_URL }}
           DISCORD_UPDATES_WEBHOOK_URL: ${{ secrets.DISCORD_UPDATES_WEBHOOK_URL }}
           DISCORD_FORUM_WEBHOOK_URL: ${{ secrets.DISCORD_FORUM_WEBHOOK_URL }}
           PING_USER_IDS: "${{ secrets.DISCORDID }},${{ secrets.WEITERE_ID_HIER }}"

@@ -30,6 +30,7 @@ from . import bgpharma, forum, notify  # noqa: F401  (bgpharma used transitively
 from .main import (
     build_dashboard_embed,
     build_forum_embed,
+    build_oos_embed,
     build_restock_embed,
     build_stats_embed,
     build_updates_embed,
@@ -62,6 +63,21 @@ def _pick_restock_sample(statuses: list[dict]) -> Optional[dict]:
     return None
 
 
+def _pick_oos_sample(statuses: list[dict]) -> Optional[dict]:
+    """First currently-OOS (but known) variant — used to render an OOS embed
+    with real product naming for the visual test."""
+    for s in statuses:
+        if not s.get("in_stock") and s.get("found"):
+            return {
+                "product_name": s["product_name"],
+                "product_url": s["product_url"],
+                "deep_link": s.get("deep_link") or s["product_url"],
+                "variant": s["variant"],
+                "last_price": s.get("price", ""),
+            }
+    return None
+
+
 def main() -> int:
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
     cfg = yaml.safe_load(CONFIG_PATH.read_text(encoding="utf-8")) or {}
@@ -69,6 +85,10 @@ def main() -> int:
     main_wh = os.environ.get(cfg.get("discord_webhook_env", "DISCORD_WEBHOOK_URL"), "")
     updates_wh = os.environ.get(cfg.get("discord_updates_webhook_env", "DISCORD_UPDATES_WEBHOOK_URL"), "")
     forum_wh = os.environ.get(cfg.get("discord_forum_webhook_env", "DISCORD_FORUM_WEBHOOK_URL"), "")
+    stock_wh = os.environ.get(cfg.get("discord_stock_webhook_env", "DISCORD_STOCK_WEBHOOK_URL"), "")
+    # Same fallback as production main(): if the stock webhook isn't set yet,
+    # stock alerts (restock + OOS) route to the main channel.
+    stock_target_wh = stock_wh or main_wh
 
     if not main_wh:
         log.error("DISCORD_WEBHOOK_URL is empty — nothing to test")
@@ -92,34 +112,34 @@ def main() -> int:
             log.warning("state.json unreadable, using empty state: %s", e)
 
     state_copy = copy.deepcopy(on_disk_state)
-    statuses, _restocks_unused = check_products(cfg, state_copy)
+    statuses, _restocks_unused, _oos_unused = check_products(cfg, state_copy)
 
     results: list[tuple[str, str, object]] = []  # (test_name, channel, True | False | "skip-reason")
 
-    # ─── 1/5 · Dashboard preview → main channel ─────────────────────────────
-    log.info("test 1/5 → dashboard preview (main)")
+    # ─── 1/6 · Dashboard preview → status channel ───────────────────────────
+    log.info("test 1/6 → dashboard preview (status)")
     ok = notify.send_test(
         main_wh,
         build_dashboard_embed(statuses, usd_eur=usd_eur),
         "🧪 **TEST** · Dashboard-Preview · _Live-Daten, postet als neue Message, "
         "die echte persistente Dashboard-Message wird NICHT überschrieben._",
     )
-    results.append(("dashboard", "main", ok))
+    results.append(("dashboard", "status", ok))
 
-    # ─── 2/5 · Stats preview → main channel ─────────────────────────────────
-    log.info("test 2/5 → stats preview (main)")
+    # ─── 2/6 · Stats preview → status channel ───────────────────────────────
+    log.info("test 2/6 → stats preview (status)")
     ok = notify.send_test(
         main_wh,
         build_stats_embed(cfg, state_copy, usd_eur=usd_eur),
         "🧪 **TEST** · Stats-Card-Preview · _Sparklines, OOS-Ø, Restock-Count "
         "aus echtem State._",
     )
-    results.append(("stats", "main", ok))
+    results.append(("stats", "status", ok))
 
-    # ─── 3/5 · Restock alert + pings → main channel ─────────────────────────
+    # ─── 3/6 · Restock alert + pings → stock channel ────────────────────────
     # The only test that includes user/role mentions — proves the IDs in
     # config are valid Discord IDs and the bot has permission to ping.
-    log.info("test 3/5 → restock alert + @-mentions (main)")
+    log.info("test 3/6 → restock alert + @-mentions (stock)")
     sample = _pick_restock_sample(statuses) or {
         "product_name": "BG Pharma",
         "product_url": "https://bgpharmadrugs.to/",
@@ -127,18 +147,36 @@ def main() -> int:
         "variant": "Test-Variante",
         "price": "€42.00",
     }
+    stock_channel_label = "stock" if stock_wh else "status (fallback)"
     ok = notify.send_test(
-        main_wh,
+        stock_target_wh,
         build_restock_embed(sample, usd_eur=usd_eur),
         "🧪 **TEST** · Restock-Alert · _wenn ihr jetzt einen Discord-Ping kriegt, "
         "stimmen eure User-IDs in `notifications.ping_user_ids`._",
         user_ids=user_ids,
         role_ids=role_ids,
     )
-    results.append(("restock + pings", "main", ok))
+    results.append(("restock + pings", stock_channel_label, ok))
 
-    # ─── 4/5 · Deploy announcement → updates channel ────────────────────────
-    log.info("test 4/5 → deploy announcement (updates)")
+    # ─── 4/6 · Out-of-stock alert (silent) → stock channel ──────────────────
+    log.info("test 4/6 → oos alert (stock)")
+    oos_sample = _pick_oos_sample(statuses) or {
+        "product_name": "BG Pharma",
+        "product_url": "https://bgpharmadrugs.to/",
+        "deep_link": "https://bgpharmadrugs.to/",
+        "variant": "Test-Variante",
+        "last_price": "€42.00",
+    }
+    ok = notify.send_test(
+        stock_target_wh,
+        build_oos_embed(oos_sample, usd_eur=usd_eur),
+        "🧪 **TEST** · OOS-Alert · _stiller Notify, kein Ping — landet im selben "
+        "Channel wie Restocks aber ohne @-Mention._",
+    )
+    results.append(("oos (silent)", stock_channel_label, ok))
+
+    # ─── 5/6 · Deploy announcement → updates channel ────────────────────────
+    log.info("test 5/6 → deploy announcement (updates)")
     if updates_wh:
         fake_commits = [
             ("abc1234", "test: this is a deploy embed preview"),
@@ -156,8 +194,8 @@ def main() -> int:
         log.warning("DISCORD_UPDATES_WEBHOOK_URL unset — skipping deploy test")
         results.append(("deploy", "updates", "skip-no-webhook"))
 
-    # ─── 5/5 · Forum scraper + post embed → forum channel ───────────────────
-    log.info("test 5/5 → forum scraper + post embed (forum)")
+    # ─── 6/6 · Forum scraper + post embed → forum channel ───────────────────
+    log.info("test 6/6 → forum scraper + post embed (forum)")
     if forum_wh:
         forum_cfg = cfg.get("forum") or {}
         url = forum_cfg.get("search_url")

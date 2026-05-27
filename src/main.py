@@ -160,7 +160,7 @@ def _check_combined(urls: list[str], watch: list[str]) -> dict[str, dict]:
     return merged
 
 
-def check_products(cfg: dict, state: dict) -> tuple[list[dict], list[dict]]:
+def check_products(cfg: dict, state: dict) -> tuple[list[dict], list[dict], list[dict]]:
     products_state = state.setdefault("products", {})
     bot_stats = state.setdefault("bot_stats", {})
     run_iso = datetime.now(timezone.utc).isoformat()
@@ -169,6 +169,7 @@ def check_products(cfg: dict, state: dict) -> tuple[list[dict], list[dict]]:
     bot_stats["total_checks"] = bot_stats.get("total_checks", 0) + 1
     statuses: list[dict] = []
     restocks: list[dict] = []
+    oos_alerts: list[dict] = []
 
     for product in cfg.get("products") or []:
         urls = _product_urls(product)
@@ -283,7 +284,11 @@ def check_products(cfg: dict, state: dict) -> tuple[list[dict], list[dict]]:
                     if len(periods) > 20:
                         entry["oos_periods"] = periods[-20:]
             elif not in_stock_now and in_stock_prev:
-                log.info("[%s] %s: out of stock again", name, variant)
+                log.info("notify out-of-stock: %s", variant)
+                oos_alerts.append({
+                    "product_name": name, "product_url": url, "deep_link": deep,
+                    "variant": variant, "last_price": prev_price,
+                })
 
             entry["in_stock"] = in_stock_now
             # Only persist the displayed price when in stock — OOS variation
@@ -305,7 +310,7 @@ def check_products(cfg: dict, state: dict) -> tuple[list[dict], list[dict]]:
             log.info("removing stale state entry: %s", key)
             del products_state[key]
 
-    return statuses, restocks
+    return statuses, restocks, oos_alerts
 
 
 def _days_since(iso: str) -> int:
@@ -560,6 +565,22 @@ def _git(*args: str) -> str:
         return ""
 
 
+def _sha_reachable(sha: str) -> bool:
+    """True if `sha` exists in local git history. Stale SHAs (rebase/force-push)
+    return False so the caller can fall back to a HEAD-only deploy embed instead
+    of silently dropping the announcement."""
+    if not sha:
+        return False
+    try:
+        subprocess.check_output(
+            ["git", "cat-file", "-e", f"{sha}^{{commit}}"],
+            cwd=str(ROOT), stderr=subprocess.DEVNULL,
+        )
+        return True
+    except (subprocess.CalledProcessError, FileNotFoundError, OSError):
+        return False
+
+
 def _commits_since(prev_sha: str) -> list[tuple[str, str]]:
     """Return [(short_sha, subject), ...] for commits in prev_sha..HEAD.
 
@@ -582,16 +603,30 @@ def _commits_since(prev_sha: str) -> list[tuple[str, str]]:
     return out
 
 
-def build_updates_embed(commits: list[tuple[str, str]], head_sha: str) -> Optional[dict]:
-    if not commits:
-        return None
-    lines = [f"`{sha}`⠀{subject}" for sha, subject in commits[:15]]
-    if len(commits) > 15:
-        lines.append(f"_…und {len(commits) - 15} weitere_")
+def _head_commit_subject(head_sha: str) -> str:
+    raw = _git("log", "-1", "--pretty=format:%s", head_sha)
+    return raw.strip()
+
+
+def build_updates_embed(commits: list[tuple[str, str]], head_sha: str) -> dict:
+    if commits:
+        lines = [f"`{sha}`⠀{subject}" for sha, subject in commits[:15]]
+        if len(commits) > 15:
+            lines.append(f"_…und {len(commits) - 15} weitere_")
+        description = "\n".join(lines)
+    else:
+        # No reachable commits in prev..HEAD (rebase/force-push or first
+        # post-feature run). Show at least the head subject so the channel
+        # still surfaces that something shipped.
+        subject = _head_commit_subject(head_sha)
+        if subject:
+            description = f"`{head_sha[:7]}`⠀{subject}"
+        else:
+            description = f"`{head_sha[:7]}`"
     return {
         "author": {"name": "✦⠀⠀Deploy⠀⠀✦"},
         "title": f"Update · `{head_sha[:7]}`",
-        "description": "\n".join(lines),
+        "description": description,
         "color": 0x5865F2,
         "footer": {"text": "github.com/prayGG/bgnotify"},
         "timestamp": datetime.now(timezone.utc).isoformat(),
@@ -691,6 +726,23 @@ def check_forum(cfg: dict, state: dict) -> list[dict]:
     return new_posts
 
 
+def build_oos_embed(item: dict, usd_eur: Optional[float] = None) -> dict:
+    """Embed for an in-stock -> out-of-stock transition. Quieter than the
+    restock alert — gray accent, last seen price, no order button, no pings."""
+    last = display_price(item.get("last_price", ""), usd_eur)
+    last_line = f"_zuletzt {last}_\n\n" if last else ""
+    link = item.get("deep_link") or item.get("product_url") or ""
+    link_line = f"[→⠀⠀Produktseite]({link})" if link else ""
+    return {
+        "author": {"name": "✦⠀⠀OUT OF STOCK⠀⠀✦"},
+        "title": item["variant"],
+        "description": last_line + link_line,
+        "color": COLOR_OUT,
+        "footer": {"text": "bgpharmadrugs.to"},
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }
+
+
 def build_restock_embed(restock: dict, usd_eur: Optional[float] = None) -> dict:
     shown = display_price(restock.get("price", ""), usd_eur)
     price_line = f"### ⠀{shown}\n\n" if shown else ""
@@ -722,13 +774,16 @@ def announce_deploy(state: dict, updates_webhook: str) -> None:
         return
 
     if last_sha and updates_webhook:
-        commits = _commits_since(last_sha)
+        # Stale SHA (rebased/force-pushed) → no reachable commit range, so
+        # _commits_since would silently return []. Treat as unreachable so
+        # build_updates_embed falls back to a HEAD-only embed instead of
+        # dropping the announcement entirely.
+        commits = _commits_since(last_sha) if _sha_reachable(last_sha) else []
         embed = build_updates_embed(commits, head_sha)
-        if embed is not None:
-            ok = notify.send_update_announcement(updates_webhook, embed)
-            if not ok:
-                log.warning("deploy announcement failed — will retry next run")
-                return  # keep last_sha so we re-try on the next run
+        ok = notify.send_update_announcement(updates_webhook, embed)
+        if not ok:
+            log.warning("deploy announcement failed — will retry next run")
+            return  # keep last_sha so we re-try on the next run
 
     state["last_deploy_sha"] = head_sha
 
@@ -748,7 +803,13 @@ def main() -> int:
     forum_webhook_env = cfg.get("discord_forum_webhook_env", "DISCORD_FORUM_WEBHOOK_URL")
     forum_webhook = os.environ.get(forum_webhook_env, "")
 
-    statuses, restocks = check_products(cfg, state)
+    # Stock-alerts (restock + OOS) ideally go to the dedicated bg-notify
+    # channel. Fall back to the main webhook so restock alerts don't go silent
+    # if the new secret hasn't been configured yet.
+    stock_webhook_env = cfg.get("discord_stock_webhook_env", "DISCORD_STOCK_WEBHOOK_URL")
+    stock_webhook = os.environ.get(stock_webhook_env, "") or webhook
+
+    statuses, restocks, oos_alerts = check_products(cfg, state)
     usd_eur = fetch_usd_eur_rate()
     log.info("USD->EUR rate: %s", usd_eur)
 
@@ -783,7 +844,11 @@ def main() -> int:
             state["dashboard_message_id"] = new_id
 
         for r in restocks:
-            notify.send_restock_alert(webhook, build_restock_embed(r, usd_eur=usd_eur), user_ids, role_ids)
+            notify.send_restock_alert(
+                stock_webhook, build_restock_embed(r, usd_eur=usd_eur), user_ids, role_ids,
+            )
+        for o in oos_alerts:
+            notify.send_oos_alert(stock_webhook, build_oos_embed(o, usd_eur=usd_eur))
 
     save_state(state)
     return 0
