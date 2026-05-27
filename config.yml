@@ -1,5 +1,26 @@
 discord_webhook_env: DISCORD_WEBHOOK_URL
 
+# Eigener Webhook für BG's Forum-Posts auf thinksteroids.com. Lautlos (kein
+# @-Mention) — landet in einem dedizierten Channel. Wenn die env var leer
+# ist, wird der Forum-Check übersprungen.
+discord_forum_webhook_env: DISCORD_FORUM_WEBHOOK_URL
+
+forum:
+  # Saved-search URL für BG's Posts. Wird intern auf o=date umgebogen, damit
+  # neueste oben stehen. Falls die URL irgendwann nicht mehr geht, kann auch
+  # eine frische Suche von thinksteroids.com hier rein.
+  search_url: "https://thinksteroids.com/community/search/2728764/?c[users]=BG+pharmaceuticals&o=relevance"
+  # Defensiver Filter — XenForo ignoriert unbekannte User-Filter lautlos,
+  # ohne diesen Check würden wir bei kaputter URL alle Posts spammen.
+  author: "BG pharmaceuticals"
+  # Max neue Posts pro Run die wirklich gepostet werden. Bei längerem Ausfall
+  # vermeidet das einen riesigen Burst — ältere fallen einfach weg.
+  max_per_run: 5
+  # Forum wird nur alle N Minuten gescraped, egal wie oft der Bot insgesamt
+  # läuft. Polite für Incapsula — Headless-Chrome ist teurer + auffälliger als
+  # ein Stock-Check, deshalb großzügiger Abstand.
+  check_interval_minutes: 120
+
 notifications:
   # Discord User-IDs die bei jedem Dashboard-Update und bei Restocks gepingt
   # werden. Wie holen: Discord → Settings → Advanced → Developer Mode an,

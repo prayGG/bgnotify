@@ -128,6 +128,18 @@ def send_update_announcement(webhook_url: str, embed: dict) -> bool:
     return _request("POST", webhook_url, payload) is not None
 
 
+def send_forum_post(webhook_url: str, embed: dict) -> bool:
+    """Silent notification for a new BG forum post — no pings."""
+    if not webhook_url:
+        return False
+    payload = {
+        "username": "bgnotify · forum",
+        "embeds": [embed],
+        "allowed_mentions": {"parse": []},
+    }
+    return _request("POST", webhook_url, payload) is not None
+
+
 def send(webhook_url: str, content: str) -> bool:
     """Simple unpinged message — CLI test only."""
     if not webhook_url:

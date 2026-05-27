@@ -24,11 +24,24 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
+      # Cache the ~150 MB Chromium binary across runs. Key on requirements.txt
+      # so an upgrade re-downloads matching browser builds automatically.
+      - name: Cache Playwright browsers
+        id: playwright-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('requirements.txt') }}
+
+      - name: Install Playwright Chromium
+        run: python -m playwright install --with-deps chromium
+
       - name: Run Bot
         run: python -m src.main
         env:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
           DISCORD_UPDATES_WEBHOOK_URL: ${{ secrets.DISCORD_UPDATES_WEBHOOK_URL }}
+          DISCORD_FORUM_WEBHOOK_URL: ${{ secrets.DISCORD_FORUM_WEBHOOK_URL }}
 
       - name: Commit & Push state
         run: |

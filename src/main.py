@@ -18,7 +18,7 @@ from typing import Optional
 import requests
 import yaml
 
-from . import bgpharma, notify
+from . import bgpharma, forum, notify
 
 log = logging.getLogger(__name__)
 
@@ -584,6 +584,102 @@ def build_updates_embed(commits: list[tuple[str, str]], head_sha: str) -> Option
     }
 
 
+_ISO_PREFIX = re.compile(r"^\d{4}-\d{2}-\d{2}T")
+
+
+def build_forum_embed(post: dict) -> dict:
+    """Embed for one new BG forum post — title links to the post, excerpt below."""
+    excerpt = post.get("excerpt") or ""
+    if len(excerpt) > 600:
+        excerpt = excerpt[:597].rstrip() + "…"
+    description = f">>> {excerpt}" if excerpt else "_(kein Snippet)_"
+    embed = {
+        "author": {
+            "name": f"✦⠀⠀{post.get('author') or 'BG pharmaceuticals'} · neuer Post⠀⠀✦"
+        },
+        "title": post.get("thread_title") or "(ohne Titel)",
+        "url": post.get("url", ""),
+        "description": description,
+        "color": 0x5865F2,
+        "footer": {"text": "thinksteroids.com"},
+    }
+    posted_at = post.get("posted_at") or ""
+    if _ISO_PREFIX.match(posted_at):
+        embed["timestamp"] = posted_at
+    return embed
+
+
+def check_forum(cfg: dict, state: dict) -> list[dict]:
+    """Return new posts (oldest first) and update state. Seeds silently on first run.
+
+    State shape:
+      forum.seen_post_ids: list[str]  (last ~200 post ids we've ever seen)
+      forum.seeded: bool              (true once we've recorded a baseline)
+      forum.last_check_at: iso str    (rate-limit gate)
+    """
+    forum_cfg = cfg.get("forum") or {}
+    url = forum_cfg.get("search_url")
+    if not url:
+        return []
+    expected_author = forum_cfg.get("author") or ""
+    max_per_run = int(forum_cfg.get("max_per_run", 5))
+    interval_min = int(forum_cfg.get("check_interval_minutes", 120))
+
+    fstate = state.setdefault("forum", {})
+
+    # Rate-limit gate. Be polite to Incapsula — only one Playwright run per
+    # `interval_min` regardless of how often the bot's main cron fires.
+    last_iso = fstate.get("last_check_at", "")
+    if last_iso:
+        try:
+            last = datetime.fromisoformat(last_iso.replace("Z", "+00:00"))
+            elapsed = (datetime.now(timezone.utc) - last).total_seconds()
+            if elapsed < interval_min * 60:
+                log.info("forum: %.0f min since last check (< %d min gate) — skipping",
+                         elapsed / 60, interval_min)
+                return []
+        except (ValueError, TypeError):
+            pass
+
+    # Stamp BEFORE fetch — if Playwright crashes or Incapsula blocks us, we
+    # still respect the interval. Otherwise a hard failure would retry every
+    # cron run, which is exactly the hammering pattern that gets us flagged.
+    fstate["last_check_at"] = datetime.now(timezone.utc).isoformat()
+
+    try:
+        posts = forum.fetch_posts(url, expected_author=expected_author)
+    except Exception as e:
+        log.warning("forum fetch failed: %s", e)
+        return []
+
+    seen_ids = set(fstate.get("seen_post_ids") or [])
+    seeded = bool(fstate.get("seeded"))
+
+    # `posts` is newest-first from the scraper.
+    new_posts = [p for p in posts if p["post_id"] not in seen_ids]
+
+    # Persist seen ids (cap at 200 so state.json doesn't grow forever).
+    merged = list(fstate.get("seen_post_ids") or [])
+    for p in new_posts:
+        if p["post_id"] not in seen_ids:
+            merged.append(p["post_id"])
+    fstate["seen_post_ids"] = merged[-200:]
+
+    if not seeded:
+        # First run after the feature lands — record current posts as the
+        # baseline but don't notify (would dump the entire backlog at once).
+        fstate["seeded"] = True
+        log.info("forum: seeded with %d existing posts (no Discord notify)", len(posts))
+        return []
+
+    # Oldest first so Discord messages read chronologically. If too many
+    # accumulated (long outage), keep the most-recent slice.
+    new_posts.reverse()
+    if len(new_posts) > max_per_run:
+        new_posts = new_posts[-max_per_run:]
+    return new_posts
+
+
 def build_restock_embed(restock: dict, usd_eur: Optional[float] = None) -> dict:
     shown = display_price(restock.get("price", ""), usd_eur)
     price_line = f"### ⠀{shown}\n\n" if shown else ""
@@ -638,11 +734,21 @@ def main() -> int:
     updates_webhook_env = cfg.get("discord_updates_webhook_env", "DISCORD_UPDATES_WEBHOOK_URL")
     updates_webhook = os.environ.get(updates_webhook_env, "")
 
+    forum_webhook_env = cfg.get("discord_forum_webhook_env", "DISCORD_FORUM_WEBHOOK_URL")
+    forum_webhook = os.environ.get(forum_webhook_env, "")
+
     statuses, restocks = check_products(cfg, state)
     usd_eur = fetch_usd_eur_rate()
     log.info("USD->EUR rate: %s", usd_eur)
 
     announce_deploy(state, updates_webhook)
+
+    new_forum_posts = check_forum(cfg, state)
+    if new_forum_posts and forum_webhook:
+        for post in new_forum_posts:
+            notify.send_forum_post(forum_webhook, build_forum_embed(post))
+    elif new_forum_posts:
+        log.info("forum: %d new post(s) but %s is empty", len(new_forum_posts), forum_webhook_env)
 
     if webhook:
         notif = cfg.get("notifications") or {}
