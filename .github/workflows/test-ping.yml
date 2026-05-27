@@ -23,7 +23,7 @@ jobs:
           key: playwright-${{ runner.os }}-${{ hashFiles('requirements.txt') }}
 
       - name: Install Playwright Chromium
-        run: python -m playwright install --with-deps chromium
+        run: python -m playwright install chromium
 
       - run: python -m src.test_ping
         env:

@@ -9,7 +9,7 @@ permissions:
 jobs:
   run-bot:
     runs-on: ubuntu-latest
-    
+
     steps:
       - uses: actions/checkout@v4
         with:
@@ -24,17 +24,49 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
+      # The forum scraper hits thinksteroids only every `check_interval_minutes`
+      # (2h by default). On the other ~11 of 12 cron runs the Playwright
+      # install + cache restore would just burn ~20s for nothing — so we skip
+      # them when state.json says the next forum visit isn't due yet.
+      - name: Check if forum is due
+        id: forum
+        run: |
+          python <<'PY' >> "$GITHUB_OUTPUT"
+          import json, yaml
+          from datetime import datetime, timezone
+          try:
+              cfg = yaml.safe_load(open("config.yml", encoding="utf-8")) or {}
+              interval = int((cfg.get("forum") or {}).get("check_interval_minutes", 120))
+          except Exception:
+              interval = 120
+          due = True
+          try:
+              state = json.load(open("state.json", encoding="utf-8"))
+              last = (state.get("forum") or {}).get("last_check_at", "")
+              if last:
+                  dt = datetime.fromisoformat(last.replace("Z", "+00:00"))
+                  elapsed = (datetime.now(timezone.utc) - dt).total_seconds()
+                  due = elapsed >= interval * 60
+          except (OSError, ValueError, KeyError):
+              pass
+          print(f"due={'yes' if due else 'no'}")
+          PY
+
       # Cache the ~150 MB Chromium binary across runs. Key on requirements.txt
       # so an upgrade re-downloads matching browser builds automatically.
       - name: Cache Playwright browsers
-        id: playwright-cache
+        if: steps.forum.outputs.due == 'yes'
         uses: actions/cache@v4
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ hashFiles('requirements.txt') }}
 
+      # No --with-deps: ubuntu-latest has every shared lib Playwright needs
+      # pre-installed; the only "missing" packages with --with-deps were
+      # emoji/CJK fonts, which we don't need for HTML-only scraping.
       - name: Install Playwright Chromium
-        run: python -m playwright install --with-deps chromium
+        if: steps.forum.outputs.due == 'yes'
+        run: python -m playwright install chromium
 
       - name: Run Bot
         run: python -m src.main
