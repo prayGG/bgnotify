@@ -593,7 +593,7 @@ def build_forum_embed(post: dict) -> dict:
     if len(excerpt) > 600:
         excerpt = excerpt[:597].rstrip() + "…"
     embed = {
-        "author": {"name": post.get("author") or "BG pharmaceuticals"},
+        "author": {"name": "✦ ⠀ neuer Post⠀⠀✦"},
         "title": post.get("thread_title") or "(ohne Titel)",
         "url": post.get("url", ""),
         "description": excerpt or "_(kein Snippet)_",
