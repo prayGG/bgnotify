@@ -774,11 +774,16 @@ def announce_deploy(state: dict, updates_webhook: str) -> None:
         return
 
     if last_sha and updates_webhook:
-        # Stale SHA (rebased/force-pushed) → no reachable commit range, so
-        # _commits_since would silently return []. Treat as unreachable so
-        # build_updates_embed falls back to a HEAD-only embed instead of
-        # dropping the announcement entirely.
-        commits = _commits_since(last_sha) if _sha_reachable(last_sha) else []
+        reachable = _sha_reachable(last_sha)
+        commits = _commits_since(last_sha) if reachable else []
+        # When the previous SHA *is* reachable but the only commits in the
+        # range are the bot's own "update state" entries (which _commits_since
+        # filters out), this isn't a real deploy — advance last_sha silently
+        # so we don't keep firing on every bot tick. The HEAD-only fallback
+        # is only correct when the SHA is unreachable (rebase/force-push).
+        if reachable and not commits:
+            state["last_deploy_sha"] = head_sha
+            return
         embed = build_updates_embed(commits, head_sha)
         ok = notify.send_update_announcement(updates_webhook, embed)
         if not ok:
