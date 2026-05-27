@@ -89,6 +89,20 @@ def load_state() -> dict:
         return {}
 
 
+def load_ping_user_ids(cfg: dict) -> list[str]:
+    """Resolve Discord user IDs from env (PING_USER_IDS, comma/semicolon/space
+    separated), else fall back to `notifications.ping_user_ids` in config.
+
+    Env-first keeps personal Discord IDs out of the public repo while still
+    allowing local dev to use config.yml.
+    """
+    env = os.environ.get("PING_USER_IDS", "").strip()
+    if env:
+        return [u for u in re.split(r"[,;\s]+", env) if u]
+    notif = cfg.get("notifications") or {}
+    return [str(u) for u in (notif.get("ping_user_ids") or [])]
+
+
 def save_state(state: dict) -> None:
     with STATE_PATH.open("w", encoding="utf-8") as f:
         json.dump(state, f, indent=2, ensure_ascii=False, sort_keys=True)
@@ -749,7 +763,7 @@ def main() -> int:
 
     if webhook:
         notif = cfg.get("notifications") or {}
-        user_ids = [str(u) for u in (notif.get("ping_user_ids") or [])]
+        user_ids = load_ping_user_ids(cfg)
         role_ids = [str(r) for r in (notif.get("ping_role_ids") or [])]
 
         new_stats_id = notify.edit_in_place(

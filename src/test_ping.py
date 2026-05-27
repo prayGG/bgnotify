@@ -35,6 +35,7 @@ from .main import (
     build_updates_embed,
     check_products,
     fetch_usd_eur_rate,
+    load_ping_user_ids,
 )
 
 log = logging.getLogger(__name__)
@@ -74,9 +75,9 @@ def main() -> int:
         return 1
 
     notif = cfg.get("notifications") or {}
-    user_ids = [str(u) for u in (notif.get("ping_user_ids") or [])]
+    user_ids = load_ping_user_ids(cfg)
     role_ids = [str(r) for r in (notif.get("ping_role_ids") or [])]
-    log.info("ping targets — users=%s roles=%s", user_ids, role_ids)
+    log.info("ping targets — users=%d, roles=%d", len(user_ids), len(role_ids))
 
     usd_eur = fetch_usd_eur_rate()
     log.info("USD->EUR rate: %s", usd_eur)

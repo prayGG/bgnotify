@@ -22,13 +22,13 @@ forum:
   check_interval_minutes: 120
 
 notifications:
-  # Discord User-IDs die bei jedem Dashboard-Update und bei Restocks gepingt
-  # werden. Wie holen: Discord → Settings → Advanced → Developer Mode an,
-  # dann Rechtsklick auf den Username → "User-ID kopieren" (~18-stellige Zahl).
-  # Pro Person eine neue "- " Zeile mit der ID in Anführungszeichen.
-  ping_user_ids:
-    - "REDACTED"
-    - "REDACTED"
+  # Discord User-IDs werden bei Restocks gepingt. Damit die IDs NICHT im
+  # public Repo stehen, kommen sie über env var `PING_USER_IDS`
+  # (komma-/semicolon-/space-separiert), die der Workflow aus GitHub
+  # Secrets baut. Für lokales Dev kannst du hier weiterhin Werte eintragen
+  # — die env var hat Vorrang.
+  # ping_user_ids:
+  #   - "DEINE_ID_HIER"
 
   # Optional: ganze Discord-Rollen pingen (Rechtsklick auf Rolle → ID kopieren).
   # ping_role_ids:
