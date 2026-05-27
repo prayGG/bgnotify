@@ -588,19 +588,16 @@ _ISO_PREFIX = re.compile(r"^\d{4}-\d{2}-\d{2}T")
 
 
 def build_forum_embed(post: dict) -> dict:
-    """Embed for one new BG forum post — title links to the post, excerpt below."""
+    """Embed for one new BG forum post — green accent, minimal chrome."""
     excerpt = post.get("excerpt") or ""
     if len(excerpt) > 600:
         excerpt = excerpt[:597].rstrip() + "…"
-    description = f">>> {excerpt}" if excerpt else "_(kein Snippet)_"
     embed = {
-        "author": {
-            "name": f"✦⠀⠀{post.get('author') or 'BG pharmaceuticals'} · neuer Post⠀⠀✦"
-        },
+        "author": {"name": post.get("author") or "BG pharmaceuticals"},
         "title": post.get("thread_title") or "(ohne Titel)",
         "url": post.get("url", ""),
-        "description": description,
-        "color": 0x5865F2,
+        "description": excerpt or "_(kein Snippet)_",
+        "color": COLOR_IN_STOCK,
         "footer": {"text": "thinksteroids.com"},
     }
     posted_at = post.get("posted_at") or ""
