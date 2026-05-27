@@ -12,6 +12,21 @@ jobs:
         with:
           python-version: '3.12'
       - run: pip install -r requirements.txt
+
+      # Shares the cache key with the main bot-run workflow so they reuse
+      # the same Chromium binary — first test-ping after a deps change is
+      # slow, subsequent runs are <2s for the install step.
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('requirements.txt') }}
+
+      - name: Install Playwright Chromium
+        run: python -m playwright install --with-deps chromium
+
       - run: python -m src.test_ping
         env:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          DISCORD_UPDATES_WEBHOOK_URL: ${{ secrets.DISCORD_UPDATES_WEBHOOK_URL }}
+          DISCORD_FORUM_WEBHOOK_URL: ${{ secrets.DISCORD_FORUM_WEBHOOK_URL }}

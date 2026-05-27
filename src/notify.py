@@ -140,6 +140,30 @@ def send_forum_post(webhook_url: str, embed: dict) -> bool:
     return _request("POST", webhook_url, payload) is not None
 
 
+def send_test(
+    webhook_url: str,
+    embed: dict,
+    label: str,
+    user_ids: Optional[list[str]] = None,
+    role_ids: Optional[list[str]] = None,
+) -> bool:
+    """One-shot test message — distinct `bgnotify · TEST` username, label in
+    content, optional mentions (used to verify ping config end-to-end)."""
+    if not webhook_url:
+        return False
+    prefix, allowed = _mentions(user_ids or [], role_ids or [])
+    content = label
+    if prefix:
+        content = f"{label}\n{prefix}" if label else prefix
+    payload = {
+        "username": "bgnotify · TEST",
+        "content": content,
+        "embeds": [embed] if embed else [],
+        "allowed_mentions": allowed if (user_ids or role_ids) else {"parse": []},
+    }
+    return _request("POST", webhook_url, payload) is not None
+
+
 def send(webhook_url: str, content: str) -> bool:
     """Simple unpinged message — CLI test only."""
     if not webhook_url:
