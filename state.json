@@ -1,8 +1,8 @@
 {
   "bot_stats": {
     "first_check_at": "2026-05-20T18:50:44.075159+00:00",
-    "last_check_at": "2026-05-28T11:20:27.539336+00:00",
-    "total_checks": 1093,
+    "last_check_at": "2026-05-28T11:30:33.078361+00:00",
+    "total_checks": 1094,
     "total_restocks": 18
   },
   "dashboard_message_id": "1509325502408822856",
@@ -37,7 +37,7 @@
       "3764548"
     ]
   },
-  "last_deploy_sha": "2df65ef90fef25dc3ca1dac013551da710b09b8e",
+  "last_deploy_sha": "624027ee3a113856632fec0d6f8abb7a5782eb26",
   "products": {
     "combined:Minoxidil 5 mg": {
       "Minoxidil 5 mg": {
@@ -59,7 +59,7 @@
         "found": true,
         "highest_price": "€ 42.20",
         "highest_price_at": "2026-05-20T20:10:30.624120+00:00",
-        "in_stock": true,
+        "in_stock": false,
         "last_restock_at": "2026-05-25T23:30:34.455575+00:00",
         "lowest_price": "€ 42.08",
         "lowest_price_at": "2026-05-25T23:30:34.455575+00:00",
@@ -77,6 +77,7 @@
             "start": "2026-05-25T22:10:27.764810+00:00"
           }
         ],
+        "out_since": "2026-05-28T11:30:36.533511+00:00",
         "previous_price": "€ 42.17",
         "price": "€ 42.08",
         "price_history": [
@@ -94,7 +95,7 @@
         "found": true,
         "highest_price": "€ 25.76",
         "highest_price_at": "2026-05-28T00:10:31.753712+00:00",
-        "in_stock": true,
+        "in_stock": false,
         "last_restock_at": "2026-05-28T00:10:31.753712+00:00",
         "lowest_price": "€ 25.76",
         "lowest_price_at": "2026-05-28T00:10:31.753712+00:00",
@@ -104,6 +105,7 @@
             "start": "2026-05-26T00:10:26.745860+00:00"
           }
         ],
+        "out_since": "2026-05-28T11:30:35.432881+00:00",
         "price": "€ 25.76",
         "price_history": [
           25.76
@@ -114,7 +116,7 @@
         "found": true,
         "highest_price": "€ 21.47",
         "highest_price_at": "2026-05-28T00:10:28.106438+00:00",
-        "in_stock": true,
+        "in_stock": false,
         "last_restock_at": "2026-05-25T23:30:30.287557+00:00",
         "lowest_price": "€ 17.18",
         "lowest_price_at": "2026-05-25T23:30:30.287557+00:00",
@@ -136,6 +138,7 @@
             "start": "2026-05-25T22:10:26.587866+00:00"
           }
         ],
+        "out_since": "2026-05-28T11:30:33.665639+00:00",
         "previous_price": "€ 17.18",
         "price": "€ 21.47",
         "price_history": [
@@ -155,7 +158,7 @@
         "found": true,
         "highest_price": "€ 68.85",
         "highest_price_at": "2026-05-25T21:00:37.227567+00:00",
-        "in_stock": true,
+        "in_stock": false,
         "last_restock_at": "2026-05-25T23:30:33.416524+00:00",
         "lowest_price": "€ 68.70",
         "lowest_price_at": "2026-05-25T23:30:33.416524+00:00",
@@ -177,6 +180,7 @@
             "start": "2026-05-25T22:10:27.403750+00:00"
           }
         ],
+        "out_since": "2026-05-28T11:30:34.867012+00:00",
         "previous_price": "€ 68.85",
         "price": "€ 68.70",
         "price_history": [
@@ -191,7 +195,7 @@
         "found": true,
         "highest_price": "€ 43.06",
         "highest_price_at": "2026-05-20T20:10:28.063486+00:00",
-        "in_stock": true,
+        "in_stock": false,
         "last_restock_at": "2026-05-25T23:30:31.865697+00:00",
         "lowest_price": "€ 42.94",
         "lowest_price_at": "2026-05-25T23:30:31.865697+00:00",
@@ -209,6 +213,7 @@
             "start": "2026-05-25T22:10:26.994903+00:00"
           }
         ],
+        "out_since": "2026-05-28T11:30:34.258082+00:00",
         "previous_price": "€ 43.03",
         "price": "€ 42.94",
         "price_history": [
@@ -226,7 +231,7 @@
         "found": true,
         "highest_price": "€ 38.75",
         "highest_price_at": "2026-05-20T18:50:46.223098+00:00",
-        "in_stock": true,
+        "in_stock": false,
         "last_restock_at": "2026-05-25T23:30:35.540298+00:00",
         "lowest_price": "€ 38.65",
         "lowest_price_at": "2026-05-25T23:30:35.540298+00:00",
@@ -244,6 +249,7 @@
             "start": "2026-05-25T22:10:28.115990+00:00"
           }
         ],
+        "out_since": "2026-05-28T11:30:37.081582+00:00",
         "previous_price": "€ 38.73",
         "price": "€ 38.65",
         "price_history": [
