@@ -1,9 +1,9 @@
 {
   "bot_stats": {
     "first_check_at": "2026-05-20T18:50:44.075159+00:00",
-    "last_check_at": "2026-05-28T00:00:41.694005+00:00",
-    "total_checks": 1025,
-    "total_restocks": 17
+    "last_check_at": "2026-05-28T00:10:26.844768+00:00",
+    "total_checks": 1026,
+    "total_restocks": 18
   },
   "dashboard_message_id": "1509325502408822856",
   "forum": {
@@ -37,7 +37,7 @@
       "3764548"
     ]
   },
-  "last_deploy_sha": "1dfadb358aa9deb7acc3d48d8bcb16bd8e3dbbab",
+  "last_deploy_sha": "0e41c0cb3a0938badd471779952b3250c35459c8",
   "products": {
     "combined:Minoxidil 5 mg": {
       "Minoxidil 5 mg": {
@@ -92,13 +92,28 @@
     "https://bgpharmadrugs.to/product/peptides/": {
       "BPC157/TB500 mix 5mg each": {
         "found": true,
-        "in_stock": false,
-        "out_since": "2026-05-26T00:10:26.745860+00:00"
+        "highest_price": "€ 25.76",
+        "highest_price_at": "2026-05-28T00:10:31.753712+00:00",
+        "in_stock": true,
+        "last_restock_at": "2026-05-28T00:10:31.753712+00:00",
+        "lowest_price": "€ 25.76",
+        "lowest_price_at": "2026-05-28T00:10:31.753712+00:00",
+        "oos_periods": [
+          {
+            "end": "2026-05-28T00:10:31.753712+00:00",
+            "start": "2026-05-26T00:10:26.745860+00:00"
+          }
+        ],
+        "price": "€ 25.76",
+        "price_history": [
+          25.76
+        ],
+        "restock_count": 1
       },
       "GHK CU 100 mg": {
         "found": true,
-        "highest_price": "€ 17.21",
-        "highest_price_at": "2026-05-22T03:20:24.857295+00:00",
+        "highest_price": "€ 21.47",
+        "highest_price_at": "2026-05-28T00:10:28.106438+00:00",
         "in_stock": true,
         "last_restock_at": "2026-05-25T23:30:30.287557+00:00",
         "lowest_price": "€ 17.18",
@@ -121,12 +136,13 @@
             "start": "2026-05-25T22:10:26.587866+00:00"
           }
         ],
-        "previous_price": "€ 17.21",
-        "price": "€ 17.18",
+        "previous_price": "€ 17.18",
+        "price": "€ 21.47",
         "price_history": [
           17.2,
           17.21,
-          17.18
+          17.18,
+          21.47
         ],
         "restock_count": 4
       },
