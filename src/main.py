@@ -171,19 +171,62 @@ def check_products(cfg: dict, state: dict) -> tuple[list[dict], list[dict], list
     restocks: list[dict] = []
     oos_alerts: list[dict] = []
 
+    # Phase 1 — scrape every product up front. We need all reads in hand before
+    # deciding transitions so we can recognize a site-wide outage (phase 2).
+    scanned: list[dict] = []
     for product in cfg.get("products") or []:
         urls = _product_urls(product)
         if not urls:
             continue
         url = urls[0]
         state_key = _product_state_key(product, urls)
-        name = product.get("name") or url
         watch = product.get("watch_variants") or []
         prev = products_state.setdefault(state_key, {})
         try:
             current = _check_combined(urls, watch) if len(urls) > 1 else bgpharma.check(url, watch)
         except Exception as e:
             log.error("check failed for %s: %s", url, e)
+            current = None
+        scanned.append({
+            "url": url, "state_key": state_key, "name": product.get("name") or url,
+            "watch": watch, "prev": prev, "current": current,
+        })
+
+    # Phase 2 — detect a suspected site-wide outage. If *every* variant that was
+    # in stock last run now reads OOS (or failed to scrape) in the same run,
+    # it's almost certainly a site-side glitch — a catalog re-sync or a
+    # currency/region context flip that marks the whole shop non-purchasable —
+    # not a real catalog-wide sellout. (Observed 2026-05-28: all 6 in-stock
+    # variants flipped OOS at 11:30 UTC and back at 12:30 UTC, every price a few
+    # cents higher: the signature of a currency refresh, not six real restocks.)
+    # For those variants we hold last-known state instead of recording the OOS,
+    # which also prevents the false restock ping storm when the site recovers.
+    prev_up: set[tuple[str, str]] = set()
+    confirmed_up_now: set[tuple[str, str]] = set()
+    for item in scanned:
+        cur = item["current"]
+        variants = list(cur.keys()) if cur else (item["watch"] or ["(unknown)"])
+        for variant in variants:
+            key = (item["state_key"], variant)
+            if item["prev"].get(variant, {}).get("in_stock"):
+                prev_up.add(key)
+            info = cur.get(variant) if cur else None
+            if info and info.get("found") and info.get("in_stock"):
+                confirmed_up_now.add(key)
+    site_wide_outage = len(prev_up) >= 3 and prev_up.isdisjoint(confirmed_up_now)
+    if site_wide_outage:
+        log.warning(
+            "suspected site-wide outage: all %d previously in-stock variant(s) "
+            "read OOS/failed this run — holding last-known state, suppressing alerts",
+            len(prev_up),
+        )
+
+    # Phase 3 — apply per-variant transitions.
+    for item in scanned:
+        url, name = item["url"], item["name"]
+        watch, prev, current = item["watch"], item["prev"], item["current"]
+
+        if current is None:
             # Whole-product scrape failed — surface last known state so the
             # dashboard doesn't black out during a transient site outage.
             for variant in watch or ["(unknown)"]:
@@ -222,6 +265,25 @@ def check_products(cfg: dict, state: dict) -> tuple[list[dict], list[dict], list
 
             in_stock_now = bool(info["in_stock"])
             in_stock_prev = entry.get("in_stock")
+
+            # Site-wide-outage guard: a previously in-stock variant reading OOS
+            # during a mass flip is an unreliable read. Preserve last-known
+            # state (don't stamp out_since, don't flip in_stock, don't alert) so
+            # the recovery doesn't fire a false restock ping. Flagged uncertain
+            # on the dashboard via `error`.
+            if site_wide_outage and in_stock_prev and not in_stock_now:
+                statuses.append({
+                    "product_name": name, "product_url": url, "variant": variant,
+                    "in_stock": True,
+                    "price": entry.get("price", ""),
+                    "previous_price": entry.get("previous_price", ""),
+                    "out_since": entry.get("out_since", ""),
+                    "found": True,
+                    "deep_link": deep,
+                    "error": True,
+                })
+                continue
+
             new_price = info.get("price", "")
             prev_price = entry.get("price", "")
             now_iso = datetime.now(timezone.utc).isoformat()
