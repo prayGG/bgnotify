@@ -91,7 +91,7 @@ def edit_in_place(webhook_url: str, embed: dict, message_id: str = "") -> Option
         if result.get("id"):
             return str(result["id"])
 
-    post_payload = {"username": "bgnotify by pray", **payload}
+    post_payload = {"username": "bgnotify · status", **payload}
     result = _request("POST", f"{webhook_url}?wait=true", post_payload)
     if result is None:
         return None
@@ -108,7 +108,7 @@ def send_restock_alert(
         return False
     prefix, allowed = _mentions(user_ids or [], role_ids or [])
     payload = {
-        "username": "bgnotify by pray",
+        "username": "bgnotify · status",
         "content": prefix,
         "embeds": [embed],
         "allowed_mentions": allowed,
@@ -134,7 +134,7 @@ def send_update_announcement(webhook_url: str, embed: dict) -> bool:
     if not webhook_url:
         return False
     payload = {
-        "username": "bgnotify deploys",
+        "username": "bgnotify · updates",
         "embeds": [embed],
         "allowed_mentions": {"parse": []},
     }
@@ -146,7 +146,7 @@ def send_forum_post(webhook_url: str, embed: dict) -> bool:
     if not webhook_url:
         return False
     payload = {
-        "username": "bgnotify · forum",
+        "username": "bgnotify · meso",
         "embeds": [embed],
         "allowed_mentions": {"parse": []},
     }
@@ -181,7 +181,7 @@ def send(webhook_url: str, content: str) -> bool:
     """Simple unpinged message — CLI test only."""
     if not webhook_url:
         return False
-    payload = {"username": "bgnotify by pray", "content": content[:1900], "allowed_mentions": {"parse": []}}
+    payload = {"username": "bgnotify · status", "content": content[:1900], "allowed_mentions": {"parse": []}}
     return _request("POST", webhook_url, payload) is not None
 
 
