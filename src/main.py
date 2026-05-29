@@ -18,7 +18,7 @@ from typing import Optional
 import requests
 import yaml
 
-from . import bgpharma, forum, notify
+from . import bgpharma, forum, notify, orders
 
 log = logging.getLogger(__name__)
 
@@ -903,6 +903,120 @@ def announce_deploy(state: dict, updates_webhook: str) -> None:
     state["last_deploy_sha"] = head_sha
 
 
+# --------------------------------------------------------------------------
+# Bestellstatus (BG-Kundenkonto → privater Discord-Channel)
+# --------------------------------------------------------------------------
+_ORDER_STATUS_EMOJI = {
+    "pending": "🕓", "processing": "📦", "preparing": "📦", "on-hold": "⏸️",
+    "completed": "✅", "cancelled": "❌", "refunded": "↩️", "failed": "⚠️",
+}
+# Status, in denen eine Tracking-Note auftauchen kann.
+_TRACKABLE_STATUS = {"processing", "preparing", "on-hold", "completed"}
+
+
+def build_order_status_embed(order: dict, fresh: bool = False) -> dict:
+    slug = order.get("status", "")
+    emoji = _ORDER_STATUS_EMOJI.get(slug, "📦")
+    label = order.get("status_text") or slug or "—"
+    head = "🆕 Neue Bestellung" if fresh else "Status-Update"
+    return {
+        "author": {"name": "✦⠀⠀Bestellung⠀⠀✦"},
+        "title": f"#{order.get('order_id', '')}",
+        "description": f"{head}\n{emoji}⠀**{label}**",
+        "color": COLOR_IN_STOCK if slug == "completed" else COLOR_WARN,
+        "footer": {"text": "bgpharmadrugs.to"},
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }
+
+
+def build_order_tracking_embed(order_id: str, links: list[str]) -> dict:
+    body = "\n".join(f"[→⠀Sendung verfolgen]({l})" for l in links)
+    return {
+        "author": {"name": "✦⠀⠀Tracking⠀⠀✦"},
+        "title": f"#{order_id}",
+        "description": f"🚚⠀**Tracking ist da**\n{body}\n\n_Details in deiner Proton-Mail_",
+        "color": COLOR_IN_STOCK,
+        "footer": {"text": "via Hermes"},
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }
+
+
+def check_orders(webhook: str, user_ids: list[str], role_ids: list[str], interval_minutes: int = 30) -> None:
+    """BG-Kundenkonto einloggen, Bestellungen diffen, Discord pingen.
+
+    Stand liegt in einem privaten Gist (NICHT state.json — das ist öffentlich).
+    Erster Lauf setzt nur die Baseline (postet nichts), damit alte Bestellungen
+    nicht rückwirkend gespammt werden. Login nur alle `interval_minutes`
+    (höflich gegenüber Incapsula — der Bot-Takt selbst ist viel enger).
+    """
+    token = os.environ.get("GIST_TOKEN", "")
+    gist_id = os.environ.get("GIST_ID", "")
+    user = os.environ.get("BG_USERNAME", "")
+    pw = os.environ.get("BG_PASSWORD", "")
+    if not all([webhook, token, gist_id, user, pw]):
+        log.info("orders: nicht konfiguriert (BG_USERNAME/BG_PASSWORD/GIST_TOKEN/GIST_ID/order-webhook) — übersprungen")
+        return
+
+    st = orders.load_order_state(token, gist_id)
+    order_map = st.setdefault("orders", {})
+    initialized = st.get("_initialized", False)
+
+    # Intervall-Gate: außerhalb des Fensters gar nicht erst einloggen.
+    last = st.get("last_check_at", "")
+    if initialized and last:
+        try:
+            dt = datetime.fromisoformat(last.replace("Z", "+00:00"))
+            if (datetime.now(timezone.utc) - dt).total_seconds() < interval_minutes * 60:
+                log.info("orders: noch nicht fällig (Intervall %d min)", interval_minutes)
+                return
+        except ValueError:
+            pass
+
+    def want_detail(o: dict) -> bool:
+        if not initialized:
+            return False  # Baseline-Lauf: keine History nachladen
+        if o["status"] not in _TRACKABLE_STATUS:
+            return False
+        prev = order_map.get(o["order_id"])
+        return not (prev and prev.get("tracking_posted"))
+
+    try:
+        olist, details = orders.fetch(user, pw, want_detail)
+    except Exception as e:  # Login/Incapsula/Netzwerk — nie den ganzen Bot reißen
+        log.error("orders: fetch fehlgeschlagen: %s", e)
+        return
+
+    st["last_check_at"] = datetime.now(timezone.utc).isoformat()
+
+    if not initialized:
+        for o in olist:
+            order_map[o["order_id"]] = {"status": o["status"], "tracking_posted": o["status"] == "completed"}
+        st["_initialized"] = True
+        orders.save_order_state(token, gist_id, st)
+        log.info("orders: Baseline gesetzt (%d Bestellungen), nichts gepostet", len(olist))
+        return
+
+    for o in olist:
+        oid, slug = o["order_id"], o["status"]
+        prev = order_map.get(oid)
+        if prev is None:
+            notify.send_order_update(webhook, build_order_status_embed(o, fresh=True), user_ids, role_ids)
+            order_map[oid] = {"status": slug, "tracking_posted": False}
+            prev = order_map[oid]
+        elif prev.get("status") != slug:
+            notify.send_order_update(webhook, build_order_status_embed(o), user_ids, role_ids)
+            prev["status"] = slug
+
+        if not prev.get("tracking_posted") and oid in details:
+            d = orders.parse_order_detail(details[oid])
+            if d["tracking"]:
+                notify.send_order_update(webhook, build_order_tracking_embed(oid, d["tracking"]), user_ids, role_ids)
+                prev["tracking_posted"] = True
+
+    # Immer speichern — sonst rückt last_check_at nie vor (= Login bei jedem Lauf).
+    orders.save_order_state(token, gist_id, st)
+
+
 def main() -> int:
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
     cfg = load_yaml(CONFIG_PATH)
@@ -937,6 +1051,13 @@ def main() -> int:
             notify.send_forum_post(forum_webhook, build_forum_embed(post))
     elif new_forum_posts:
         log.info("forum: %d new post(s) but %s is empty", len(new_forum_posts), forum_webhook_env)
+
+    # Bestellstatus aus dem BG-Kundenkonto (eigener Webhook, eigener Gist-Stand).
+    order_webhook_env = cfg.get("discord_order_webhook_env", "DISCORD_ORDER_WEBHOOK_URL")
+    order_webhook = os.environ.get(order_webhook_env, "")
+    order_role_ids = [str(r) for r in ((cfg.get("notifications") or {}).get("ping_role_ids") or [])]
+    order_interval = int((cfg.get("orders") or {}).get("check_interval_minutes", 30))
+    check_orders(order_webhook, load_ping_user_ids(cfg), order_role_ids, order_interval)
 
     if webhook:
         notif = cfg.get("notifications") or {}

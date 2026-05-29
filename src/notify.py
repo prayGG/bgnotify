@@ -153,6 +153,26 @@ def send_forum_post(webhook_url: str, embed: dict) -> bool:
     return _request("POST", webhook_url, payload) is not None
 
 
+def send_order_update(
+    webhook_url: str,
+    embed: dict,
+    user_ids: Optional[list[str]] = None,
+    role_ids: Optional[list[str]] = None,
+) -> bool:
+    """One POST per order status change / tracking drop, into the private
+    order channel. Pings the order's owner so they actually notice."""
+    if not webhook_url:
+        return False
+    prefix, allowed = _mentions(user_ids or [], role_ids or [])
+    payload = {
+        "username": "bgnotify · orders",
+        "content": prefix,
+        "embeds": [embed],
+        "allowed_mentions": allowed,
+    }
+    return _request("POST", webhook_url, payload) is not None
+
+
 def send_test(
     webhook_url: str,
     embed: dict,

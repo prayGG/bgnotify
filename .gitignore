@@ -3,3 +3,8 @@ __pycache__/
 .venv/
 .env
 prompt.txt
+
+# Lokale Order-Samples (persönliche Daten — NIE committen)
+order-sample.html
+order-*.html
+*.eml

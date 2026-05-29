@@ -54,8 +54,10 @@ jobs:
 
       # Cache the ~150 MB Chromium binary across runs. Key on requirements.txt
       # so an upgrade re-downloads matching browser builds automatically.
+      # Unconditional now: both the forum scraper AND the order-status login
+      # need a real browser. The order check self-gates by interval in code,
+      # so the binary is present but only actually driven when due.
       - name: Cache Playwright browsers
-        if: steps.forum.outputs.due == 'yes'
         uses: actions/cache@v4
         with:
           path: ~/.cache/ms-playwright
@@ -65,7 +67,6 @@ jobs:
       # pre-installed; the only "missing" packages with --with-deps were
       # emoji/CJK fonts, which we don't need for HTML-only scraping.
       - name: Install Playwright Chromium
-        if: steps.forum.outputs.due == 'yes'
         run: python -m playwright install chromium
 
       - name: Run Bot
@@ -76,6 +77,12 @@ jobs:
           DISCORD_UPDATES_WEBHOOK_URL: ${{ secrets.DISCORD_UPDATES_WEBHOOK_URL }}
           DISCORD_FORUM_WEBHOOK_URL: ${{ secrets.DISCORD_FORUM_WEBHOOK_URL }}
           PING_USER_IDS: "${{ secrets.DISCORDID }},${{ secrets.WEITERE_ID_HIER }}"
+          # Bestellstatus aus dem BG-Kundenkonto (leer = Feature inaktiv)
+          DISCORD_ORDER_WEBHOOK_URL: ${{ secrets.DISCORD_ORDER_WEBHOOK_URL }}
+          BG_USERNAME: ${{ secrets.BG_USERNAME }}
+          BG_PASSWORD: ${{ secrets.BG_PASSWORD }}
+          GIST_TOKEN: ${{ secrets.GIST_TOKEN }}
+          GIST_ID: ${{ secrets.GIST_ID }}
 
       - name: Commit & Push state
         run: |
