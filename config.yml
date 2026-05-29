@@ -27,6 +27,12 @@ forum:
   # ein Stock-Check, deshalb großzügiger Abstand.
   check_interval_minutes: 120
 
+# Bestellstatus aus dem BG-Kundenkonto. Login nur alle N Minuten (höflich +
+# unauffällig — Bestellungen bewegen sich über Stunden, nicht Minuten). Der
+# Login-Zeitpunkt wird zusätzlich um ±10% gejittert (kein exaktes Muster).
+orders:
+  check_interval_minutes: 240
+
 notifications:
   # Discord User-IDs werden bei Restocks gepingt. Damit die IDs NICHT im
   # public Repo stehen, kommen sie über env var `PING_USER_IDS`

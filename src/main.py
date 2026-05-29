@@ -8,6 +8,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import random
 import re
 import subprocess
 import sys
@@ -941,7 +942,7 @@ def build_order_tracking_embed(order_id: str, links: list[str]) -> dict:
     }
 
 
-def check_orders(webhook: str, user_ids: list[str], role_ids: list[str], interval_minutes: int = 30) -> None:
+def check_orders(webhook: str, user_ids: list[str], role_ids: list[str], interval_minutes: int = 240) -> None:
     """BG-Kundenkonto einloggen, Bestellungen diffen, Discord pingen.
 
     Stand liegt in einem privaten Gist (NICHT state.json — das ist öffentlich).
@@ -961,16 +962,24 @@ def check_orders(webhook: str, user_ids: list[str], role_ids: list[str], interva
     order_map = st.setdefault("orders", {})
     initialized = st.get("_initialized", False)
 
-    # Intervall-Gate: außerhalb des Fensters gar nicht erst einloggen.
+    # Intervall-Gate mit ±10% Jitter (kein exakt-periodisches Login-Muster).
+    # Greift auch nach Fehlversuchen, weil last_check_at unten IMMER gesetzt
+    # wird — so hämmert ein fehlschlagender Login nicht jeden Bot-Lauf erneut
+    # gegen BG (Ban-/Lockout-Schutz).
     last = st.get("last_check_at", "")
-    if initialized and last:
+    if last:
         try:
             dt = datetime.fromisoformat(last.replace("Z", "+00:00"))
-            if (datetime.now(timezone.utc) - dt).total_seconds() < interval_minutes * 60:
-                log.info("orders: noch nicht fällig (Intervall %d min)", interval_minutes)
+            threshold = interval_minutes * 60 * random.uniform(0.9, 1.1)
+            if (datetime.now(timezone.utc) - dt).total_seconds() < threshold:
+                log.info("orders: noch nicht fällig (Intervall ~%d min)", interval_minutes)
                 return
         except ValueError:
             pass
+
+    # Versuchszeitpunkt sofort vormerken (Fehler-Drossel: auch ein gescheiterter
+    # Login zählt als Versuch und löst den vollen Intervall-Backoff aus).
+    st["last_check_at"] = datetime.now(timezone.utc).isoformat()
 
     def want_detail(o: dict) -> bool:
         if not initialized:
@@ -984,9 +993,8 @@ def check_orders(webhook: str, user_ids: list[str], role_ids: list[str], interva
         olist, details = orders.fetch(user, pw, want_detail)
     except Exception as e:  # Login/Incapsula/Netzwerk — nie den ganzen Bot reißen
         log.error("orders: fetch fehlgeschlagen: %s", e)
+        orders.save_order_state(token, gist_id, st)  # last_check_at sichern → Backoff
         return
-
-    st["last_check_at"] = datetime.now(timezone.utc).isoformat()
 
     if not initialized:
         for o in olist:
