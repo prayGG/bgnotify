@@ -1,8 +1,8 @@
 {
   "bot_stats": {
     "first_check_at": "2026-05-20T18:50:44.075159+00:00",
-    "last_check_at": "2026-05-29T10:30:34.743040+00:00",
-    "total_checks": 1232,
+    "last_check_at": "2026-05-29T10:40:26.934574+00:00",
+    "total_checks": 1233,
     "total_restocks": 24
   },
   "dashboard_message_id": "1509325502408822856",
@@ -37,7 +37,7 @@
       "3764548"
     ]
   },
-  "last_deploy_sha": "f5a82ce7200b60405fa97f7d3b1f516e611ab00b",
+  "last_deploy_sha": "b8f2d65c3848189a10f73f18ad07b7bc06a70bba",
   "products": {
     "combined:Minoxidil 5 mg": {
       "Minoxidil 5 mg": {
