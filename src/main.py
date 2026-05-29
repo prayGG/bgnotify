@@ -911,13 +911,31 @@ _ORDER_STATUS_EMOJI = {
     "pending": "🕓", "processing": "📦", "preparing": "📦", "on-hold": "⏸️",
     "completed": "✅", "cancelled": "❌", "refunded": "↩️", "failed": "⚠️",
 }
+# Farbe je Status — visuell dem Prozess-Schritt zugeordnet (pending→completed).
+_ORDER_STATUS_COLOR = {
+    "pending":    0x95A5A6,  # grau   — wartet auf Zahlung
+    "processing": 0x5865F2,  # blau   — in Bearbeitung (BG: "Preparing")
+    "preparing":  0x5865F2,  # blau
+    "on-hold":    0xE67E22,  # orange — hängt / Klärung
+    "completed":  0x57F287,  # grün   — fertig / versandt
+    "cancelled":  0xED4245,  # rot    — storniert
+    "failed":     0xED4245,  # rot    — fehlgeschlagen
+    "refunded":   0x95A5A6,  # grau   — erstattet
+}
 # Status, in denen eine Tracking-Note auftauchen kann.
 _TRACKABLE_STATUS = {"processing", "preparing", "on-hold", "completed"}
 # Endzustände — eine Bestellung in einem dieser Status gilt als "nicht offen".
 _TERMINAL_STATUS = {"completed", "cancelled", "refunded", "failed"}
 
 
-def build_order_status_embed(order: dict, fresh: bool = False) -> dict:
+def _items_block(items: Optional[list[str]]) -> str:
+    """Artikelzeilen für die Embed-Beschreibung (leer wenn keine bekannt)."""
+    if not items:
+        return ""
+    return "\n\n" + "\n".join(f"·⠀{it}" for it in items)
+
+
+def build_order_status_embed(order: dict, fresh: bool = False, items: Optional[list[str]] = None) -> dict:
     slug = order.get("status", "")
     emoji = _ORDER_STATUS_EMOJI.get(slug, "📦")
     label = order.get("status_text") or slug or "—"
@@ -925,19 +943,19 @@ def build_order_status_embed(order: dict, fresh: bool = False) -> dict:
     return {
         "author": {"name": "✦⠀⠀Bestellung⠀⠀✦"},
         "title": f"#{order.get('order_id', '')}",
-        "description": f"{head}\n{emoji}⠀**{label}**",
-        "color": COLOR_IN_STOCK if slug == "completed" else COLOR_WARN,
+        "description": f"{head}\n{emoji}⠀**{label}**" + _items_block(items),
+        "color": _ORDER_STATUS_COLOR.get(slug, COLOR_WARN),
         "footer": {"text": "bgpharmadrugs.to"},
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }
 
 
-def build_order_tracking_embed(order_id: str, links: list[str]) -> dict:
+def build_order_tracking_embed(order_id: str, links: list[str], items: Optional[list[str]] = None) -> dict:
     body = "\n".join(f"[→⠀Sendung verfolgen]({l})" for l in links)
     return {
         "author": {"name": "✦⠀⠀Tracking⠀⠀✦"},
         "title": f"#{order_id}",
-        "description": f"🚚⠀**Tracking ist da**\n{body}\n\n_Details in deiner Mail_",
+        "description": f"🚚⠀**Tracking ist da**\n{body}" + _items_block(items) + "\n\n_Details in deiner Mail_",
         "color": COLOR_IN_STOCK,
         "footer": {"text": "via Hermes"},
         "timestamp": datetime.now(timezone.utc).isoformat(),
@@ -979,10 +997,12 @@ def _check_one_account(name: str, webhook: str, user: str, pw: str,
     def want_detail(o: dict) -> bool:
         if not initialized:
             return False  # Baseline-Lauf: keine History nachladen
+        prev = order_map.get(o["order_id"])
+        if prev is None:
+            return True  # neue Bestellung → Detailseite für die Artikel (+ ggf. Tracking)
         if o["status"] not in _TRACKABLE_STATUS:
             return False
-        prev = order_map.get(o["order_id"])
-        return not (prev and prev.get("tracking_posted"))
+        return not prev.get("tracking_posted")
 
     olist, details = orders.fetch(user, pw, want_detail)
 
@@ -995,20 +1015,26 @@ def _check_one_account(name: str, webhook: str, user: str, pw: str,
 
     for o in olist:
         oid, slug = o["order_id"], o["status"]
+        detail = orders.parse_order_detail(details[oid]) if oid in details else None
+        items = (detail or {}).get("items") or None
+
         prev = order_map.get(oid)
         if prev is None:
-            notify.send_order_update(webhook, build_order_status_embed(o, fresh=True), ping_ids, role_ids)
             order_map[oid] = {"status": slug, "tracking_posted": False}
             prev = order_map[oid]
-        elif prev.get("status") != slug:
-            notify.send_order_update(webhook, build_order_status_embed(o), ping_ids, role_ids)
-            prev["status"] = slug
+            if items:
+                prev["items"] = items
+            notify.send_order_update(webhook, build_order_status_embed(o, fresh=True, items=prev.get("items")), ping_ids, role_ids)
+        else:
+            if items and not prev.get("items"):
+                prev["items"] = items  # Artikel einmalig sichern
+            if prev.get("status") != slug:
+                notify.send_order_update(webhook, build_order_status_embed(o, items=prev.get("items")), ping_ids, role_ids)
+                prev["status"] = slug
 
-        if not prev.get("tracking_posted") and oid in details:
-            d = orders.parse_order_detail(details[oid])
-            if d["tracking"]:
-                notify.send_order_update(webhook, build_order_tracking_embed(oid, d["tracking"]), ping_ids, role_ids)
-                prev["tracking_posted"] = True
+        if not prev.get("tracking_posted") and detail and detail.get("tracking"):
+            notify.send_order_update(webhook, build_order_tracking_embed(oid, detail["tracking"], items=prev.get("items")), ping_ids, role_ids)
+            prev["tracking_posted"] = True
 
 
 def check_orders(cfg: dict, default_webhook: str, default_ping_ids: list[str], role_ids: list[str]) -> None:

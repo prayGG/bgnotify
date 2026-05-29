@@ -99,10 +99,25 @@ def parse_order_detail(html_text: str) -> dict:
             if href not in tracking:
                 tracking.append(href)
 
+    # Bestellte Artikel (Name + Menge) aus der Order-Details-Tabelle.
+    items: list[str] = []
+    for row in soup.select("tr.woocommerce-table__line-item, tr.order_item"):
+        name_cell = row.select_one(".product-name")
+        if not name_cell:
+            continue
+        link = name_cell.select_one("a")
+        name = _norm(link.get_text()) if link else _norm(name_cell.get_text())
+        qty_el = name_cell.select_one(".product-quantity")
+        qty = _norm(qty_el.get_text()) if qty_el else ""
+        line = _norm(f"{name} {qty}")
+        if line:
+            items.append(line)
+
     return {
         "order_id": _norm(number_el.get_text()) if number_el else "",
         "status_text": _norm(status_el.get_text()) if status_el else "",
         "tracking": tracking,
+        "items": items,
     }
 
 

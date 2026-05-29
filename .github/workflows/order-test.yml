@@ -19,3 +19,4 @@ jobs:
       - run: python -m src.order_test
         env:
           DISCORD_ORDER_WEBHOOK_URL: ${{ secrets.DISCORD_ORDER_WEBHOOK_URL }}
+          DISCORDID: ${{ secrets.DISCORDID }}   # damit der Test wie echt pingt
