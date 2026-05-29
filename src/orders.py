@@ -36,8 +36,15 @@ UA = (
 # Status-Slug steckt in der Zeilen-Klasse: ...__row--status-completed
 _ROW_STATUS_RE = re.compile(r"--status-([a-z0-9\-]+)")
 _ORDER_ID_RE = re.compile(r"/view-order/(\d+)")
-# Tracking-Links, die wir erkennen wollen (BG nutzt Hermes).
-_TRACKING_HOSTS = ("hermesworld.com", "myhermes", "evri")
+# Tracking-Links, die wir als Sendungsverfolgung erkennen. BG nutzt aktuell
+# Hermes — die übrigen sind ein Sicherheitsnetz, falls der Carrier wechselt.
+# Substring-Match auf die URL; bewusst spezifisch gehalten (keine Fehl-Treffer).
+_TRACKING_HOSTS = (
+    "hermesworld", "myhermes", "evri",          # Hermes (aktuell)
+    "dhl.", "dpd.", "gls-group", "gls.de",      # DHL / DPD / GLS
+    "deutschepost", "ups.com", "fedex.com",     # Dt. Post / UPS / FedEx
+    "17track", "tracking.",                      # Aggregator / generischer Tracking-Host
+)
 
 
 def _norm(s: str) -> str:
