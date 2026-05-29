@@ -937,7 +937,7 @@ def build_order_tracking_embed(order_id: str, links: list[str]) -> dict:
     return {
         "author": {"name": "✦⠀⠀Tracking⠀⠀✦"},
         "title": f"#{order_id}",
-        "description": f"🚚⠀**Tracking ist da**\n{body}\n\n_Details in deiner Proton-Mail_",
+        "description": f"🚚⠀**Tracking ist da**\n{body}\n\n_Details in deiner Mail_",
         "color": COLOR_IN_STOCK,
         "footer": {"text": "via Hermes"},
         "timestamp": datetime.now(timezone.utc).isoformat(),
