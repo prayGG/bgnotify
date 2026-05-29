@@ -948,7 +948,6 @@ def build_order_status_embed(order: dict, fresh: bool = False, items: Optional[l
     return {
         "author": {"name": "✦⠀⠀Bestellung⠀⠀✦"},
         "title": f"#{order.get('order_id', '')}",
-        "url": order.get("url") or None,
         "description": f"{head}\n{emoji}⠀**{label}**" + _items_block(items) + _order_link(order.get("url")),
         "color": _ORDER_STATUS_COLOR.get(slug, COLOR_WARN),
         "footer": {"text": "bgpharmadrugs.to"},
@@ -962,7 +961,6 @@ def build_order_tracking_embed(order_id: str, links: list[str], items: Optional[
     return {
         "author": {"name": "✦⠀⠀Tracking⠀⠀✦"},
         "title": f"#{order_id}",
-        "url": url or None,
         "description": f"🚚⠀**Tracking ist da**\n{body}" + _items_block(items) + _order_link(url) + "\n\n_Details in deiner Mail_",
         "color": COLOR_IN_STOCK,
         "footer": {"text": "via Hermes"},
