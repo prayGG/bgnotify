@@ -944,55 +944,37 @@ def build_order_tracking_embed(order_id: str, links: list[str]) -> dict:
     }
 
 
-def check_orders(webhook: str, user_ids: list[str], role_ids: list[str],
-                 interval_minutes: int = 240, idle_interval_minutes: int = 1440) -> None:
-    """BG-Kundenkonto einloggen, Bestellungen diffen, Discord pingen.
+def _parse_ids(raw: str) -> list[str]:
+    return [x for x in re.split(r"[,;\s]+", raw or "") if x]
 
-    Stand liegt in einem privaten Gist (NICHT state.json — das ist öffentlich).
-    Erster Lauf setzt nur die Baseline (postet nichts), damit alte Bestellungen
-    nicht rückwirkend gespammt werden.
 
-    Zwei-Gang-Takt: bei offener Bestellung alle `interval_minutes` (schnell für
-    Statuswechsel/Tracking), sonst nur alle `idle_interval_minutes` (ruhend —
-    nur um neue Bestellungen zu entdecken). Höflich gegenüber Incapsula.
-    """
-    token = os.environ.get("GIST_TOKEN", "")
-    gist_id = os.environ.get("GIST_ID", "")
-    user = os.environ.get("BG_USERNAME", "")
-    pw = os.environ.get("BG_PASSWORD", "")
-    if not all([webhook, token, gist_id, user, pw]):
-        log.info("orders: nicht konfiguriert (BG_USERNAME/BG_PASSWORD/GIST_TOKEN/GIST_ID/order-webhook) — übersprungen")
-        return
-
-    st = orders.load_order_state(token, gist_id)
-    order_map = st.setdefault("orders", {})
-    initialized = st.get("_initialized", False)
-
-    # Zwei-Gang-Takt: offene Bestellung → schnell, sonst Ruhemodus (selten,
-    # nur um neue Bestellungen zu entdecken — spart Logins wenn man nicht
-    # bestellt). Schaltet automatisch zurück, sobald wieder was offen ist.
-    has_open = any(v.get("status") not in _TERMINAL_STATUS for v in order_map.values())
+def _orders_due(acct: dict, interval_minutes: int, idle_interval_minutes: int) -> bool:
+    """Ist dieser Account fällig? Zwei-Gang-Takt (offen→schnell, sonst Ruhe) mit
+    ±10% Jitter. Kein last_check_at = noch nie geprüft = fällig."""
+    has_open = any(v.get("status") not in _TERMINAL_STATUS for v in (acct.get("orders") or {}).values())
     effective = interval_minutes if has_open else idle_interval_minutes
+    last = acct.get("last_check_at", "")
+    if not last:
+        return True
+    try:
+        dt = datetime.fromisoformat(last.replace("Z", "+00:00"))
+    except ValueError:
+        return True
+    threshold = effective * 60 * random.uniform(0.9, 1.1)
+    return (datetime.now(timezone.utc) - dt).total_seconds() >= threshold
 
-    # Intervall-Gate mit ±10% Jitter (kein exakt-periodisches Login-Muster).
-    # Greift auch nach Fehlversuchen, weil last_check_at unten IMMER gesetzt
-    # wird — so hämmert ein fehlschlagender Login nicht jeden Bot-Lauf erneut
-    # gegen BG (Ban-/Lockout-Schutz).
-    last = st.get("last_check_at", "")
-    if last:
-        try:
-            dt = datetime.fromisoformat(last.replace("Z", "+00:00"))
-            threshold = effective * 60 * random.uniform(0.9, 1.1)
-            if (datetime.now(timezone.utc) - dt).total_seconds() < threshold:
-                log.info("orders: noch nicht fällig (%s, ~%d min)",
-                         "aktiv" if has_open else "ruhend", effective)
-                return
-        except ValueError:
-            pass
 
-    # Versuchszeitpunkt sofort vormerken (Fehler-Drossel: auch ein gescheiterter
-    # Login zählt als Versuch und löst den vollen Intervall-Backoff aus).
-    st["last_check_at"] = datetime.now(timezone.utc).isoformat()
+def _check_one_account(name: str, webhook: str, user: str, pw: str,
+                       ping_ids: list[str], role_ids: list[str], acct: dict) -> None:
+    """Login + Diff + Post für GENAU einen Account; mutiert `acct` in place.
+
+    last_check_at wird VOR dem Login gesetzt → Fehler-Drossel (ein gescheiterter
+    Login löst trotzdem den Backoff aus, kein Hämmern). fetch() darf werfen —
+    der Aufrufer fängt das und speichert den Stand (mit gesetztem last_check_at).
+    """
+    order_map = acct.setdefault("orders", {})
+    initialized = acct.get("_initialized", False)
+    acct["last_check_at"] = datetime.now(timezone.utc).isoformat()
 
     def want_detail(o: dict) -> bool:
         if not initialized:
@@ -1002,39 +984,100 @@ def check_orders(webhook: str, user_ids: list[str], role_ids: list[str],
         prev = order_map.get(o["order_id"])
         return not (prev and prev.get("tracking_posted"))
 
-    try:
-        olist, details = orders.fetch(user, pw, want_detail)
-    except Exception as e:  # Login/Incapsula/Netzwerk — nie den ganzen Bot reißen
-        log.error("orders: fetch fehlgeschlagen: %s", e)
-        orders.save_order_state(token, gist_id, st)  # last_check_at sichern → Backoff
-        return
+    olist, details = orders.fetch(user, pw, want_detail)
 
     if not initialized:
         for o in olist:
             order_map[o["order_id"]] = {"status": o["status"], "tracking_posted": o["status"] == "completed"}
-        st["_initialized"] = True
-        orders.save_order_state(token, gist_id, st)
-        log.info("orders: Baseline gesetzt (%d Bestellungen), nichts gepostet", len(olist))
+        acct["_initialized"] = True
+        log.info("orders[%s]: Baseline gesetzt (%d Bestellungen), nichts gepostet", name, len(olist))
         return
 
     for o in olist:
         oid, slug = o["order_id"], o["status"]
         prev = order_map.get(oid)
         if prev is None:
-            notify.send_order_update(webhook, build_order_status_embed(o, fresh=True), user_ids, role_ids)
+            notify.send_order_update(webhook, build_order_status_embed(o, fresh=True), ping_ids, role_ids)
             order_map[oid] = {"status": slug, "tracking_posted": False}
             prev = order_map[oid]
         elif prev.get("status") != slug:
-            notify.send_order_update(webhook, build_order_status_embed(o), user_ids, role_ids)
+            notify.send_order_update(webhook, build_order_status_embed(o), ping_ids, role_ids)
             prev["status"] = slug
 
         if not prev.get("tracking_posted") and oid in details:
             d = orders.parse_order_detail(details[oid])
             if d["tracking"]:
-                notify.send_order_update(webhook, build_order_tracking_embed(oid, d["tracking"]), user_ids, role_ids)
+                notify.send_order_update(webhook, build_order_tracking_embed(oid, d["tracking"]), ping_ids, role_ids)
                 prev["tracking_posted"] = True
 
-    # Immer speichern — sonst rückt last_check_at nie vor (= Login bei jedem Lauf).
+
+def check_orders(cfg: dict, default_webhook: str, default_ping_ids: list[str], role_ids: list[str]) -> None:
+    """BG-Bestellungen aller konfigurierten Accounts → privater Discord-Channel.
+
+    Stand pro Account im privaten Gist unter `accounts.<name>` (NICHT state.json
+    — das ist öffentlich). Mehrere Accounts via `orders.accounts` (Credentials
+    als Secrets, nur deren Env-Namen stehen in der Config).
+
+    STAGGERING: pro Bot-Lauf wird höchstens EIN Account eingeloggt (der am
+    längsten überfällige). So loggen sich nie zwei Accounts gleichzeitig von
+    derselben IP ein — verhindert, dass BG die Konten korreliert.
+    """
+    token = os.environ.get("GIST_TOKEN", "")
+    gist_id = os.environ.get("GIST_ID", "")
+    if not (token and gist_id):
+        log.info("orders: GIST_TOKEN/GIST_ID fehlen — übersprungen")
+        return
+
+    orders_cfg = cfg.get("orders") or {}
+    interval = int(orders_cfg.get("check_interval_minutes", 240))
+    idle = int(orders_cfg.get("idle_interval_minutes", 1440))
+    cfg_accounts = orders_cfg.get("accounts") or [
+        {"name": "default", "username_env": "BG_USERNAME", "password_env": "BG_PASSWORD"}
+    ]
+
+    st = orders.load_order_state(token, gist_id)
+    # Migration: alter flacher Stand (Single-Account) → unter erstem Account-Namen.
+    if "orders" in st and "accounts" not in st:
+        st["accounts"] = {cfg_accounts[0]["name"]: {
+            "orders": st.pop("orders"),
+            "last_check_at": st.pop("last_check_at", ""),
+            "_initialized": st.pop("_initialized", False),
+        }}
+    accounts_state = st.setdefault("accounts", {})
+
+    # Nur Accounts mit vorhandenen Secrets (Login + Ziel-Webhook) berücksichtigen.
+    resolved = []
+    for a in cfg_accounts:
+        user = os.environ.get(a.get("username_env", "BG_USERNAME"), "")
+        pw = os.environ.get(a.get("password_env", "BG_PASSWORD"), "")
+        if not (user and pw):
+            continue
+        webhook = os.environ.get(a["webhook_env"], "") if a.get("webhook_env") else default_webhook
+        if not webhook:
+            continue
+        ping = _parse_ids(os.environ.get(a["ping_env"], "")) if a.get("ping_env") else default_ping_ids
+        resolved.append({"name": a["name"], "user": user, "pw": pw, "webhook": webhook, "ping": ping})
+
+    if not resolved:
+        log.info("orders: keine Accounts konfiguriert (Secrets/Webhook fehlen) — übersprungen")
+        return
+
+    # Fällige Accounts sammeln, dann nur den am längsten überfälligen prüfen.
+    due = [r for r in resolved if _orders_due(accounts_state.setdefault(r["name"], {}), interval, idle)]
+    if not due:
+        log.info("orders: nichts fällig (%d Account(s))", len(resolved))
+        return
+    due.sort(key=lambda r: accounts_state[r["name"]].get("last_check_at", ""))  # "" zuerst, dann ältester
+    pick = due[0]
+
+    acct = accounts_state[pick["name"]]
+    try:
+        _check_one_account(pick["name"], pick["webhook"], pick["user"], pick["pw"],
+                           pick["ping"], role_ids, acct)
+    except Exception as e:  # Login/Incapsula/Netzwerk — nie den ganzen Bot reißen
+        log.error("orders[%s]: fetch fehlgeschlagen: %s", pick["name"], e)
+    # Immer speichern: last_check_at (in _check_one_account vor dem Login gesetzt)
+    # muss persistiert werden — auch bei Fehler → Backoff statt Hämmern.
     orders.save_order_state(token, gist_id, st)
 
 
@@ -1077,10 +1120,7 @@ def main() -> int:
     order_webhook_env = cfg.get("discord_order_webhook_env", "DISCORD_ORDER_WEBHOOK_URL")
     order_webhook = os.environ.get(order_webhook_env, "")
     order_role_ids = [str(r) for r in ((cfg.get("notifications") or {}).get("ping_role_ids") or [])]
-    orders_cfg = cfg.get("orders") or {}
-    order_interval = int(orders_cfg.get("check_interval_minutes", 240))
-    order_idle = int(orders_cfg.get("idle_interval_minutes", 1440))
-    check_orders(order_webhook, load_ping_user_ids(cfg), order_role_ids, order_interval, order_idle)
+    check_orders(cfg, order_webhook, load_ping_user_ids(cfg), order_role_ids)
 
     if webhook:
         notif = cfg.get("notifications") or {}

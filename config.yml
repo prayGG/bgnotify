@@ -36,6 +36,19 @@ orders:
   # Ruhe-Takt wenn nichts offen ist (alles completed/cancelled) — nur um neue
   # Bestellungen zu entdecken. ~1× täglich; spart Logins wenn man nicht bestellt.
   idle_interval_minutes: 1440
+  # Mehrere BG-Konten. Hier stehen NUR die Namen der GitHub-Secrets — nie die
+  # Werte selbst (Repo ist öffentlich). Pro Bot-Lauf wird höchstens EIN Konto
+  # eingeloggt (Staggering), nie zwei gleichzeitig von derselben IP.
+  # Ein Konto wird übersprungen, solange seine Secrets nicht existieren.
+  accounts:
+    - name: a
+      username_env: BG_USERNAME
+      password_env: BG_PASSWORD
+      ping_env: DISCORDID            # Secret mit Konto-a Discord-User-ID
+    - name: kollege
+      username_env: BG_USERNAME_2
+      password_env: BG_PASSWORD_2
+      ping_env: KOLLEGE_DISCORD_ID   # Secret mit der Discord-ID des Kollegen
 
 notifications:
   # Discord User-IDs werden bei Restocks gepingt. Damit die IDs NICHT im

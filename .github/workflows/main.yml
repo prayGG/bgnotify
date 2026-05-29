@@ -79,10 +79,16 @@ jobs:
           PING_USER_IDS: "${{ secrets.DISCORDID }},${{ secrets.WEITERE_ID_HIER }}"
           # Bestellstatus aus dem BG-Kundenkonto (leer = Feature inaktiv)
           DISCORD_ORDER_WEBHOOK_URL: ${{ secrets.DISCORD_ORDER_WEBHOOK_URL }}
-          BG_USERNAME: ${{ secrets.BG_USERNAME }}
-          BG_PASSWORD: ${{ secrets.BG_PASSWORD }}
           GIST_TOKEN: ${{ secrets.GIST_TOKEN }}
           GIST_ID: ${{ secrets.GIST_ID }}
+          # Konto 1 (a)
+          BG_USERNAME: ${{ secrets.BG_USERNAME }}
+          BG_PASSWORD: ${{ secrets.BG_PASSWORD }}
+          DISCORDID: ${{ secrets.DISCORDID }}
+          # Konto 2 (Kollege — leer/abwesend = wird einfach übersprungen)
+          BG_USERNAME_2: ${{ secrets.BG_USERNAME_2 }}
+          BG_PASSWORD_2: ${{ secrets.BG_PASSWORD_2 }}
+          KOLLEGE_DISCORD_ID: ${{ secrets.KOLLEGE_DISCORD_ID }}
 
       - name: Commit & Push state
         run: |
