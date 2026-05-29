@@ -436,20 +436,45 @@ def _humanize_ago(iso: str) -> str:
     return f"vor {_humanize_duration(delta)}"
 
 
-def _avg_oos_duration(periods: list) -> str:
-    total = 0.0
-    count = 0
+# OOS-Phasen kürzer als das sind fast immer Scraper-/Outage-Artefakte: ein
+# site-weiter Hänger liest ~1 Run lang OOS und „erholt" sich danach sofort
+# wieder. Der Outage-Guard (siehe check_products) fängt nur site-weite
+# Ausfälle ab — ein einzelner Hänger bei genau einem Produkt rutscht durch
+# und würde sonst als 1h-Phantom-OOS den Schnitt verfälschen.
+MIN_OOS_PERIOD_SECONDS = 90 * 60
+
+
+def _median(values: list) -> float:
+    s = sorted(values)
+    mid = len(s) // 2
+    if len(s) % 2:
+        return s[mid]
+    return (s[mid - 1] + s[mid]) / 2
+
+
+def _oos_period_durations(periods: list) -> list:
+    """Echte OOS-Dauern in Sekunden — Artefakt-Blips rausgefiltert."""
+    out = []
     for p in periods or []:
         try:
             start = datetime.fromisoformat(p["start"].replace("Z", "+00:00"))
             end = datetime.fromisoformat(p["end"].replace("Z", "+00:00"))
         except (ValueError, KeyError, TypeError):
             continue
-        total += (end - start).total_seconds()
-        count += 1
-    if not count:
-        return "—"
-    return _humanize_duration(total / count)
+        secs = (end - start).total_seconds()
+        if secs >= MIN_OOS_PERIOD_SECONDS:
+            out.append(secs)
+    return out
+
+
+def _typical_oos_duration(periods: list) -> tuple:
+    """Median der echten OOS-Phasen + deren Anzahl. Median statt Mittelwert,
+    damit ein einzelner Ausreißer (oder ein durchgerutschtes Artefakt) die
+    Zahl nicht kippt. Gibt ("—", 0) zurück, wenn keine echte Phase übrig ist."""
+    durations = _oos_period_durations(periods)
+    if not durations:
+        return "—", 0
+    return _humanize_duration(_median(durations)), len(durations)
 
 
 _SPARK_CHARS = "▁▂▃▄▅▆▇█"
@@ -584,8 +609,11 @@ def build_stats_embed(cfg: dict, state: dict, usd_eur: Optional[float] = None) -
             only_str = _fmt_price_value(history[0], sample_price, usd_eur)
             lines.append(f"├⠀📈⠀**{only_str}**")
 
-        avg = _avg_oos_duration(e.get("oos_periods", []))
-        lines.append(f"├⠀⏱⠀**OOS-Dauer Ø: {avg}**")
+        oos_typical, oos_n = _typical_oos_duration(e.get("oos_periods", []))
+        if oos_n:
+            lines.append(f"├⠀⏱⠀**OOS-Dauer Ø: {oos_typical}**⠀·⠀{oos_n}×")
+        else:
+            lines.append("├⠀⏱⠀OOS-Dauer Ø: —")
 
         low = display_price(e.get("lowest_price", ""), usd_eur)
         high = display_price(e.get("highest_price", ""), usd_eur)
