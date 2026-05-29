@@ -1,0 +1,21 @@
+name: order-test
+
+# Manueller Sicht-Test: schickt alle Bestell-Nachrichtentypen mit Beispieldaten
+# in den Order-Channel (kein BG-Login, kein Gist). Zum Ansehen + Feintunen der
+# Embeds. Per Hand auslösen: Actions → order-test → Run workflow.
+on:
+  workflow_dispatch:
+
+jobs:
+  send:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install -r requirements.txt
+
+      - run: python -m src.order_test
+        env:
+          DISCORD_ORDER_WEBHOOK_URL: ${{ secrets.DISCORD_ORDER_WEBHOOK_URL }}
