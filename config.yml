@@ -64,6 +64,9 @@ products:
     emoji: "🧪"
     watch_variants:
       - "BPC157/TB500 mix 5mg each"
+    # Anzeige-Alias (variable product → Match-String roh lassen).
+    variant_labels:
+      "BPC157/TB500 mix 5mg each": "BPC/TB500 5 mg"
 
   - name: "IGF-1 LR3"
     url: "https://bgpharmadrugs.to/product/peptides/"
