@@ -20,7 +20,7 @@ log = logging.getLogger(__name__)
 
 # Beispiel-Bestellung (frei erfunden) — deckt den ganzen Lebenslauf + Sonderfälle ab.
 _OID = "12345"
-_ITEMS = ["GHK CU 100 mg × 6", "BPC/TB500 5 mg × 2"]
+_ITEMS = ["GHK CU 100 mg × 2", "Roaccutane 20 mg × 3"]
 SAMPLES: list[tuple[str, dict]] = [
     ("Neue Bestellung (pending)",
      build_order_status_embed({"order_id": _OID, "status": "pending", "status_text": "Pending payment"}, fresh=True, items=_ITEMS)),
