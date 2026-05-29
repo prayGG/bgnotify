@@ -935,6 +935,11 @@ def _items_block(items: Optional[list[str]]) -> str:
     return "\n\n" + "\n".join(f"·⠀{it}" for it in items)
 
 
+def _order_link(url: Optional[str]) -> str:
+    """Klickbarer Link zur Bestellseite (leer wenn keine URL)."""
+    return f"\n\n[→⠀Bestellung ansehen]({url})" if url else ""
+
+
 def build_order_status_embed(order: dict, fresh: bool = False, items: Optional[list[str]] = None) -> dict:
     slug = order.get("status", "")
     emoji = _ORDER_STATUS_EMOJI.get(slug, "📦")
@@ -943,19 +948,22 @@ def build_order_status_embed(order: dict, fresh: bool = False, items: Optional[l
     return {
         "author": {"name": "✦⠀⠀Bestellung⠀⠀✦"},
         "title": f"#{order.get('order_id', '')}",
-        "description": f"{head}\n{emoji}⠀**{label}**" + _items_block(items),
+        "url": order.get("url") or None,
+        "description": f"{head}\n{emoji}⠀**{label}**" + _items_block(items) + _order_link(order.get("url")),
         "color": _ORDER_STATUS_COLOR.get(slug, COLOR_WARN),
         "footer": {"text": "bgpharmadrugs.to"},
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }
 
 
-def build_order_tracking_embed(order_id: str, links: list[str], items: Optional[list[str]] = None) -> dict:
+def build_order_tracking_embed(order_id: str, links: list[str], items: Optional[list[str]] = None,
+                               url: Optional[str] = None) -> dict:
     body = "\n".join(f"[→⠀Sendung verfolgen]({l})" for l in links)
     return {
         "author": {"name": "✦⠀⠀Tracking⠀⠀✦"},
         "title": f"#{order_id}",
-        "description": f"🚚⠀**Tracking ist da**\n{body}" + _items_block(items) + "\n\n_Details in deiner Mail_",
+        "url": url or None,
+        "description": f"🚚⠀**Tracking ist da**\n{body}" + _items_block(items) + _order_link(url) + "\n\n_Details in deiner Mail_",
         "color": COLOR_IN_STOCK,
         "footer": {"text": "via Hermes"},
         "timestamp": datetime.now(timezone.utc).isoformat(),
@@ -1033,7 +1041,7 @@ def _check_one_account(name: str, webhook: str, user: str, pw: str,
                 prev["status"] = slug
 
         if not prev.get("tracking_posted") and detail and detail.get("tracking"):
-            notify.send_order_update(webhook, build_order_tracking_embed(oid, detail["tracking"], items=prev.get("items")), ping_ids, role_ids)
+            notify.send_order_update(webhook, build_order_tracking_embed(oid, detail["tracking"], items=prev.get("items"), url=o.get("url")), ping_ids, role_ids)
             prev["tracking_posted"] = True
 
 

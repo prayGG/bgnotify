@@ -20,20 +20,27 @@ log = logging.getLogger(__name__)
 
 # Beispiel-Bestellung (frei erfunden) — deckt den ganzen Lebenslauf + Sonderfälle ab.
 _OID = "12345"
+_URL = f"https://bgpharmadrugs.to/my-account/view-order/{_OID}/"
 _ITEMS = ["GHK CU 100 mg × 2", "Roaccutane 20 mg × 3"]
+
+
+def _o(status: str, text: str) -> dict:
+    return {"order_id": _OID, "status": status, "status_text": text, "url": _URL}
+
+
 SAMPLES: list[tuple[str, dict]] = [
     ("Neue Bestellung (pending)",
-     build_order_status_embed({"order_id": _OID, "status": "pending", "status_text": "Pending payment"}, fresh=True, items=_ITEMS)),
+     build_order_status_embed(_o("pending", "Pending payment"), fresh=True, items=_ITEMS)),
     ("Status → Preparing",
-     build_order_status_embed({"order_id": _OID, "status": "processing", "status_text": "Preparing"}, items=_ITEMS)),
+     build_order_status_embed(_o("processing", "Preparing"), items=_ITEMS)),
     ("Status → On hold",
-     build_order_status_embed({"order_id": _OID, "status": "on-hold", "status_text": "On hold"}, items=_ITEMS)),
+     build_order_status_embed(_o("on-hold", "On hold"), items=_ITEMS)),
     ("Status → Completed",
-     build_order_status_embed({"order_id": _OID, "status": "completed", "status_text": "Completed"}, items=_ITEMS)),
+     build_order_status_embed(_o("completed", "Completed"), items=_ITEMS)),
     ("Status → Cancelled",
-     build_order_status_embed({"order_id": _OID, "status": "cancelled", "status_text": "Cancelled"}, items=_ITEMS)),
+     build_order_status_embed(_o("cancelled", "Cancelled"), items=_ITEMS)),
     ("Tracking (mit Link)",
-     build_order_tracking_embed(_OID, ["https://tracking.hermesworld.com/?TrackID=H1234567890BEISPIEL"], items=_ITEMS)),
+     build_order_tracking_embed(_OID, ["https://tracking.hermesworld.com/?TrackID=H1234567890BEISPIEL"], items=_ITEMS, url=_URL)),
 ]
 
 
