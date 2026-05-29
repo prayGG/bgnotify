@@ -76,6 +76,12 @@ products:
     emoji: "💊"
     watch_variants:
       - "ASPENDOS tablets 100 mg * 30 Medochemie"
+    # Anzeige-Alias: Modafinil ist ein variable product, der watch_variant
+    # MUSS exakt das Website-Variantenlabel treffen — daher bleibt der
+    # Match-String roh und nur die Anzeige (Dashboard/Stats/Alerts) wird
+    # umbenannt. Key = exakter watch_variant.
+    variant_labels:
+      "ASPENDOS tablets 100 mg * 30 Medochemie": "Modafinil 100 mg 30"
 
   - name: "Roaccutane 20 mg (Roche)"
     url: "https://bgpharmadrugs.to/product/roaccutane-20-mg-30-roche/"

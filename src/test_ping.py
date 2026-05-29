@@ -28,6 +28,7 @@ import yaml
 
 from . import bgpharma, forum, notify  # noqa: F401  (bgpharma used transitively)
 from .main import (
+    _variant_labels,
     build_dashboard_embed,
     build_forum_embed,
     build_oos_embed,
@@ -113,6 +114,7 @@ def main() -> int:
 
     state_copy = copy.deepcopy(on_disk_state)
     statuses, _restocks_unused, _oos_unused = check_products(cfg, state_copy)
+    labels = _variant_labels(cfg)
 
     results: list[tuple[str, str, object]] = []  # (test_name, channel, True | False | "skip-reason")
 
@@ -120,7 +122,7 @@ def main() -> int:
     log.info("test 1/6 → dashboard preview (status)")
     ok = notify.send_test(
         main_wh,
-        build_dashboard_embed(statuses, usd_eur=usd_eur),
+        build_dashboard_embed(statuses, usd_eur=usd_eur, labels=labels),
         "🧪 **TEST** · Dashboard-Preview · _Live-Daten, postet als neue Message, "
         "die echte persistente Dashboard-Message wird NICHT überschrieben._",
     )
@@ -150,7 +152,7 @@ def main() -> int:
     stock_channel_label = "stock" if stock_wh else "status (fallback)"
     ok = notify.send_test(
         stock_target_wh,
-        build_restock_embed(sample, usd_eur=usd_eur),
+        build_restock_embed(sample, usd_eur=usd_eur, labels=labels),
         "🧪 **TEST** · Restock-Alert · _wenn ihr jetzt einen Discord-Ping kriegt, "
         "stimmen eure User-IDs in `notifications.ping_user_ids`._",
         user_ids=user_ids,
@@ -169,7 +171,7 @@ def main() -> int:
     }
     ok = notify.send_test(
         stock_target_wh,
-        build_oos_embed(oos_sample, usd_eur=usd_eur),
+        build_oos_embed(oos_sample, usd_eur=usd_eur, labels=labels),
         "🧪 **TEST** · OOS-Alert · _stiller Notify, kein Ping — landet im selben "
         "Channel wie Restocks aber ohne @-Mention._",
     )

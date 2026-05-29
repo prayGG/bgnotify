@@ -512,7 +512,25 @@ def _dashboard_sort_key(s: dict) -> int:
     return 0 if s["in_stock"] else 1
 
 
-def build_dashboard_embed(statuses: list[dict], usd_eur: Optional[float] = None) -> dict:
+def _variant_labels(cfg: dict) -> dict:
+    """Optionale Anzeige-Aliase pro Variante: {match_string: label}.
+
+    Betrifft NUR die Darstellung (Dashboard, Stats, Alerts) — das Matching
+    gegen die Website und der state.json-Key bleiben der rohe watch_variants-
+    String. Nötig für variable Produkte (z.B. Modafinil), wo der watch_variant
+    exakt das Website-Variantenlabel treffen muss; bei simple products kann man
+    den watch_variant direkt umbenennen (er ist dort nur ein Label)."""
+    out: dict = {}
+    for p in cfg.get("products") or []:
+        for match, label in (p.get("variant_labels") or {}).items():
+            out[str(match)] = str(label)
+    return out
+
+
+def build_dashboard_embed(
+    statuses: list[dict], usd_eur: Optional[float] = None, labels: Optional[dict] = None
+) -> dict:
+    labels = labels or {}
     blocks: list[str] = []
     for s in sorted(statuses, key=_dashboard_sort_key):
         link = s.get("deep_link") or s.get("product_url", "")
@@ -536,7 +554,8 @@ def build_dashboard_embed(statuses: list[dict], usd_eur: Optional[float] = None)
             warn = "⠀·⠀⚠️_check unsicher_" if uncertain else ""
             sub = f"🔴⠀out of stock{last_suffix}{warn}"
 
-        blocks.append(f"**{s['variant']}**\n└⠀{sub}{klick}")
+        disp = labels.get(s["variant"], s["variant"])
+        blocks.append(f"**{disp}**\n└⠀{sub}{klick}")
 
     any_in_stock = any(s["in_stock"] for s in statuses if s.get("found") or _has_last_known_state(s))
     any_hard_error = any(s.get("error") and not _has_last_known_state(s) for s in statuses)
@@ -556,6 +575,7 @@ def build_stats_embed(cfg: dict, state: dict, usd_eur: Optional[float] = None) -
     """Persistent stats card — edited in place each run. Pin manually once."""
     bot_stats = state.get("bot_stats", {})
     products_state = state.get("products", {})
+    labels = _variant_labels(cfg)
 
     checks = bot_stats.get("total_checks", 0)
     restocks = bot_stats.get("total_restocks", 0)
@@ -596,7 +616,7 @@ def build_stats_embed(cfg: dict, state: dict, usd_eur: Optional[float] = None) -
 
     for emoji, variant, e in entries:
         sample_price = e.get("price", "") or e.get("lowest_price", "")
-        lines = [f"{emoji}⠀**{variant}**"]
+        lines = [f"{emoji}⠀**{labels.get(variant, variant)}**"]
 
         history = e.get("price_history", [])
         spark = _sparkline(history)
@@ -816,7 +836,7 @@ def check_forum(cfg: dict, state: dict) -> list[dict]:
     return new_posts
 
 
-def build_oos_embed(item: dict, usd_eur: Optional[float] = None) -> dict:
+def build_oos_embed(item: dict, usd_eur: Optional[float] = None, labels: Optional[dict] = None) -> dict:
     """Embed for an in-stock -> out-of-stock transition. Quieter than the
     restock alert — gray accent, last seen price, no order button, no pings."""
     last = display_price(item.get("last_price", ""), usd_eur)
@@ -825,7 +845,7 @@ def build_oos_embed(item: dict, usd_eur: Optional[float] = None) -> dict:
     link_line = f"[→⠀⠀Produktseite]({link})" if link else ""
     return {
         "author": {"name": "✦⠀⠀OUT OF STOCK⠀⠀✦"},
-        "title": item["variant"],
+        "title": (labels or {}).get(item["variant"], item["variant"]),
         "description": last_line + link_line,
         "color": COLOR_OUT,
         "footer": {"text": "bgpharmadrugs.to"},
@@ -833,12 +853,12 @@ def build_oos_embed(item: dict, usd_eur: Optional[float] = None) -> dict:
     }
 
 
-def build_restock_embed(restock: dict, usd_eur: Optional[float] = None) -> dict:
+def build_restock_embed(restock: dict, usd_eur: Optional[float] = None, labels: Optional[dict] = None) -> dict:
     shown = display_price(restock.get("price", ""), usd_eur)
     price_line = f"### ⠀{shown}\n\n" if shown else ""
     return {
         "author": {"name": "✦⠀⠀RESTOCKED⠀⠀✦"},
-        "title": restock["variant"],
+        "title": (labels or {}).get(restock["variant"], restock["variant"]),
         "description": (
             price_line
             + f"**[→⠀⠀Jetzt bestellen]({restock['deep_link']})**"
@@ -907,6 +927,7 @@ def main() -> int:
     statuses, restocks, oos_alerts = check_products(cfg, state)
     usd_eur = fetch_usd_eur_rate()
     log.info("USD->EUR rate: %s", usd_eur)
+    labels = _variant_labels(cfg)
 
     announce_deploy(state, updates_webhook)
 
@@ -932,7 +953,7 @@ def main() -> int:
 
         new_id = notify.edit_in_place(
             webhook,
-            build_dashboard_embed(statuses, usd_eur=usd_eur),
+            build_dashboard_embed(statuses, usd_eur=usd_eur, labels=labels),
             message_id=state.get("dashboard_message_id", ""),
         )
         if new_id:
@@ -940,10 +961,10 @@ def main() -> int:
 
         for r in restocks:
             notify.send_restock_alert(
-                stock_webhook, build_restock_embed(r, usd_eur=usd_eur), user_ids, role_ids,
+                stock_webhook, build_restock_embed(r, usd_eur=usd_eur, labels=labels), user_ids, role_ids,
             )
         for o in oos_alerts:
-            notify.send_oos_alert(stock_webhook, build_oos_embed(o, usd_eur=usd_eur))
+            notify.send_oos_alert(stock_webhook, build_oos_embed(o, usd_eur=usd_eur, labels=labels))
 
     save_state(state)
     return 0
