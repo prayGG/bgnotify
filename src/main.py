@@ -913,6 +913,8 @@ _ORDER_STATUS_EMOJI = {
 }
 # Status, in denen eine Tracking-Note auftauchen kann.
 _TRACKABLE_STATUS = {"processing", "preparing", "on-hold", "completed"}
+# Endzustände — eine Bestellung in einem dieser Status gilt als "nicht offen".
+_TERMINAL_STATUS = {"completed", "cancelled", "refunded", "failed"}
 
 
 def build_order_status_embed(order: dict, fresh: bool = False) -> dict:
@@ -942,13 +944,17 @@ def build_order_tracking_embed(order_id: str, links: list[str]) -> dict:
     }
 
 
-def check_orders(webhook: str, user_ids: list[str], role_ids: list[str], interval_minutes: int = 240) -> None:
+def check_orders(webhook: str, user_ids: list[str], role_ids: list[str],
+                 interval_minutes: int = 240, idle_interval_minutes: int = 1440) -> None:
     """BG-Kundenkonto einloggen, Bestellungen diffen, Discord pingen.
 
     Stand liegt in einem privaten Gist (NICHT state.json — das ist öffentlich).
     Erster Lauf setzt nur die Baseline (postet nichts), damit alte Bestellungen
-    nicht rückwirkend gespammt werden. Login nur alle `interval_minutes`
-    (höflich gegenüber Incapsula — der Bot-Takt selbst ist viel enger).
+    nicht rückwirkend gespammt werden.
+
+    Zwei-Gang-Takt: bei offener Bestellung alle `interval_minutes` (schnell für
+    Statuswechsel/Tracking), sonst nur alle `idle_interval_minutes` (ruhend —
+    nur um neue Bestellungen zu entdecken). Höflich gegenüber Incapsula.
     """
     token = os.environ.get("GIST_TOKEN", "")
     gist_id = os.environ.get("GIST_ID", "")
@@ -962,6 +968,12 @@ def check_orders(webhook: str, user_ids: list[str], role_ids: list[str], interva
     order_map = st.setdefault("orders", {})
     initialized = st.get("_initialized", False)
 
+    # Zwei-Gang-Takt: offene Bestellung → schnell, sonst Ruhemodus (selten,
+    # nur um neue Bestellungen zu entdecken — spart Logins wenn man nicht
+    # bestellt). Schaltet automatisch zurück, sobald wieder was offen ist.
+    has_open = any(v.get("status") not in _TERMINAL_STATUS for v in order_map.values())
+    effective = interval_minutes if has_open else idle_interval_minutes
+
     # Intervall-Gate mit ±10% Jitter (kein exakt-periodisches Login-Muster).
     # Greift auch nach Fehlversuchen, weil last_check_at unten IMMER gesetzt
     # wird — so hämmert ein fehlschlagender Login nicht jeden Bot-Lauf erneut
@@ -970,9 +982,10 @@ def check_orders(webhook: str, user_ids: list[str], role_ids: list[str], interva
     if last:
         try:
             dt = datetime.fromisoformat(last.replace("Z", "+00:00"))
-            threshold = interval_minutes * 60 * random.uniform(0.9, 1.1)
+            threshold = effective * 60 * random.uniform(0.9, 1.1)
             if (datetime.now(timezone.utc) - dt).total_seconds() < threshold:
-                log.info("orders: noch nicht fällig (Intervall ~%d min)", interval_minutes)
+                log.info("orders: noch nicht fällig (%s, ~%d min)",
+                         "aktiv" if has_open else "ruhend", effective)
                 return
         except ValueError:
             pass
@@ -1064,8 +1077,10 @@ def main() -> int:
     order_webhook_env = cfg.get("discord_order_webhook_env", "DISCORD_ORDER_WEBHOOK_URL")
     order_webhook = os.environ.get(order_webhook_env, "")
     order_role_ids = [str(r) for r in ((cfg.get("notifications") or {}).get("ping_role_ids") or [])]
-    order_interval = int((cfg.get("orders") or {}).get("check_interval_minutes", 30))
-    check_orders(order_webhook, load_ping_user_ids(cfg), order_role_ids, order_interval)
+    orders_cfg = cfg.get("orders") or {}
+    order_interval = int(orders_cfg.get("check_interval_minutes", 240))
+    order_idle = int(orders_cfg.get("idle_interval_minutes", 1440))
+    check_orders(order_webhook, load_ping_user_ids(cfg), order_role_ids, order_interval, order_idle)
 
     if webhook:
         notif = cfg.get("notifications") or {}

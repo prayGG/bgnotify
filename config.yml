@@ -31,7 +31,11 @@ forum:
 # unauffällig — Bestellungen bewegen sich über Stunden, nicht Minuten). Der
 # Login-Zeitpunkt wird zusätzlich um ±10% gejittert (kein exaktes Muster).
 orders:
+  # Takt bei OFFENER Bestellung (schnell genug für Statuswechsel + Tracking).
   check_interval_minutes: 240
+  # Ruhe-Takt wenn nichts offen ist (alles completed/cancelled) — nur um neue
+  # Bestellungen zu entdecken. ~1× täglich; spart Logins wenn man nicht bestellt.
+  idle_interval_minutes: 1440
 
 notifications:
   # Discord User-IDs werden bei Restocks gepingt. Damit die IDs NICHT im
