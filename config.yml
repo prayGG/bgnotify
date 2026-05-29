@@ -84,7 +84,7 @@ products:
     # Match-String roh und nur die Anzeige (Dashboard/Stats/Alerts) wird
     # umbenannt. Key = exakter watch_variant.
     variant_labels:
-      "ASPENDOS tablets 100 mg * 30 Medochemie": "Modafinil 100 mg 30"
+      "ASPENDOS tablets 100 mg * 30 Medochemie": "Modafinil 100 mg 30x"
 
   - name: "Roaccutane 20 mg (Roche)"
     url: "https://bgpharmadrugs.to/product/roaccutane-20-mg-30-roche/"
@@ -93,7 +93,7 @@ products:
     # Anzeige-Alias: watch_variant bleibt roh (Match + state.json-Key), nur
     # die Anzeige (Dashboard/Stats/Alerts) wird ohne "Roche" gezeigt.
     variant_labels:
-      "Roaccutane 20 mg 30 Roche": "Roaccutane 20 mg 30"
+      "Roaccutane 20 mg 30 Roche": "Roaccutane 20 mg 30x"
 
   - name: "Minoxidil 5 mg"
     emoji: "💊"
