@@ -739,7 +739,7 @@ def build_updates_embed(commits: list[tuple[str, str]], head_sha: str) -> dict:
         "title": f"Update · `{head_sha[:7]}`",
         "description": description,
         "color": 0x5865F2,
-        "footer": {"text": "github.com/prayGG/bgnotify"},
+        "footer": {"text": "bgnotify"},
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }
 
