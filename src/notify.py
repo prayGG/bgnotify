@@ -108,7 +108,7 @@ def send_restock_alert(
         return False
     prefix, allowed = _mentions(user_ids or [], role_ids or [])
     payload = {
-        "username": "bgnotify · status",
+        "username": "bgnotify by pray",
         "content": prefix,
         "embeds": [embed],
         "allowed_mentions": allowed,
@@ -117,12 +117,12 @@ def send_restock_alert(
 
 
 def send_oos_alert(webhook_url: str, embed: dict) -> bool:
-    """Silent out-of-stock alert — no pings, distinct username so the channel
-    visually separates restocks (loud) from OOS (informational)."""
+    """Silent out-of-stock alert — no pings. Gleicher Channel-Name wie Restock
+    (bg-notify); die Embeds (RESTOCKED/OUT OF STOCK) unterscheiden sich eh."""
     if not webhook_url:
         return False
     payload = {
-        "username": "bgnotify · oos",
+        "username": "bgnotify by pray",
         "embeds": [embed],
         "allowed_mentions": {"parse": []},
     }
