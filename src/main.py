@@ -972,17 +972,26 @@ def _parse_ids(raw: str) -> list[str]:
     return [x for x in re.split(r"[,;\s]+", raw or "") if x]
 
 
+def _truthy(v) -> bool:
+    if isinstance(v, bool):
+        return v
+    return str(v).strip().lower() in ("on", "an", "true", "yes", "y", "ja", "1")
+
+
 def _order_enabled(st: dict, name: str) -> bool:
     """An/Aus-Schalter aus dem Gist-Feld `enabled` — pro Konto:
 
-    - fehlt / `false`        → aus (kein Login)
-    - `true`                 → alle Konten an
-    - Liste `["a"]`          → nur diese Konten an
+    - Dict (empfohlen): `{"a": "on", "b": "off"}`  → einfach on/off pro Konto
+    - `true`                                        → alle Konten an
+    - Liste `["a"]`                                 → nur diese Konten an
+    - fehlt / `false`                               → aus (kein Login)
 
     So aktivierst du Tracking nur wenn du wirklich bestellt hast (Gist editieren,
     kein Code-Commit) — in Bestellpausen also NULL authentifizierte Logins.
     """
     en = st.get("enabled", False)
+    if isinstance(en, dict):
+        return _truthy(en.get(name, False))
     if en is True:
         return True
     if isinstance(en, list):
@@ -1095,11 +1104,19 @@ def check_orders(cfg: dict, default_webhook: str, default_ping_ids: list[str], r
         }}
     accounts_state = st.setdefault("accounts", {})
 
+    # Beim ersten Mal die on/off-Schalter ins Gist schreiben, damit man sie nur
+    # noch umschreiben muss (kein Tippen von Klammern/Struktur).
+    if "enabled" not in st:
+        st["enabled"] = {a["name"]: "off" for a in cfg_accounts}
+        orders.save_order_state(token, gist_id, st)
+        log.info("orders: enabled-Schalter im Gist angelegt (alle 'off') — bei Bestellung auf 'on' setzen")
+        return
+
     # An/Aus-Schalter: nur aktivierte Konten (Gist-Feld `enabled`) → in
     # Bestellpausen keine Logins. Standard = aus.
     enabled_names = [a["name"] for a in cfg_accounts if _order_enabled(st, a["name"])]
     if not enabled_names:
-        log.info("orders: deaktiviert — kein Konto in `enabled` (Gist). Übersprungen.")
+        log.info("orders: alle Konten 'off' (Gist `enabled`) — übersprungen.")
         return
 
     # Nur aktivierte Accounts mit vorhandenen Secrets (Login + Ziel-Webhook).
