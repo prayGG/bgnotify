@@ -944,7 +944,7 @@ def build_order_status_embed(order: dict, fresh: bool = False, items: Optional[l
     slug = order.get("status", "")
     emoji = _ORDER_STATUS_EMOJI.get(slug, "📦")
     label = order.get("status_text") or slug or "—"
-    head = "🆕 Neue Bestellung" if fresh else "Status-Update"
+    head = "🆕⠀Neue Bestellung" if fresh else "Status-Update"
     return {
         "author": {"name": "✦⠀⠀Bestellung⠀⠀✦"},
         "title": f"#{order.get('order_id', '')}",
