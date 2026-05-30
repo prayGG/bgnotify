@@ -911,17 +911,21 @@ _ORDER_STATUS_EMOJI = {
     "pending": "🕓", "processing": "📦", "preparing": "📦", "on-hold": "⏸️",
     "completed": "✅", "cancelled": "❌", "refunded": "↩️", "failed": "⚠️",
 }
-# Farbe je Status — visuell dem Prozess-Schritt zugeordnet (pending→completed).
+# Farbreise entlang des Ablaufs: grau → blau → türkis(Tracking) → grün.
+# Seiten-/Negativzustände mit klar abgegrenzten Warnfarben.
 _ORDER_STATUS_COLOR = {
-    "pending":    0x95A5A6,  # grau   — wartet auf Zahlung
-    "processing": 0x5865F2,  # blau   — in Bearbeitung (BG: "Preparing")
-    "preparing":  0x5865F2,  # blau
-    "on-hold":    0xE67E22,  # orange — hängt / Klärung
-    "completed":  0x57F287,  # grün   — fertig / versandt
-    "cancelled":  0xED4245,  # rot    — storniert
-    "failed":     0xED4245,  # rot    — fehlgeschlagen
-    "refunded":   0x95A5A6,  # grau   — erstattet
+    "pending":    0x95A5A6,  # grau      — wartet auf Zahlung (Start)
+    "processing": 0x3498DB,  # blau      — in Bearbeitung (BG: "Preparing")
+    "preparing":  0x3498DB,  # blau
+    "on-hold":    0xE67E22,  # orange    — hängt / Klärung
+    "completed":  0x57F287,  # grün      — fertig / angekommen (Ziel)
+    "cancelled":  0xED4245,  # rot       — storniert
+    "failed":     0x992D22,  # dunkelrot — fehlgeschlagen
+    "refunded":   0x9B59B6,  # lila      — erstattet (Geld zurück)
 }
+# Tracking/„unterwegs" — türkis, sitzt visuell zwischen blau (Bearbeitung) und
+# grün (angekommen). Bewusst NICHT grün, damit es sich von Completed abhebt.
+_ORDER_TRACKING_COLOR = 0x1ABC9C
 # Status, in denen eine Tracking-Note auftauchen kann.
 _TRACKABLE_STATUS = {"processing", "preparing", "on-hold", "completed"}
 # Endzustände — eine Bestellung in einem dieser Status gilt als "nicht offen".
@@ -962,7 +966,7 @@ def build_order_tracking_embed(order_id: str, links: list[str], items: Optional[
         "author": {"name": "✦⠀⠀Tracking⠀⠀✦"},
         "title": f"#{order_id}",
         "description": f"🚚⠀**Tracking ist da**\n{body}" + _items_block(items) + _order_link(url) + "\n\n_Details in deiner Mail_",
-        "color": COLOR_IN_STOCK,
+        "color": _ORDER_TRACKING_COLOR,
         "footer": {"text": "via Hermes"},
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }
