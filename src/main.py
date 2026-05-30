@@ -972,6 +972,24 @@ def _parse_ids(raw: str) -> list[str]:
     return [x for x in re.split(r"[,;\s]+", raw or "") if x]
 
 
+def _order_enabled(st: dict, name: str) -> bool:
+    """An/Aus-Schalter aus dem Gist-Feld `enabled` — pro Konto:
+
+    - fehlt / `false`        → aus (kein Login)
+    - `true`                 → alle Konten an
+    - Liste `["a"]`          → nur diese Konten an
+
+    So aktivierst du Tracking nur wenn du wirklich bestellt hast (Gist editieren,
+    kein Code-Commit) — in Bestellpausen also NULL authentifizierte Logins.
+    """
+    en = st.get("enabled", False)
+    if en is True:
+        return True
+    if isinstance(en, list):
+        return name in en
+    return False
+
+
 def _orders_due(acct: dict, interval_minutes: int, idle_interval_minutes: int) -> bool:
     """Ist dieser Account fällig? Zwei-Gang-Takt (offen→schnell, sonst Ruhe) mit
     ±10% Jitter. Kein last_check_at = noch nie geprüft = fällig."""
@@ -1077,9 +1095,18 @@ def check_orders(cfg: dict, default_webhook: str, default_ping_ids: list[str], r
         }}
     accounts_state = st.setdefault("accounts", {})
 
-    # Nur Accounts mit vorhandenen Secrets (Login + Ziel-Webhook) berücksichtigen.
+    # An/Aus-Schalter: nur aktivierte Konten (Gist-Feld `enabled`) → in
+    # Bestellpausen keine Logins. Standard = aus.
+    enabled_names = [a["name"] for a in cfg_accounts if _order_enabled(st, a["name"])]
+    if not enabled_names:
+        log.info("orders: deaktiviert — kein Konto in `enabled` (Gist). Übersprungen.")
+        return
+
+    # Nur aktivierte Accounts mit vorhandenen Secrets (Login + Ziel-Webhook).
     resolved = []
     for a in cfg_accounts:
+        if a["name"] not in enabled_names:
+            continue
         user = os.environ.get(a.get("username_env", "BG_USERNAME"), "")
         pw = os.environ.get(a.get("password_env", "BG_PASSWORD"), "")
         if not (user and pw):
@@ -1091,7 +1118,7 @@ def check_orders(cfg: dict, default_webhook: str, default_ping_ids: list[str], r
         resolved.append({"name": a["name"], "user": user, "pw": pw, "webhook": webhook, "ping": ping})
 
     if not resolved:
-        log.info("orders: keine Accounts konfiguriert (Secrets/Webhook fehlen) — übersprungen")
+        log.info("orders: aktiviert, aber Secrets/Webhook fehlen — übersprungen")
         return
 
     # Fällige Accounts sammeln, dann nur den am längsten überfälligen prüfen.
