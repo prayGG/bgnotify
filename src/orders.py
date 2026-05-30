@@ -131,16 +131,17 @@ def parse_order_detail(html_text: str) -> dict:
 # --------------------------------------------------------------------------
 # Fetch (Playwright — deferred import wie in forum.py)
 # --------------------------------------------------------------------------
-def fetch(username: str, password: str, want_detail=None) -> tuple[list[dict], dict]:
-    """Login, Bestellliste parsen, Detailseiten nur für gewünschte Bestellungen.
+def fetch(username: str, password: str, want_detail=None, cookies=None) -> tuple[list[dict], dict, list]:
+    """Bestellliste + gewünschte Detailseiten holen — Session wiederverwendend.
 
-    `want_detail(order_dict) -> bool` entscheidet pro Bestellung, ob ihre
-    Detailseite geladen wird (spart Requests — nur was wir wirklich brauchen).
-    Alles in EINER Browser-Session = ein Login.
+    `cookies` (aus einem früheren Lauf) wird zuerst geladen; ist die Session noch
+    gültig, sparen wir uns das Login-Formular komplett. Nur wenn die Session weg/
+    abgelaufen ist, wird mit "Angemeldet bleiben" frisch eingeloggt (Session hält
+    dann ~14 Tage). So passieren echte Logins nur noch selten — viel unauffälliger.
 
-    Returns: (orders, details) — orders ist die geparste Liste,
-    details ist {order_id: detail_html} für die ausgewählten Bestellungen.
-    Wirft RuntimeError, wenn der Login nicht greift.
+    `want_detail(order)->bool` entscheidet pro Bestellung, ob ihr Detail geladen
+    wird. Returns: (orders, details, cookies) — die (ggf. erneuerten) Cookies zum
+    Persistieren. Wirft RuntimeError, wenn der Login nicht greift.
     """
     from playwright.sync_api import sync_playwright  # noqa: WPS433
 
@@ -159,27 +160,42 @@ def fetch(username: str, password: str, want_detail=None) -> tuple[list[dict], d
             ctx.add_init_script(
                 "Object.defineProperty(navigator, 'webdriver', {get: () => undefined});"
             )
-            page = ctx.new_page()
-            page.goto(ACCOUNT_URL, wait_until="networkidle", timeout=45000)
+            if cookies:
+                try:
+                    ctx.add_cookies(cookies)
+                except Exception as e:  # kaputte/abgelaufene Cookies → einfach neu einloggen
+                    log.warning("gespeicherte Cookies ungültig (%s) — logge neu ein", e)
 
-            if not _is_logged_in(page.content()):
+            page = ctx.new_page()
+            # Direkt zur Bestellliste: mit gültiger Session sind wir schon drin.
+            page.goto(ORDERS_URL, wait_until="networkidle", timeout=45000)
+
+            if _is_logged_in(page.content()):
+                log.info("orders: Session wiederverwendet (kein Login nötig)")
+            else:
+                # Session weg/abgelaufen → frisch einloggen, mit "Angemeldet bleiben".
+                page.goto(ACCOUNT_URL, wait_until="networkidle", timeout=45000)
                 page.wait_for_selector("input#username", timeout=15000)
                 page.fill("input#username", username)
                 page.fill("input#password", password)
+                try:
+                    page.check("input#rememberme")
+                except Exception:
+                    pass
                 page.click("button[name='login']")
                 page.wait_for_load_state("networkidle", timeout=45000)
                 if not _is_logged_in(page.content()):
                     raise RuntimeError("BG login failed (check credentials / Incapsula)")
+                page.goto(ORDERS_URL, wait_until="networkidle", timeout=45000)
+                log.info("orders: frischer Login (Session erneuert)")
 
-            page.goto(ORDERS_URL, wait_until="networkidle", timeout=45000)
             orders = parse_orders_list(page.content())
-
             for o in orders:
                 if want_detail and want_detail(o):
                     page.goto(o["url"], wait_until="networkidle", timeout=45000)
                     details[o["order_id"]] = page.content()
 
-            return orders, details
+            return orders, details, ctx.cookies()
         finally:
             browser.close()
 

@@ -1037,7 +1037,8 @@ def _check_one_account(name: str, webhook: str, user: str, pw: str,
             return False
         return not prev.get("tracking_posted")
 
-    olist, details = orders.fetch(user, pw, want_detail)
+    olist, details, cookies = orders.fetch(user, pw, want_detail, cookies=acct.get("cookies"))
+    acct["cookies"] = cookies  # Session für nächsten Lauf merken (privates Gist)
 
     if not initialized:
         for o in olist:
