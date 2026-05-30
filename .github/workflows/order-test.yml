@@ -1,8 +1,9 @@
 name: order-test
 
-# Manueller Sicht-Test: schickt alle Bestell-Nachrichtentypen mit Beispieldaten
-# in den Order-Channel (kein BG-Login, kein Gist). Zum Ansehen + Feintunen der
-# Embeds. Per Hand auslösen: Actions → order-test → Run workflow.
+# Manueller Order-Test mit Live-Diagnose: postet Secrets/Verdrahtung, Gist-Stand,
+# einen ECHTEN Login + Parse (deine echten Bestellungen) und die 6 Beispiel-
+# Nachrichten in den Order-Channel. Macht echte Logins → per Hand auslösen:
+# Actions → order-test → Run workflow.
 on:
   workflow_dispatch:
 
@@ -16,7 +17,23 @@ jobs:
           python-version: '3.12'
       - run: pip install -r requirements.txt
 
+      # Browser für den echten Login (teilt den Cache mit den anderen Workflows).
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('requirements.txt') }}
+      - name: Install Playwright Chromium
+        run: python -m playwright install chromium
+
       - run: python -m src.order_test
         env:
           DISCORD_ORDER_WEBHOOK_URL: ${{ secrets.DISCORD_ORDER_WEBHOOK_URL }}
-          DISCORDID: ${{ secrets.DISCORDID }}   # damit der Test wie echt pingt
+          GIST_TOKEN: ${{ secrets.GIST_TOKEN }}
+          GIST_ID: ${{ secrets.GIST_ID }}
+          DISCORDID: ${{ secrets.DISCORDID }}
+          WEITERE_ID_HIER: ${{ secrets.WEITERE_ID_HIER }}
+          BG_USERNAME: ${{ secrets.BG_USERNAME }}
+          BG_PASSWORD: ${{ secrets.BG_PASSWORD }}
+          BG_USERNAME_2: ${{ secrets.BG_USERNAME_2 }}
+          BG_PASSWORD_2: ${{ secrets.BG_PASSWORD_2 }}
