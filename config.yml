@@ -48,7 +48,7 @@ orders:
     - name: b
       username_env: BG_USERNAME_2
       password_env: BG_PASSWORD_2
-      ping_env: KOLLEGE_DISCORD_ID   # Secret mit der Discord-User-ID für Konto b
+      ping_env: WEITERE_ID_HIER      # bestehendes Secret mit der Discord-ID für Konto b
 
 notifications:
   # Discord User-IDs werden bei Restocks gepingt. Damit die IDs NICHT im
