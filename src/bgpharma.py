@@ -36,6 +36,17 @@ UA = (
     "(KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
 )
 
+# Per-run cache of fetched product pages, keyed by URL. Several configured
+# products share one page (e.g. every peptide lives on /product/peptides/),
+# so without this each one would re-GET the same HTML. The caller resets this
+# once per scrape via reset_page_cache() so data never goes stale across runs.
+_PAGE_CACHE: dict[str, str] = {}
+
+
+def reset_page_cache() -> None:
+    """Drop the per-run page cache. Call once at the start of a scrape run."""
+    _PAGE_CACHE.clear()
+
 
 def _normalize(s: str) -> str:
     return re.sub(r"\s+", " ", s).strip().lower()
@@ -337,7 +348,10 @@ def check(url: str, watch_variants: list[str]) -> dict[str, dict]:
     for notifications). If no variants are provided, the URL is used.
     """
     session = requests.Session()
-    page = _fetch(url, session)
+    page = _PAGE_CACHE.get(url)
+    if page is None:
+        page = _fetch(url, session)
+        _PAGE_CACHE[url] = page
     soup = BeautifulSoup(page, "html.parser")
 
     if _is_simple_product(soup):

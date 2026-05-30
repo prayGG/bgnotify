@@ -162,6 +162,7 @@ def _check_combined(urls: list[str], watch: list[str]) -> dict[str, dict]:
 
 
 def check_products(cfg: dict, state: dict) -> tuple[list[dict], list[dict], list[dict]]:
+    bgpharma.reset_page_cache()  # products sharing a URL fetch it once per run
     products_state = state.setdefault("products", {})
     bot_stats = state.setdefault("bot_stats", {})
     run_iso = datetime.now(timezone.utc).isoformat()
@@ -374,28 +375,6 @@ def check_products(cfg: dict, state: dict) -> tuple[list[dict], list[dict], list
             del products_state[key]
 
     return statuses, restocks, oos_alerts
-
-
-def _days_since(iso: str) -> int:
-    try:
-        when = datetime.fromisoformat(iso.replace("Z", "+00:00"))
-    except ValueError:
-        return -1
-    return max(0, (datetime.now(timezone.utc) - when).days)
-
-
-def _oos_label(iso: str) -> str:
-    """OOS text (no leading separator). Used inside the └-line under each variant."""
-    if not iso:
-        return "OOS"
-    days = _days_since(iso)
-    if days < 0:
-        return "OOS"
-    if days == 0:
-        return "OOS seit heute"
-    if days == 1:
-        return "OOS seit 1 Tag"
-    return f"OOS seit {days} Tagen"
 
 
 def _price_change_suffix(prev_price: str, current_price: str) -> str:

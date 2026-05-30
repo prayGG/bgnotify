@@ -17,7 +17,6 @@ import json
 import logging
 import re
 import sys
-from typing import Optional
 from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 
 from bs4 import BeautifulSoup
