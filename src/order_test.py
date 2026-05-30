@@ -39,6 +39,8 @@ SAMPLES: list[tuple[str, dict]] = [
     ("Status → On hold", build_order_status_embed(_o("on-hold", "On hold"), items=_ITEMS)),
     ("Status → Completed", build_order_status_embed(_o("completed", "Completed"), items=_ITEMS)),
     ("Status → Cancelled", build_order_status_embed(_o("cancelled", "Cancelled"), items=_ITEMS)),
+    ("Status → Refunded", build_order_status_embed(_o("refunded", "Refunded"), items=_ITEMS)),
+    ("Status → Failed", build_order_status_embed(_o("failed", "Failed"), items=_ITEMS)),
     ("Tracking (mit Link)", build_order_tracking_embed(_OID, ["https://tracking.hermesworld.com/?TrackID=H1234567890BEISPIEL"], items=_ITEMS, url=_URL)),
 ]
 
