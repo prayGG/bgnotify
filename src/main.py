@@ -19,7 +19,7 @@ from typing import Optional
 import requests
 import yaml
 
-from . import bgpharma, forum, notify, orders
+from . import bgpharma, forum, notify, orders, playstation
 
 log = logging.getLogger(__name__)
 
@@ -816,6 +816,122 @@ def check_forum(cfg: dict, state: dict) -> list[dict]:
     return new_posts
 
 
+# --------------------------------------------------------------------------
+# PlayStation Store — Preis-Watcher (eigener Channel: Alert bei Preissenkung)
+# --------------------------------------------------------------------------
+_CURRENCY_SYMBOL = {"EUR": "€", "USD": "$", "GBP": "£"}
+
+
+def _fmt_price_cents(cents: Optional[int], currency: str = "EUR") -> str:
+    """Cents → Anzeigepreis. Aus den numerischen Werten formatiert (nicht aus dem
+    gescrapten String), damit das € unabhängig von der Encoding-Umgebung stimmt.
+    Deutsches Dezimalkomma, passend zum /de-de/-Store."""
+    if cents is None:
+        return ""
+    sym = _CURRENCY_SYMBOL.get(currency, f"{currency} " if currency else "")
+    return f"{sym}{cents / 100:.2f}".replace(".", ",")
+
+
+def check_playstation(cfg: dict, state: dict) -> tuple[list[dict], list[dict]]:
+    """Konfigurierte PS-Store-Spiele prüfen; bei Preissenkung alerten.
+
+    Gibt (statuses, drops) zurück. Erstkontakt eines Spiels setzt nur die
+    Baseline (kein Alert) — sonst würde der erste Lauf jedes Spiel als „Drop"
+    feuern. Alert nur, wenn der aktuelle Preis (discountedValue in Cent) unter
+    dem zuletzt gespeicherten liegt — „wieder günstiger geworden".
+
+    State: state["playstation"][url] = {name, price_value, base_value,
+    discount_text, currency, lowest_value, lowest_at, last_check_at}
+    """
+    ps_state = state.setdefault("playstation", {})
+    statuses: list[dict] = []
+    drops: list[dict] = []
+    now_iso = datetime.now(timezone.utc).isoformat()
+
+    seen_urls: set[str] = set()
+    for game in (cfg.get("playstation") or {}).get("games") or []:
+        url = game.get("url")
+        if not url:
+            continue
+        seen_urls.add(url)
+        cfg_name = game.get("name") or ""
+        entry = ps_state.setdefault(url, {})
+
+        try:
+            info = playstation.check(url, cfg_name)
+        except Exception as e:
+            log.error("playstation check failed for %s: %s", url, e)
+            info = None
+
+        if info is None or not info.get("found"):
+            # Scrape/Lookup fehlgeschlagen — letzten bekannten Stand zeigen,
+            # NICHT als Drop werten (sonst falscher Alarm beim nächsten Erfolg).
+            statuses.append({
+                "name": entry.get("name") or cfg_name or url, "url": url,
+                "price_value": entry.get("price_value"), "base_value": entry.get("base_value"),
+                "discount_text": entry.get("discount_text", ""), "currency": entry.get("currency", ""),
+                "found": False,
+            })
+            continue
+
+        cur = info["price_value"]
+        prev = entry.get("price_value")
+
+        if cur is not None:
+            low = entry.get("lowest_value")
+            if low is None or cur < low:
+                entry["lowest_value"] = cur
+                entry["lowest_at"] = now_iso
+
+        if prev is not None and cur is not None and cur < prev:
+            log.info("ps price drop: %s %s -> %s", info["name"], prev, cur)
+            drops.append({
+                "name": info["name"] or cfg_name, "url": url,
+                "old_value": prev, "new_value": cur, "base_value": info["base_value"],
+                "discount_text": info["discount_text"], "currency": info["currency"],
+            })
+
+        entry["name"] = info["name"] or cfg_name
+        entry["price_value"] = cur
+        entry["base_value"] = info["base_value"]
+        entry["discount_text"] = info["discount_text"]
+        entry["currency"] = info["currency"]
+        entry["last_check_at"] = now_iso
+
+        statuses.append({
+            "name": entry["name"], "url": url, "price_value": cur,
+            "base_value": info["base_value"], "discount_text": info["discount_text"],
+            "currency": info["currency"], "found": True,
+        })
+
+    # Stand für entfernte Spiele aufräumen, damit state.json nicht wächst.
+    for url in list(ps_state.keys()):
+        if url not in seen_urls:
+            log.info("removing stale ps state entry: %s", url)
+            del ps_state[url]
+
+    return statuses, drops
+
+
+def build_ps_drop_embed(drop: dict) -> dict:
+    """Embed für eine PS-Preissenkung — grüner Akzent, neuer Preis groß,
+    alter Preis + Rabatt als Kontext, Link in den Store."""
+    currency = drop.get("currency", "EUR")
+    new_s = _fmt_price_cents(drop.get("new_value"), currency)
+    old_s = _fmt_price_cents(drop.get("old_value"), currency)
+    disc = drop.get("discount_text") or ""
+    disc_suffix = f"⠀·⠀**{disc}**" if disc else ""
+    lines = f"### ⠀{new_s}\n_war {old_s}_{disc_suffix}" if old_s else f"### ⠀{new_s}"
+    return {
+        "author": {"name": "✦⠀⠀PREIS GESENKT⠀⠀✦"},
+        "title": drop.get("name") or "PlayStation",
+        "description": lines + f"\n\n**[→⠀⠀Im PS Store ansehen]({drop['url']})**",
+        "color": COLOR_IN_STOCK,
+        "footer": {"text": "store.playstation.com"},
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }
+
+
 def build_oos_embed(item: dict, usd_eur: Optional[float] = None, labels: Optional[dict] = None) -> dict:
     """Embed for an in-stock -> out-of-stock transition. Quieter than the
     restock alert — gray accent, last seen price, no order button, no pings."""
@@ -1181,6 +1297,19 @@ def main() -> int:
     order_webhook = os.environ.get(order_webhook_env, "")
     order_role_ids = [str(r) for r in ((cfg.get("notifications") or {}).get("ping_role_ids") or [])]
     check_orders(cfg, order_webhook, load_ping_user_ids(cfg), order_role_ids)
+
+    # PlayStation-Preis-Watcher (eigener Webhook). Pingt bei Preissenkung wie ein
+    # Restock. Leerer Webhook = Feature inaktiv (Check + Baseline laufen trotzdem,
+    # damit beim späteren Aktivieren nicht der ganze Backlog feuert).
+    ps_webhook_env = cfg.get("discord_ps_webhook_env", "DISCORD_PS_WEBHOOK_URL")
+    ps_webhook = os.environ.get(ps_webhook_env, "")
+    ps_statuses, ps_drops = check_playstation(cfg, state)
+    if ps_drops and ps_webhook:
+        ps_ping_ids = load_ping_user_ids(cfg)
+        for d in ps_drops:
+            notify.send_ps_price_drop(ps_webhook, build_ps_drop_embed(d), ps_ping_ids, order_role_ids)
+    elif ps_drops:
+        log.info("playstation: %d price drop(s) but %s is empty", len(ps_drops), ps_webhook_env)
 
     if webhook:
         notif = cfg.get("notifications") or {}

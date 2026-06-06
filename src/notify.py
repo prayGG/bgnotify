@@ -116,6 +116,26 @@ def send_restock_alert(
     return _request("POST", webhook_url, payload) is not None
 
 
+def send_ps_price_drop(
+    webhook_url: str,
+    embed: dict,
+    user_ids: Optional[list[str]] = None,
+    role_ids: Optional[list[str]] = None,
+) -> bool:
+    """One POST per PlayStation game price drop, into the dedicated PS channel.
+    Pings like a restock — a cheaper game is the whole point of the channel."""
+    if not webhook_url:
+        return False
+    prefix, allowed = _mentions(user_ids or [], role_ids or [])
+    payload = {
+        "username": "bgnotify · playstation",
+        "content": prefix,
+        "embeds": [embed],
+        "allowed_mentions": allowed,
+    }
+    return _request("POST", webhook_url, payload) is not None
+
+
 def send_oos_alert(webhook_url: str, embed: dict) -> bool:
     """Silent out-of-stock alert — no pings. Gleicher Channel-Name wie Restock
     (bg-notify); die Embeds (RESTOCKED/OUT OF STOCK) unterscheiden sich eh."""

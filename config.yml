@@ -11,6 +11,12 @@ discord_stock_webhook_env: DISCORD_STOCK_WEBHOOK_URL
 # ist, wird der Forum-Check übersprungen.
 discord_forum_webhook_env: DISCORD_FORUM_WEBHOOK_URL
 
+# Eigener Webhook für den PlayStation-Preis-Watcher. Pingt, wenn ein getracktes
+# Spiel günstiger geworden ist (neuer Preis < zuletzt gesehener Preis). Wenn die
+# env var leer ist, läuft der Check trotzdem (setzt nur die Baseline) — es wird
+# nur nichts gepostet.
+discord_ps_webhook_env: DISCORD_PS_WEBHOOK_URL
+
 forum:
   # Saved-search URL für BG's Posts. Wird intern auf o=date umgebogen, damit
   # neueste oben stehen. Falls die URL irgendwann nicht mehr geht, kann auch
@@ -49,6 +55,15 @@ orders:
       username_env: BG_USERNAME_2
       password_env: BG_PASSWORD_2
       ping_env: WEITERE_ID_HIER      # bestehendes Secret mit der Discord-ID für Konto b
+
+# PlayStation-Store-Spiele, deren Preis beobachtet wird. Jeder Eintrag braucht
+# nur Name + URL (die normale /de-de/-Produktseite). Der Bot liest den Kaufpreis
+# aus dem eingebetteten Seiten-JSON (kein Browser nötig) und pingt, sobald der
+# Preis unter den zuletzt gesehenen fällt. Erstkontakt setzt nur die Baseline.
+playstation:
+  games:
+    - name: "LEGO City Undercover"
+      url: "https://store.playstation.com/de-de/product/EP1018-CUSA06511_00-LEGOCITYUNDERCOV"
 
 notifications:
   # Discord User-IDs werden bei Restocks gepingt. Damit die IDs NICHT im
