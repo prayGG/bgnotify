@@ -1,8 +1,8 @@
 {
   "bot_stats": {
     "first_check_at": "2026-05-20T18:50:44.075159+00:00",
-    "last_check_at": "2026-06-06T05:40:33.204772+00:00",
-    "total_checks": 2352,
+    "last_check_at": "2026-06-06T05:50:28.647035+00:00",
+    "total_checks": 2353,
     "total_restocks": 0
   },
   "dashboard_message_id": "1510095616322175107",
@@ -39,13 +39,13 @@
       "3826520"
     ]
   },
-  "last_deploy_sha": "74db3a292c7ad68953e9c8b7053c9ba8ecae92b4",
+  "last_deploy_sha": "5b654785cc0c512f08ef3fa85d38f4f4e4ef24bd",
   "products": {
     "combined:Minoxidil 5 mg": {
       "Minoxidil 5 mg": {
         "found": true,
-        "highest_price": "€ 30.10",
-        "highest_price_at": "2026-05-28T12:30:51.092195+00:00",
+        "highest_price": "€ 30.13",
+        "highest_price_at": "2026-06-06T05:50:40.178831+00:00",
         "in_stock": false,
         "lowest_price": "€ 30.04",
         "lowest_price_at": "2026-05-31T01:40:41.606882+00:00",
@@ -54,7 +54,8 @@
         "price_history": [
           30.06,
           30.1,
-          30.04
+          30.04,
+          30.13
         ]
       }
     },
@@ -66,8 +67,8 @@
         "in_stock": true,
         "lowest_price": "€ 42.06",
         "lowest_price_at": "2026-05-31T01:40:41.606861+00:00",
-        "previous_price": "€ 42.14",
-        "price": "€ 42.06",
+        "previous_price": "€ 42.06",
+        "price": "€ 42.18",
         "price_history": [
           42.2,
           42.14,
@@ -75,42 +76,45 @@
           42.17,
           42.08,
           42.14,
-          42.06
+          42.06,
+          42.18
         ]
       }
     },
     "https://bgpharmadrugs.to/product/peptides/": {
       "BPC157/TB500 mix 5mg each": {
         "found": true,
-        "highest_price": "€ 25.80",
-        "highest_price_at": "2026-05-28T12:30:41.804295+00:00",
+        "highest_price": "€ 25.82",
+        "highest_price_at": "2026-06-06T05:50:40.178789+00:00",
         "in_stock": true,
         "lowest_price": "€ 25.75",
         "lowest_price_at": "2026-05-31T01:40:41.606843+00:00",
-        "previous_price": "€ 25.80",
-        "price": "€ 25.75",
+        "previous_price": "€ 25.75",
+        "price": "€ 25.82",
         "price_history": [
           25.76,
           25.8,
-          25.75
+          25.75,
+          25.82
         ]
       },
       "GHK CU 100 mg": {
         "found": true,
-        "highest_price": "€ 21.50",
-        "highest_price_at": "2026-05-28T12:30:37.369809+00:00",
+        "highest_price": "€ 21.52",
+        "highest_price_at": "2026-06-06T05:50:40.178719+00:00",
         "in_stock": true,
         "lowest_price": "€ 17.18",
         "lowest_price_at": "2026-05-25T23:30:30.287557+00:00",
-        "previous_price": "€ 21.50",
-        "price": "€ 21.46",
+        "previous_price": "€ 21.46",
+        "price": "€ 21.52",
         "price_history": [
           17.2,
           17.21,
           17.18,
           21.47,
           21.5,
-          21.46
+          21.46,
+          21.52
         ]
       },
       "IGF-1 LR3 1 mg": {
@@ -120,20 +124,21 @@
       },
       "Retatrutide 30 mg": {
         "found": true,
-        "highest_price": "€ 68.85",
-        "highest_price_at": "2026-05-25T21:00:37.227567+00:00",
+        "highest_price": "€ 68.86",
+        "highest_price_at": "2026-06-06T05:50:40.178771+00:00",
         "in_stock": true,
         "lowest_price": "€ 68.66",
         "lowest_price_at": "2026-05-31T01:40:41.606830+00:00",
-        "previous_price": "€ 68.79",
-        "price": "€ 68.66",
+        "previous_price": "€ 68.66",
+        "price": "€ 68.86",
         "price_history": [
           68.79,
           68.83,
           68.85,
           68.7,
           68.79,
-          68.66
+          68.66,
+          68.86
         ]
       },
       "Tirzepatide 30 mg": {
@@ -143,8 +148,8 @@
         "in_stock": true,
         "lowest_price": "€ 42.91",
         "lowest_price_at": "2026-05-31T01:40:41.606813+00:00",
-        "previous_price": "€ 42.99",
-        "price": "€ 42.91",
+        "previous_price": "€ 42.91",
+        "price": "€ 43.04",
         "price_history": [
           43.06,
           42.99,
@@ -152,7 +157,8 @@
           43.03,
           42.94,
           42.99,
-          42.91
+          42.91,
+          43.04
         ]
       }
     },
@@ -164,8 +170,8 @@
         "in_stock": true,
         "lowest_price": "€ 38.62",
         "lowest_price_at": "2026-05-31T01:40:41.606872+00:00",
-        "previous_price": "€ 38.70",
-        "price": "€ 38.62",
+        "previous_price": "€ 38.62",
+        "price": "€ 38.74",
         "price_history": [
           38.75,
           38.7,
@@ -173,7 +179,8 @@
           38.73,
           38.65,
           38.7,
-          38.62
+          38.62,
+          38.74
         ]
       }
     }
