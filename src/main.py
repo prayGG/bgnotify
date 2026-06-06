@@ -592,6 +592,20 @@ def build_stats_embed(cfg: dict, state: dict, usd_eur: Optional[float] = None) -
                 continue
             entries.append((emoji, variant, e))
 
+    # PS-Spiele in dieselbe Stats-Schleife einreihen — gleiche Entry-Form,
+    # daher identisches Rendering (Sparkline, tief/hoch, OOS-Dauer, Restocks).
+    ps_state = state.get("playstation", {})
+    for game in (cfg.get("playstation") or {}).get("games") or []:
+        url = game.get("url")
+        if not url:
+            continue
+        e = ps_state.get(url)
+        if not e:
+            continue
+        emoji = game.get("emoji") or "🎮"
+        label = e.get("name") or game.get("name") or url
+        entries.append((emoji, label, e))
+
     entries.sort(key=lambda t: 0 if t[2].get("in_stock") else 1)
 
     for emoji, variant, e in entries:
@@ -823,25 +837,34 @@ _CURRENCY_SYMBOL = {"EUR": "€", "USD": "$", "GBP": "£"}
 
 
 def _fmt_price_cents(cents: Optional[int], currency: str = "EUR") -> str:
-    """Cents → Anzeigepreis. Aus den numerischen Werten formatiert (nicht aus dem
-    gescrapten String), damit das € unabhängig von der Encoding-Umgebung stimmt.
-    Deutsches Dezimalkomma, passend zum /de-de/-Store."""
+    """Cents → Anzeigepreis im SELBEN Format wie die Shop-Produkte ("€ 59.99":
+    Symbol + Space + Punkt-Dezimal). Aus den numerischen Werten formatiert (nicht
+    aus dem gescrapten String), damit das € unabhängig von der Encoding-Umgebung
+    stimmt UND `_price_value`/`display_price` es wie einen Medi-Preis lesen."""
     if cents is None:
         return ""
-    sym = _CURRENCY_SYMBOL.get(currency, f"{currency} " if currency else "")
-    return f"{sym}{cents / 100:.2f}".replace(".", ",")
+    sym = _CURRENCY_SYMBOL.get(currency)
+    if sym:
+        return f"{sym} {cents / 100:.2f}"
+    return f"{currency + ' ' if currency else ''}{cents / 100:.2f}"
 
 
 def check_playstation(cfg: dict, state: dict) -> tuple[list[dict], list[dict]]:
-    """Konfigurierte PS-Store-Spiele prüfen; bei Preissenkung alerten.
+    """Konfigurierte PS-Store-Spiele prüfen; State + Status genau wie die Shop-
+    Produkte führen, damit sie im Dashboard UND der Stats-Karte identisch
+    gerendert werden (in/out of stock, Preis, „war X", Sparkline, tief/hoch,
+    OOS-Dauer, Restocks).
 
-    Gibt (statuses, drops) zurück. Erstkontakt eines Spiels setzt nur die
-    Baseline (kein Alert) — sonst würde der erste Lauf jedes Spiel als „Drop"
-    feuern. Alert nur, wenn der aktuelle Preis (discountedValue in Cent) unter
-    dem zuletzt gespeicherten liegt — „wieder günstiger geworden".
+    Gibt (statuses, drops) zurück:
+      - statuses: Dashboard-Form (gleiche Keys wie check_products) → angehängt
+        an die Produkt-Statuses, fließt in build_dashboard_embed.
+      - drops: Preissenkungen für den Ping-Channel (eigenes Embed).
 
-    State: state["playstation"][url] = {name, price_value, base_value,
-    discount_text, currency, lowest_value, lowest_at, last_check_at}
+    „in stock" = kaufbar (ADD_TO_CART-Preis vorhanden). Digitale Spiele sind
+    quasi immer grün; rot nur wenn delisted / nur via Abo. Erstkontakt setzt
+    nur die Baseline (kein Ping). State unter state["playstation"][url] in der
+    GLEICHEN Entry-Form wie ein Produkt-Variant (price="€ X.XX", price_history
+    als Euro-Floats, lowest/highest, out_since, oos_periods, restock_count …).
     """
     ps_state = state.setdefault("playstation", {})
     statuses: list[dict] = []
@@ -856,6 +879,7 @@ def check_playstation(cfg: dict, state: dict) -> tuple[list[dict], list[dict]]:
         seen_urls.add(url)
         cfg_name = game.get("name") or ""
         entry = ps_state.setdefault(url, {})
+        disp_name = cfg_name or entry.get("name") or url
 
         try:
             info = playstation.check(url, cfg_name)
@@ -863,46 +887,91 @@ def check_playstation(cfg: dict, state: dict) -> tuple[list[dict], list[dict]]:
             log.error("playstation check failed for %s: %s", url, e)
             info = None
 
+        # Scrape fehlgeschlagen — letzten bekannten Stand zeigen, KEINE
+        # Transition/Drop (sonst falscher Alarm beim nächsten Erfolg).
         if info is None or not info.get("found"):
-            # Scrape/Lookup fehlgeschlagen — letzten bekannten Stand zeigen,
-            # NICHT als Drop werten (sonst falscher Alarm beim nächsten Erfolg).
             statuses.append({
-                "name": entry.get("name") or cfg_name or url, "url": url,
-                "price_value": entry.get("price_value"), "base_value": entry.get("base_value"),
-                "discount_text": entry.get("discount_text", ""), "currency": entry.get("currency", ""),
-                "found": False,
+                "product_name": disp_name, "product_url": url, "variant": disp_name,
+                "in_stock": bool(entry.get("in_stock")),
+                "price": entry.get("price", ""), "previous_price": entry.get("previous_price", ""),
+                "out_since": entry.get("out_since", ""), "found": False,
+                "deep_link": url, "error": True,
             })
             continue
 
-        cur = info["price_value"]
-        prev = entry.get("price_value")
-
-        if cur is not None:
-            low = entry.get("lowest_value")
-            if low is None or cur < low:
-                entry["lowest_value"] = cur
-                entry["lowest_at"] = now_iso
-
-        if prev is not None and cur is not None and cur < prev:
-            log.info("ps price drop: %s %s -> %s", info["name"], prev, cur)
-            drops.append({
-                "name": info["name"] or cfg_name, "url": url,
-                "old_value": prev, "new_value": cur, "base_value": info["base_value"],
-                "discount_text": info["discount_text"], "currency": info["currency"],
-            })
-
         entry["name"] = info["name"] or cfg_name
-        entry["price_value"] = cur
-        entry["base_value"] = info["base_value"]
+        disp_name = entry["name"] or disp_name
+        in_stock_now = info["price_value"] is not None  # kaufbar = „in stock"
+        in_stock_prev = entry.get("in_stock")
+        new_price = _fmt_price_cents(info["price_value"], info["currency"]) if in_stock_now else ""
+        prev_price = entry.get("price", "")
+        out_since_before = entry.get("out_since")
         entry["discount_text"] = info["discount_text"]
-        entry["currency"] = info["currency"]
-        entry["last_check_at"] = now_iso
+
+        # OOS-Bookkeeping (out_since stempeln / beim Wieder-kaufbar löschen).
+        if not in_stock_now and not entry.get("out_since"):
+            entry["out_since"] = now_iso
+        elif in_stock_now:
+            entry.pop("out_since", None)
+
+        # Preisänderung merken (für „war X").
+        if in_stock_now and new_price and prev_price and new_price != prev_price:
+            entry["previous_price"] = prev_price
+
+        # tief/hoch + Preis-History (numerisch, dedupliziert, letzte 30) — wie Produkte.
+        new_val = _price_value(new_price)
+        if new_val is not None:
+            low_val = _price_value(entry.get("lowest_price", ""))
+            if low_val is None or new_val < low_val:
+                entry["lowest_price"] = new_price
+                entry["lowest_price_at"] = now_iso
+            high_val = _price_value(entry.get("highest_price", ""))
+            if high_val is None or new_val > high_val:
+                entry["highest_price"] = new_price
+                entry["highest_price_at"] = now_iso
+            history = entry.setdefault("price_history", [])
+            if not history or history[-1] != new_val:
+                history.append(new_val)
+                if len(history) > 30:
+                    entry["price_history"] = history[-30:]
 
         statuses.append({
-            "name": entry["name"], "url": url, "price_value": cur,
-            "base_value": info["base_value"], "discount_text": info["discount_text"],
-            "currency": info["currency"], "found": True,
+            "product_name": disp_name, "product_url": url, "variant": disp_name,
+            "in_stock": in_stock_now,
+            "price": new_price or entry.get("price", ""),
+            "previous_price": entry.get("previous_price", ""),
+            "out_since": entry.get("out_since", ""),
+            "found": True, "deep_link": url, "error": False,
         })
+
+        # Transitions. Restock (out→in) wie bei Produkten; zusätzlich der
+        # Preissenkungs-Ping (unabhängig vom Restock — feuert auch, wenn das
+        # Spiel durchgehend kaufbar war und nur billiger wurde).
+        prev_val = _price_value(prev_price)
+        if in_stock_prev is None:
+            log.info("ps baseline: %s %s", disp_name, "in stock" if in_stock_now else "out")
+        elif in_stock_now and not in_stock_prev:
+            entry["restock_count"] = entry.get("restock_count", 0) + 1
+            entry["last_restock_at"] = now_iso
+            if out_since_before:
+                periods = entry.setdefault("oos_periods", [])
+                periods.append({"start": out_since_before, "end": now_iso})
+                if len(periods) > 20:
+                    entry["oos_periods"] = periods[-20:]
+
+        if in_stock_now and prev_val is not None and new_val is not None and new_val < prev_val:
+            log.info("ps price drop: %s %s -> %s", disp_name, prev_price, new_price)
+            drops.append({
+                "name": disp_name, "url": url,
+                "old_price": prev_price, "new_price": new_price,
+                "discount_text": info["discount_text"],
+            })
+
+        entry["in_stock"] = in_stock_now
+        if in_stock_now and new_price:
+            entry["price"] = new_price
+        entry["found"] = True
+        entry["last_check_at"] = now_iso
 
     # Stand für entfernte Spiele aufräumen, damit state.json nicht wächst.
     for url in list(ps_state.keys()):
@@ -916,9 +985,8 @@ def check_playstation(cfg: dict, state: dict) -> tuple[list[dict], list[dict]]:
 def build_ps_drop_embed(drop: dict) -> dict:
     """Embed für eine PS-Preissenkung — grüner Akzent, neuer Preis groß,
     alter Preis + Rabatt als Kontext, Link in den Store."""
-    currency = drop.get("currency", "EUR")
-    new_s = _fmt_price_cents(drop.get("new_value"), currency)
-    old_s = _fmt_price_cents(drop.get("old_value"), currency)
+    new_s = drop.get("new_price") or ""
+    old_s = drop.get("old_price") or ""
     disc = drop.get("discount_text") or ""
     disc_suffix = f"⠀·⠀**{disc}**" if disc else ""
     lines = f"### ⠀{new_s}\n_war {old_s}_{disc_suffix}" if old_s else f"### ⠀{new_s}"
@@ -1304,6 +1372,9 @@ def main() -> int:
     ps_webhook_env = cfg.get("discord_ps_webhook_env", "DISCORD_PS_WEBHOOK_URL")
     ps_webhook = os.environ.get(ps_webhook_env, "")
     ps_statuses, ps_drops = check_playstation(cfg, state)
+    # PS-Spiele mit auf das BG-Status-Board (Dashboard) — gemischt mit den
+    # Produkten. Die Stats-Karte zieht ihre PS-Einträge selbst aus dem State.
+    statuses.extend(ps_statuses)
     if ps_drops and ps_webhook:
         ps_ping_ids = load_ping_user_ids(cfg)
         for d in ps_drops:
