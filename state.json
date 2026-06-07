@@ -1,8 +1,8 @@
 {
   "bot_stats": {
     "first_check_at": "2026-05-20T18:50:44.075159+00:00",
-    "last_check_at": "2026-06-07T14:40:34.840339+00:00",
-    "total_checks": 2547,
+    "last_check_at": "2026-06-07T14:50:34.788967+00:00",
+    "total_checks": 2548,
     "total_restocks": 0
   },
   "dashboard_message_id": "1510095616322175107",
@@ -39,7 +39,7 @@
       "3826520"
     ]
   },
-  "last_deploy_sha": "e5ebaff6dad03b5b26dab73a7863366d3da0ffed",
+  "last_deploy_sha": "9284cb0f152e5e3a81f0c3cca91ac901d8a16477",
   "playstation": {
     "https://store.playstation.com/de-de/product/EP1018-CUSA06511_00-LEGOCITYUNDERCOV": {
       "base_value": 5999,
@@ -49,7 +49,7 @@
       "highest_price": "€ 59.99",
       "highest_price_at": "2026-06-06T19:30:48.285006+00:00",
       "in_stock": true,
-      "last_check_at": "2026-06-07T14:40:47.689056+00:00",
+      "last_check_at": "2026-06-07T14:50:47.812510+00:00",
       "lowest_at": "2026-06-06T19:20:45.639056+00:00",
       "lowest_price": "€ 59.99",
       "lowest_price_at": "2026-06-06T19:30:48.285006+00:00",
