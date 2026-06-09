@@ -106,12 +106,6 @@ products:
     variant_labels:
       "BPC157/TB500 mix 5mg each": "BPC/TB500 5 mg"
 
-  - name: "IGF-1 LR3"
-    url: "https://bgpharmadrugs.to/product/peptides/"
-    emoji: "🧪"
-    watch_variants:
-      - "IGF-1 LR3 1 mg"
-
   - name: "Modafinil"
     url: "https://bgpharmadrugs.to/product/modafinil/"
     emoji: "💊"
