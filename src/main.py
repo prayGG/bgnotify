@@ -1366,11 +1366,12 @@ def main() -> int:
     order_role_ids = [str(r) for r in ((cfg.get("notifications") or {}).get("ping_role_ids") or [])]
     check_orders(cfg, order_webhook, load_ping_user_ids(cfg), order_role_ids)
 
-    # PlayStation-Preis-Watcher (eigener Webhook). Pingt bei Preissenkung wie ein
-    # Restock. Leerer Webhook = Feature inaktiv (Check + Baseline laufen trotzdem,
-    # damit beim späteren Aktivieren nicht der ganze Backlog feuert).
+    # PlayStation-Preis-Watcher. Pingt bei Preissenkung wie ein Restock. Wenn der
+    # eigene PS-Webhook leer ist, fällt er auf den BG-notify-Channel (stock_webhook,
+    # selbst mit Fallback auf den Haupt-Webhook) zurück — so reicht ein einziger
+    # Webhook und die PS-Drops landen mit im BG-notify-Chat.
     ps_webhook_env = cfg.get("discord_ps_webhook_env", "DISCORD_PS_WEBHOOK_URL")
-    ps_webhook = os.environ.get(ps_webhook_env, "")
+    ps_webhook = os.environ.get(ps_webhook_env, "") or stock_webhook
     ps_statuses, ps_drops = check_playstation(cfg, state)
     # PS-Spiele mit auf das BG-Status-Board (Dashboard) — gemischt mit den
     # Produkten. Die Stats-Karte zieht ihre PS-Einträge selbst aus dem State.
