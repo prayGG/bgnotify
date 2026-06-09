@@ -11,12 +11,6 @@ discord_stock_webhook_env: DISCORD_STOCK_WEBHOOK_URL
 # ist, wird der Forum-Check übersprungen.
 discord_forum_webhook_env: DISCORD_FORUM_WEBHOOK_URL
 
-# Eigener Webhook für den PlayStation-Preis-Watcher. Pingt, wenn ein getracktes
-# Spiel günstiger geworden ist (neuer Preis < zuletzt gesehener Preis). Wenn die
-# env var leer ist, läuft der Check trotzdem (setzt nur die Baseline) — es wird
-# nur nichts gepostet.
-discord_ps_webhook_env: DISCORD_PS_WEBHOOK_URL
-
 forum:
   # Saved-search URL für BG's Posts. Wird intern auf o=date umgebogen, damit
   # neueste oben stehen. Falls die URL irgendwann nicht mehr geht, kann auch

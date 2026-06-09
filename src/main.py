@@ -542,8 +542,7 @@ def build_dashboard_embed(
     color = COLOR_WARN if any_hard_error and not any_in_stock else (COLOR_IN_STOCK if any_in_stock else COLOR_OUT)
 
     return {
-        "author": {"name": "bgpharmadrugs.to", "url": "https://bgpharmadrugs.to/"},
-        "title": "BG Pharma · Status",
+        "author": {"name": "✦⠀⠀bgnotify · status⠀⠀✦"},
         "color": color,
         "description": "\n\n".join(blocks) if blocks else "_keine Produkte konfiguriert_",
         "footer": {"text": "Letzter Check"},
@@ -1366,22 +1365,19 @@ def main() -> int:
     order_role_ids = [str(r) for r in ((cfg.get("notifications") or {}).get("ping_role_ids") or [])]
     check_orders(cfg, order_webhook, load_ping_user_ids(cfg), order_role_ids)
 
-    # PlayStation-Preis-Watcher. Pingt bei Preissenkung wie ein Restock. Wenn der
-    # eigene PS-Webhook leer ist, fällt er auf den BG-notify-Channel (stock_webhook,
-    # selbst mit Fallback auf den Haupt-Webhook) zurück — so reicht ein einziger
-    # Webhook und die PS-Drops landen mit im BG-notify-Chat.
-    ps_webhook_env = cfg.get("discord_ps_webhook_env", "DISCORD_PS_WEBHOOK_URL")
-    ps_webhook = os.environ.get(ps_webhook_env, "") or stock_webhook
+    # PlayStation-Preis-Watcher. Preissenkungen pingen wie ein Restock und laufen
+    # über den BG-notify-Channel (stock_webhook → "bgnotify by pray"). Es gibt
+    # keinen eigenen PS-Webhook mehr.
     ps_statuses, ps_drops = check_playstation(cfg, state)
     # PS-Spiele mit auf das BG-Status-Board (Dashboard) — gemischt mit den
     # Produkten. Die Stats-Karte zieht ihre PS-Einträge selbst aus dem State.
     statuses.extend(ps_statuses)
-    if ps_drops and ps_webhook:
+    if ps_drops and stock_webhook:
         ps_ping_ids = load_ping_user_ids(cfg)
         for d in ps_drops:
-            notify.send_ps_price_drop(ps_webhook, build_ps_drop_embed(d), ps_ping_ids, order_role_ids)
+            notify.send_ps_price_drop(stock_webhook, build_ps_drop_embed(d), ps_ping_ids, order_role_ids)
     elif ps_drops:
-        log.info("playstation: %d price drop(s) but %s is empty", len(ps_drops), ps_webhook_env)
+        log.info("playstation: %d price drop(s) but stock webhook is empty", len(ps_drops))
 
     if webhook:
         notif = cfg.get("notifications") or {}
