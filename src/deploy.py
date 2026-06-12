@@ -86,7 +86,7 @@ def build_updates_embed(commits: list[tuple[str, str]], head_sha: str) -> dict:
         else:
             description = f"`{head_sha[:7]}`"
     return {
-        "author": {"name": "✦⠀⠀Deploy⠀⠀✦"},
+        "author": {"name": "✦⠀⠀deploy⠀⠀✦"},
         "title": f"Update · `{head_sha[:7]}`",
         "description": description,
         "color": COLOR_BLURPLE,

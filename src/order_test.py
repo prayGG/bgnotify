@@ -144,7 +144,7 @@ def main() -> int:
     lines += gist_lines
     lines += _diag_live(cfg, st)
     diag_embed = {
-        "author": {"name": "✦⠀⠀Order-Test · Diagnose⠀⠀✦"},
+        "author": {"name": "✦⠀⠀order-test · diagnose⠀⠀✦"},
         "description": "\n".join(lines)[:4000],
         "color": 0x5865F2,
     }

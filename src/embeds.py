@@ -279,7 +279,7 @@ def build_stats_embed(cfg: dict, state: dict, usd_eur: Optional[float] = None) -
         blocks.append("\n".join(lines))
 
     return {
-        "author": {"name": "✦⠀⠀bgnotify · Stats⠀⠀✦"},
+        "author": {"name": "✦⠀⠀bgnotify · stats⠀⠀✦"},
         "color": COLOR_BLURPLE,
         "description": "\n\n".join(blocks),
         "timestamp": datetime.now(timezone.utc).isoformat(),
@@ -293,7 +293,7 @@ def build_restock_embed(restock: dict, usd_eur: Optional[float] = None, labels: 
     shown = display_price(restock.get("price", ""), usd_eur)
     price_line = f"### ⠀{shown}\n\n" if shown else ""
     return {
-        "author": {"name": "✦⠀⠀RESTOCKED⠀⠀✦"},
+        "author": {"name": "✦⠀⠀restocked⠀⠀✦"},
         "title": (labels or {}).get(restock["variant"], restock["variant"]),
         "description": (
             price_line
@@ -313,7 +313,7 @@ def build_oos_embed(item: dict, usd_eur: Optional[float] = None, labels: Optiona
     link = item.get("deep_link") or item.get("product_url") or ""
     link_line = f"[→⠀⠀Produktseite]({link})" if link else ""
     return {
-        "author": {"name": "✦⠀⠀OUT OF STOCK⠀⠀✦"},
+        "author": {"name": "✦⠀⠀out of stock⠀⠀✦"},
         "title": (labels or {}).get(item["variant"], item["variant"]),
         "description": last_line + link_line,
         "color": COLOR_OUT,
@@ -334,7 +334,7 @@ def build_ps_drop_embed(drop: dict) -> dict:
     disc_suffix = f"⠀·⠀**{disc}**" if disc else ""
     lines = f"### ⠀{new_s}\n_war {old_s}_{disc_suffix}" if old_s else f"### ⠀{new_s}"
     return {
-        "author": {"name": "✦⠀⠀PREIS GESENKT⠀⠀✦"},
+        "author": {"name": "✦⠀⠀preis gesenkt⠀⠀✦"},
         "title": drop.get("name") or "PlayStation",
         "description": lines + f"\n\n**[→⠀⠀Im PS Store ansehen]({drop['url']})**",
         "color": COLOR_IN_STOCK,
@@ -355,7 +355,7 @@ def build_forum_embed(post: dict) -> dict:
     if len(excerpt) > 600:
         excerpt = excerpt[:597].rstrip() + "…"
     embed = {
-        "author": {"name": "✦ ⠀ neuer Post⠀⠀✦"},
+        "author": {"name": "✦⠀⠀neuer post⠀⠀✦"},
         "title": post.get("thread_title") or "(ohne Titel)",
         "url": post.get("url", ""),
         "description": excerpt or "_(kein Snippet)_",
@@ -410,7 +410,7 @@ def build_order_status_embed(order: dict, fresh: bool = False, items: Optional[l
     label = order.get("status_text") or slug or "—"
     head = "🆕⠀Neue Bestellung" if fresh else "Status-Update"
     return {
-        "author": {"name": "✦⠀⠀Bestellung⠀⠀✦"},
+        "author": {"name": "✦⠀⠀bestellung⠀⠀✦"},
         "title": f"#{order.get('order_id', '')}",
         "description": f"{head}\n{emoji}⠀**{label}**" + _items_block(items) + _order_link(order.get("url")),
         "color": _ORDER_STATUS_COLOR.get(slug, COLOR_WARN),
@@ -423,7 +423,7 @@ def build_order_tracking_embed(order_id: str, links: list[str], items: Optional[
                                url: Optional[str] = None) -> dict:
     body = "\n".join(f"[→⠀Sendung verfolgen]({l})" for l in links)
     return {
-        "author": {"name": "✦⠀⠀Tracking⠀⠀✦"},
+        "author": {"name": "✦⠀⠀tracking⠀⠀✦"},
         "title": f"#{order_id}",
         "description": f"🚚⠀**Tracking ist da**\n{body}" + _items_block(items) + _order_link(url) + "\n\n_Details in deiner Mail_",
         "color": _ORDER_TRACKING_COLOR,
