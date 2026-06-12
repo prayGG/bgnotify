@@ -1,8 +1,8 @@
 {
   "bot_stats": {
     "first_check_at": "2026-05-20T18:50:44.075159+00:00",
-    "last_check_at": "2026-06-12T07:40:31.740048+00:00",
-    "total_checks": 3223,
+    "last_check_at": "2026-06-12T07:50:39.347842+00:00",
+    "total_checks": 3224,
     "total_restocks": 0
   },
   "dashboard_message_id": "1510095616322175107",
@@ -46,7 +46,7 @@
       "3833579"
     ]
   },
-  "last_deploy_sha": "dde8dd4fc09a956782391850147b1d687c1666ac",
+  "last_deploy_sha": "3b7e81f00381e30a736b9627270fb7c6c8ed5980",
   "playstation": {
     "https://store.playstation.com/de-de/product/EP1018-CUSA06511_00-LEGOCITYUNDERCOV": {
       "base_value": 5999,
@@ -56,7 +56,7 @@
       "highest_price": "€ 59.99",
       "highest_price_at": "2026-06-06T19:30:48.285006+00:00",
       "in_stock": true,
-      "last_check_at": "2026-06-12T07:40:42.993063+00:00",
+      "last_check_at": "2026-06-12T07:50:51.999847+00:00",
       "lowest_at": "2026-06-06T19:20:45.639056+00:00",
       "lowest_price": "€ 59.99",
       "lowest_price_at": "2026-06-06T19:30:48.285006+00:00",
@@ -86,7 +86,8 @@
           30.04,
           30.13,
           30.38,
-          30.32
+          30.32,
+          30.22
         ]
       }
     },
@@ -98,8 +99,8 @@
         "in_stock": true,
         "lowest_price": "€ 42.06",
         "lowest_price_at": "2026-05-31T01:40:41.606861+00:00",
-        "previous_price": "€ 42.54",
-        "price": "€ 42.45",
+        "previous_price": "€ 42.45",
+        "price": "€ 42.31",
         "price_history": [
           42.2,
           42.14,
@@ -110,7 +111,8 @@
           42.06,
           42.18,
           42.54,
-          42.45
+          42.45,
+          42.31
         ]
       }
     },
@@ -122,15 +124,16 @@
         "in_stock": true,
         "lowest_price": "€ 25.75",
         "lowest_price_at": "2026-05-31T01:40:41.606843+00:00",
-        "previous_price": "€ 26.04",
-        "price": "€ 25.99",
+        "previous_price": "€ 25.99",
+        "price": "€ 25.90",
         "price_history": [
           25.76,
           25.8,
           25.75,
           25.82,
           26.04,
-          25.99
+          25.99,
+          25.9
         ]
       },
       "GHK CU 100 mg": {
@@ -140,8 +143,8 @@
         "in_stock": true,
         "lowest_price": "€ 17.18",
         "lowest_price_at": "2026-05-25T23:30:30.287557+00:00",
-        "previous_price": "€ 21.70",
-        "price": "€ 21.66",
+        "previous_price": "€ 21.66",
+        "price": "€ 21.58",
         "price_history": [
           17.2,
           17.21,
@@ -151,7 +154,8 @@
           21.46,
           21.52,
           21.7,
-          21.66
+          21.66,
+          21.58
         ]
       },
       "IGF-1 LR3 1 mg": {
@@ -166,8 +170,8 @@
         "in_stock": true,
         "lowest_price": "€ 68.66",
         "lowest_price_at": "2026-05-31T01:40:41.606830+00:00",
-        "previous_price": "€ 69.45",
-        "price": "€ 69.31",
+        "previous_price": "€ 69.31",
+        "price": "€ 69.07",
         "price_history": [
           68.79,
           68.83,
@@ -177,7 +181,8 @@
           68.66,
           68.86,
           69.45,
-          69.31
+          69.31,
+          69.07
         ]
       },
       "Tirzepatide 30 mg": {
@@ -187,8 +192,8 @@
         "in_stock": true,
         "lowest_price": "€ 42.91",
         "lowest_price_at": "2026-05-31T01:40:41.606813+00:00",
-        "previous_price": "€ 43.40",
-        "price": "€ 43.32",
+        "previous_price": "€ 43.32",
+        "price": "€ 43.17",
         "price_history": [
           43.06,
           42.99,
@@ -199,7 +204,8 @@
           42.91,
           43.04,
           43.4,
-          43.32
+          43.32,
+          43.17
         ]
       }
     },
@@ -211,8 +217,8 @@
         "in_stock": true,
         "lowest_price": "€ 38.62",
         "lowest_price_at": "2026-05-31T01:40:41.606872+00:00",
-        "previous_price": "€ 39.06",
-        "price": "€ 38.99",
+        "previous_price": "€ 38.99",
+        "price": "€ 38.85",
         "price_history": [
           38.75,
           38.7,
@@ -223,7 +229,8 @@
           38.62,
           38.74,
           39.06,
-          38.99
+          38.99,
+          38.85
         ]
       }
     }
