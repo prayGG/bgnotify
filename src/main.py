@@ -8,13 +8,15 @@ Ablauf pro Run (GitHub Actions, `python -m src.main`):
 4. Bestellstatus + Tracking (`order_watch`, Stand im privaten Gist)
 5. PlayStation-Preise (`ps_watch`) — Statuses landen mit auf dem Dashboard
 6. Dashboard + Stats-Karte in place editieren, Alerts posten (`notify`)
-7. state.json speichern (der Workflow committet sie zurück auf main)
+7. Fehler-Report in den Updates-Channel, wenn der Run Errors hatte (`health`)
+8. state.json speichern (der Workflow committet sie zurück auf main)
 
 Die Module dahinter:
 - Scraper (reines Fetch+Parse): `bgpharma`, `playstation`, `forum`, `orders`
 - Watcher (State + Transitions):  `stock_watch`, `ps_watch`, `forum_watch`, `order_watch`
 - Darstellung (Embeds):           `embeds`
 - Discord-Versand:                `notify`
+- Fehler-Report:                  `health`
 - Config/State + Preise:          `config`, `pricing`
 """
 from __future__ import annotations
@@ -23,7 +25,7 @@ import logging
 import os
 import sys
 
-from . import notify
+from . import health, notify
 from .config import (
     load_config,
     load_ping_role_ids,
@@ -56,6 +58,7 @@ def _webhook_from_cfg(cfg: dict, key: str, default_env: str) -> str:
 
 def main() -> int:
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
+    errors = health.install()  # sammelt ab hier jeden log.error des Runs
     cfg = load_config()
     state = load_state()
 
@@ -74,62 +77,73 @@ def main() -> int:
     role_ids = load_ping_role_ids(cfg)
     labels = variant_labels(cfg)
 
-    # 1 — Shop-Produkte
-    statuses, restocks, oos_alerts = check_products(cfg, state)
-    usd_eur = fetch_usd_eur_rate()
-    log.info("USD->EUR rate: %s", usd_eur)
+    try:
+        # 1 — Shop-Produkte
+        statuses, restocks, oos_alerts = check_products(cfg, state)
+        usd_eur = fetch_usd_eur_rate()
+        log.info("USD->EUR rate: %s", usd_eur)
 
-    # 2 — Deploy-Announcement
-    announce_deploy(state, updates_webhook)
+        # 2 — Deploy-Announcement
+        announce_deploy(state, updates_webhook)
 
-    # 3 — Forum-Posts
-    new_forum_posts = check_forum(cfg, state)
-    if new_forum_posts and forum_webhook:
-        for post in new_forum_posts:
-            notify.send_forum_post(forum_webhook, build_forum_embed(post))
-    elif new_forum_posts:
-        log.info("forum: %d new post(s) but forum webhook is empty", len(new_forum_posts))
+        # 3 — Forum-Posts
+        new_forum_posts = check_forum(cfg, state)
+        if new_forum_posts and forum_webhook:
+            for post in new_forum_posts:
+                notify.send_forum_post(forum_webhook, build_forum_embed(post))
+        elif new_forum_posts:
+            log.info("forum: %d new post(s) but forum webhook is empty", len(new_forum_posts))
 
-    # 4 — Bestellstatus (eigener Webhook, eigener Gist-Stand)
-    check_orders(cfg, order_webhook, user_ids, role_ids)
+        # 4 — Bestellstatus (eigener Webhook, eigener Gist-Stand)
+        check_orders(cfg, order_webhook, user_ids, role_ids)
 
-    # 5 — PlayStation-Preise. Preissenkungen pingen wie ein Restock und laufen
-    # über den BG-notify-Channel (stock_webhook). Die PS-Statuses landen mit
-    # auf dem Dashboard; die Stats-Karte zieht ihre PS-Einträge aus dem State.
-    ps_statuses, ps_drops = check_playstation(cfg, state)
-    statuses.extend(ps_statuses)
-    if ps_drops and stock_webhook:
-        for d in ps_drops:
-            notify.send_ps_price_drop(stock_webhook, build_ps_drop_embed(d), user_ids, role_ids)
-    elif ps_drops:
-        log.info("playstation: %d price drop(s) but stock webhook is empty", len(ps_drops))
+        # 5 — PlayStation-Preise. Preissenkungen pingen wie ein Restock und laufen
+        # über den BG-notify-Channel (stock_webhook). Die PS-Statuses landen mit
+        # auf dem Dashboard; die Stats-Karte zieht ihre PS-Einträge aus dem State.
+        ps_statuses, ps_drops = check_playstation(cfg, state)
+        statuses.extend(ps_statuses)
+        if ps_drops and stock_webhook:
+            for d in ps_drops:
+                notify.send_ps_price_drop(stock_webhook, build_ps_drop_embed(d), user_ids, role_ids)
+        elif ps_drops:
+            log.info("playstation: %d price drop(s) but stock webhook is empty", len(ps_drops))
 
-    # 6 — Discord aktualisieren (persistente Karten + Alerts)
-    if webhook:
-        new_stats_id = notify.edit_in_place(
-            webhook,
-            build_stats_embed(cfg, state, usd_eur=usd_eur),
-            message_id=state.get("stats_message_id", ""),
-        )
-        if new_stats_id:
-            state["stats_message_id"] = new_stats_id
-
-        new_id = notify.edit_in_place(
-            webhook,
-            build_dashboard_embed(statuses, usd_eur=usd_eur, labels=labels),
-            message_id=state.get("dashboard_message_id", ""),
-        )
-        if new_id:
-            state["dashboard_message_id"] = new_id
-
-        for r in restocks:
-            notify.send_restock_alert(
-                stock_webhook, build_restock_embed(r, usd_eur=usd_eur, labels=labels), user_ids, role_ids,
+        # 6 — Discord aktualisieren (persistente Karten + Alerts)
+        if webhook:
+            new_stats_id = notify.edit_in_place(
+                webhook,
+                build_stats_embed(cfg, state, usd_eur=usd_eur),
+                message_id=state.get("stats_message_id", ""),
             )
-        for o in oos_alerts:
-            notify.send_oos_alert(stock_webhook, build_oos_embed(o, usd_eur=usd_eur, labels=labels))
+            if new_stats_id:
+                state["stats_message_id"] = new_stats_id
 
-    # 7 — State persistieren
+            new_id = notify.edit_in_place(
+                webhook,
+                build_dashboard_embed(statuses, usd_eur=usd_eur, labels=labels),
+                message_id=state.get("dashboard_message_id", ""),
+            )
+            if new_id:
+                state["dashboard_message_id"] = new_id
+
+            for r in restocks:
+                notify.send_restock_alert(
+                    stock_webhook, build_restock_embed(r, usd_eur=usd_eur, labels=labels), user_ids, role_ids,
+                )
+            for o in oos_alerts:
+                notify.send_oos_alert(stock_webhook, build_oos_embed(o, usd_eur=usd_eur, labels=labels))
+    except Exception as e:
+        # Harter Crash: erst melden + State sichern, dann den Run trotzdem
+        # fehlschlagen lassen, damit der Workflow rot wird.
+        log.exception("run crashed: %s: %s", type(e).__name__, e)
+        health.report(state, updates_webhook, errors)
+        save_state(state)
+        raise
+
+    # 7 — Fehler-Report (nur wenn sich das Fehlerbild geändert hat)
+    health.report(state, updates_webhook, errors)
+
+    # 8 — State persistieren
     save_state(state)
     return 0
 

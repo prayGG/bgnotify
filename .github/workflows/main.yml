@@ -62,7 +62,11 @@ jobs:
           BG_PASSWORD_2: ${{ secrets.BG_PASSWORD_2 }}
           WEITERE_ID_HIER: ${{ secrets.WEITERE_ID_HIER }}
 
+      # Läuft auch bei rotem Bot-Run: bei einem Crash schreibt main.py den
+      # State (inkl. Fehler-Report-Fingerprint) trotzdem — ohne Commit würde
+      # ein Crash-Loop bei jedem Lauf denselben Discord-Alarm feuern.
       - name: Commit & Push state
+        if: ${{ success() || failure() }}
         run: |
           git config --global user.name "bgnotify-bot"
           git config --global user.email "bot@users.noreply.github.com"

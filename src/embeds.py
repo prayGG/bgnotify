@@ -401,7 +401,7 @@ def _items_block(items: Optional[list[str]]) -> str:
 
 def _order_link(url: Optional[str]) -> str:
     """Klickbarer Link zur Bestellseite (leer wenn keine URL)."""
-    return f"\n\n[→⠀Bestellung ansehen]({url})" if url else ""
+    return f"\n\n**[→⠀⠀Bestellung ansehen]({url})**" if url else ""
 
 
 def build_order_status_embed(order: dict, fresh: bool = False, items: Optional[list[str]] = None) -> dict:
@@ -421,12 +421,45 @@ def build_order_status_embed(order: dict, fresh: bool = False, items: Optional[l
 
 def build_order_tracking_embed(order_id: str, links: list[str], items: Optional[list[str]] = None,
                                url: Optional[str] = None) -> dict:
-    body = "\n".join(f"[→⠀Sendung verfolgen]({l})" for l in links)
+    body = "\n".join(f"**[→⠀⠀Sendung verfolgen]({l})**" for l in links)
     return {
         "author": {"name": "✦⠀⠀tracking⠀⠀✦"},
         "title": f"#{order_id}",
         "description": f"🚚⠀**Tracking ist da**\n{body}" + _items_block(items) + _order_link(url) + "\n\n_Details in deiner Mail_",
         "color": _ORDER_TRACKING_COLOR,
         "footer": {"text": "via Hermes"},
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }
+
+
+# --------------------------------------------------------------------------
+# Fehler-Report (Updates-Channel)
+# --------------------------------------------------------------------------
+COLOR_ERROR = 0xED4245  # Discord native red
+
+_MAX_ERROR_LINES = 15
+
+
+def build_error_embed(messages: list[str]) -> dict:
+    """Embed für die gesammelten ERROR-Logs eines Runs — eine Zeile pro Fehler."""
+    lines = [f"·⠀{m[:180]}" for m in messages[:_MAX_ERROR_LINES]]
+    if len(messages) > _MAX_ERROR_LINES:
+        lines.append(f"_…und {len(messages) - _MAX_ERROR_LINES} weitere_")
+    return {
+        "author": {"name": "✦⠀⠀fehler⠀⠀✦"},
+        "description": "\n".join(lines)[:4000],
+        "color": COLOR_ERROR,
+        "footer": {"text": "bgnotify"},
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }
+
+
+def build_recovery_embed() -> dict:
+    """Entwarnung, wenn ein zuvor gemeldetes Fehlerbild wieder weg ist."""
+    return {
+        "author": {"name": "✦⠀⠀fehler⠀⠀✦"},
+        "description": "✅⠀läuft wieder fehlerfrei",
+        "color": COLOR_IN_STOCK,
+        "footer": {"text": "bgnotify"},
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }

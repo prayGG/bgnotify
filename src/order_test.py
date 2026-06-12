@@ -17,7 +17,7 @@ import sys
 
 from . import notify, orders
 from .config import load_config, parse_ids
-from .embeds import build_order_status_embed, build_order_tracking_embed
+from .embeds import COLOR_BLURPLE, build_order_status_embed, build_order_tracking_embed
 
 log = logging.getLogger(__name__)
 
@@ -146,7 +146,7 @@ def main() -> int:
     diag_embed = {
         "author": {"name": "✦⠀⠀order-test · diagnose⠀⠀✦"},
         "description": "\n".join(lines)[:4000],
-        "color": 0x5865F2,
+        "color": COLOR_BLURPLE,
     }
     notify._request("POST", webhook, {
         "username": "bgnotify · orders · TEST",
