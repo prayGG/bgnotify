@@ -73,7 +73,7 @@ def _fetch_html(url: str) -> str:
             )
             # Strip the obvious `navigator.webdriver = true` tell. Incapsula
             # checks several signals, this isn't a silver bullet — but a real
-                # browser context with normal TLS plus this is usually enough.
+            # browser context with normal TLS plus this is usually enough.
             ctx.add_init_script(
                 "Object.defineProperty(navigator, 'webdriver', {get: () => undefined});"
             )

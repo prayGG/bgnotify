@@ -21,29 +21,22 @@ import json
 import logging
 import os
 import sys
-from pathlib import Path
 from typing import Optional
 
-import yaml
-
-from . import bgpharma, forum, notify  # noqa: F401  (bgpharma used transitively)
-from .main import (
-    _variant_labels,
+from . import forum, notify
+from .config import STATE_PATH, load_config, load_ping_role_ids, load_ping_user_ids, variant_labels
+from .deploy import build_updates_embed
+from .embeds import (
     build_dashboard_embed,
     build_forum_embed,
     build_oos_embed,
     build_restock_embed,
     build_stats_embed,
-    build_updates_embed,
-    check_products,
-    fetch_usd_eur_rate,
-    load_ping_user_ids,
 )
+from .pricing import fetch_usd_eur_rate
+from .stock_watch import check_products
 
 log = logging.getLogger(__name__)
-ROOT = Path(__file__).resolve().parent.parent
-CONFIG_PATH = ROOT / "config.yml"
-STATE_PATH = ROOT / "state.json"
 
 
 def _pick_restock_sample(statuses: list[dict]) -> Optional[dict]:
@@ -81,7 +74,7 @@ def _pick_oos_sample(statuses: list[dict]) -> Optional[dict]:
 
 def main() -> int:
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
-    cfg = yaml.safe_load(CONFIG_PATH.read_text(encoding="utf-8")) or {}
+    cfg = load_config()
 
     main_wh = os.environ.get(cfg.get("discord_webhook_env", "DISCORD_WEBHOOK_URL"), "")
     updates_wh = os.environ.get(cfg.get("discord_updates_webhook_env", "DISCORD_UPDATES_WEBHOOK_URL"), "")
@@ -95,9 +88,8 @@ def main() -> int:
         log.error("DISCORD_WEBHOOK_URL is empty — nothing to test")
         return 1
 
-    notif = cfg.get("notifications") or {}
     user_ids = load_ping_user_ids(cfg)
-    role_ids = [str(r) for r in (notif.get("ping_role_ids") or [])]
+    role_ids = load_ping_role_ids(cfg)
     log.info("ping targets — users=%d, roles=%d", len(user_ids), len(role_ids))
 
     usd_eur = fetch_usd_eur_rate()
@@ -114,7 +106,7 @@ def main() -> int:
 
     state_copy = copy.deepcopy(on_disk_state)
     statuses, _restocks_unused, _oos_unused = check_products(cfg, state_copy)
-    labels = _variant_labels(cfg)
+    labels = variant_labels(cfg)
 
     results: list[tuple[str, str, object]] = []  # (test_name, channel, True | False | "skip-reason")
 

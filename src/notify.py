@@ -1,13 +1,14 @@
-"""Discord webhook notifications.
+"""Discord webhook notifications — the only module that talks to Discord.
 
-Two message types, each with a focused job:
+Two delivery patterns, each with a focused job:
 
 - `edit_in_place(embed, message_id)` — persistent dashboards (status + stats),
   PATCHed silently each run. Discord doesn't push notifications for edits, so
   this never spams. POSTs a fresh message if the saved id is missing or 404.
 
-- `send_restock_alert(embed, user_ids)` — one new POST per restocked variant.
-  Includes `<@user_id>` in the content so Discord pings the listed users.
+- `send_*` — one new POST per event. Pinging variants (restock, PS price drop,
+  order update) include `<@user_id>`/`<@&role_id>` mentions in the content;
+  silent variants (OOS, forum post, deploy announcement) never mention anyone.
 """
 from __future__ import annotations
 

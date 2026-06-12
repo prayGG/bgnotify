@@ -4,22 +4,20 @@ Postet in den Order-Channel:
   1. Eine **Diagnose**-Nachricht: Secrets/Verdrahtung, Gist-Stand und einen
      ECHTEN Login + Parse pro Konto (zeigt deine echten Bestellungen, Status,
      Artikel, Tracking — beweist die ganze Kette live).
-  2. Die 6 Beispiel-Nachrichten (jeder Embed-Typ) zum Ansehen/Feintunen.
+  2. Alle Beispiel-Nachrichten (jeder Embed-Typ) zum Ansehen/Feintunen.
 
 KEIN Schreiben ins Gist (read-only Test). Macht echte Logins → manuell auslösen
-(Actions → order-test). Nutzt die echten Builder/Parser aus main.py/orders.py.
+(Actions → order-test). Nutzt die echten Builder/Parser aus embeds.py/orders.py.
 """
 from __future__ import annotations
 
 import logging
 import os
-import re
 import sys
 
-import yaml
-
 from . import notify, orders
-from .main import CONFIG_PATH, build_order_status_embed, build_order_tracking_embed
+from .config import load_config, parse_ids
+from .embeds import build_order_status_embed, build_order_tracking_embed
 
 log = logging.getLogger(__name__)
 
@@ -136,7 +134,7 @@ def main() -> int:
         log.error("DISCORD_ORDER_WEBHOOK_URL ist leer — nichts zu senden.")
         return 1
 
-    cfg = yaml.safe_load(open(CONFIG_PATH, encoding="utf-8")) or {}
+    cfg = load_config()
     token, gist_id = os.environ.get("GIST_TOKEN", ""), os.environ.get("GIST_ID", "")
 
     # --- Diagnose zusammenbauen + posten ---
@@ -159,7 +157,7 @@ def main() -> int:
     log.info("Diagnose gepostet")
 
     # --- Render-Vorschau aller Nachrichtentypen ---
-    ping_ids = [x for x in re.split(r"[,;\s]+", os.environ.get("DISCORDID", "")) if x]
+    ping_ids = parse_ids(os.environ.get("DISCORDID", ""))
     ok = True
     for label, embed in SAMPLES:
         sent = _post_raw(webhook, embed, ping_ids)
