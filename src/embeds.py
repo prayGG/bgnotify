@@ -154,24 +154,26 @@ def _dashboard_dot_segs(s: dict, usd_eur: Optional[float]) -> tuple[str, list[st
     return dot, segs, False
 
 
+def _linked(text: str, link: str) -> str:
+    """Macht `text` zum Hyperlink auf `link` (bold-fett). Ohne Link nur fett —
+    so ist der Produkt-/Variantenname selbst klickbar, ein extra '· Klick'
+    entfällt und die Zeile bleibt kurz."""
+    return f"**[{text}]({link})**" if link else f"**{text}**"
+
+
 def _dashboard_status_line(s: dict, usd_eur: Optional[float]) -> str:
-    """Statuszeile EINES Einzelprodukts (Titel steht separat darüber)."""
-    link = s.get("deep_link") or s.get("product_url", "")
-    dot, segs, is_error = _dashboard_dot_segs(s, usd_eur)
-    if link and not is_error:
-        segs.append(f"[Klick]({link})")
+    """Statuszeile EINES Einzelprodukts (verlinkter Titel steht separat darüber)."""
+    dot, segs, _is_error = _dashboard_dot_segs(s, usd_eur)
     detail = "⠀·⠀".join(segs)
     return f"{dot}⠀{detail}" if detail else dot
 
 
 def _dashboard_group_row(tree: str, short: str, s: dict, usd_eur: Optional[float]) -> str:
     """Varianten-Zeile innerhalb einer Produkt-Gruppe: Dot direkt nach dem
-    Baum-Zeichen (├/└), damit die Dots senkrecht untereinander stehen."""
+    Baum-Zeichen (├/└), dann der verlinkte Variantenname."""
     link = s.get("deep_link") or s.get("product_url", "")
-    dot, segs, is_error = _dashboard_dot_segs(s, usd_eur)
-    segs = [f"**{short}**"] + segs
-    if link and not is_error:
-        segs.append(f"[Klick]({link})")
+    dot, segs, _is_error = _dashboard_dot_segs(s, usd_eur)
+    segs = [_linked(short, link)] + segs
     return f"{tree}⠀{dot}⠀" + "⠀·⠀".join(segs)
 
 
@@ -199,7 +201,8 @@ def build_dashboard_embed(
         if len(members) == 1:
             s = members[0]
             disp = labels.get(s["variant"], s["variant"])
-            blocks.append(f"**{disp}**\n└⠀{_dashboard_status_line(s, usd_eur)}")
+            link = s.get("deep_link") or s.get("product_url", "")
+            blocks.append(f"{_linked(disp, link)}\n└⠀{_dashboard_status_line(s, usd_eur)}")
             continue
 
         rows = [f"**{name}**"]
