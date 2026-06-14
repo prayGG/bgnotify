@@ -321,12 +321,14 @@ def build_stats_embed(cfg: dict, state: dict, usd_eur: Optional[float] = None) -
             continue
 
         # Mehrere Varianten: ein Gruppen-Header (Emoji + Produktname), darunter
-        # je Variante ein Unterblock mit verkürztem Label.
-        sub_blocks = [f"{emoji}⠀**{name}**"]
+        # je Variante direkt der Unterblock — ohne Leerzeilen dazwischen, damit
+        # die Gruppe optisch eine Einheit bleibt (das fette Label trennt genug).
+        lines = [f"{emoji}⠀**{name}**"]
         for variant, e in members:
             short = _short_label(name, labels.get(variant, variant))
-            sub_blocks.append("\n".join([f"**{short}**"] + _stats_body_lines(e, usd_eur)))
-        blocks.append("\n\n".join(sub_blocks))
+            lines.append(f"**{short}**")
+            lines += _stats_body_lines(e, usd_eur)
+        blocks.append("\n".join(lines))
 
     return {
         "author": {"name": "✦⠀⠀bgnotify · stats⠀⠀✦"},

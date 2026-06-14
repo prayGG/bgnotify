@@ -131,7 +131,7 @@ products:
 
   - name: "Tretinoin"
     url: "https://bgpharmadrugs.to/product/tretinoin/"
-    emoji: "🧴"
+    emoji: "✨"
     # Variable product mit zwei Optionen. Die Dropdown-Labels enthalten kein
     # "Tretinoin", daher bleibt der watch_variant roh (exakter Match-String +
     # state.json-Key) und nur die Anzeige bekommt einen lesbaren Alias.
