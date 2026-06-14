@@ -102,12 +102,16 @@ def _has_last_known_state(s: dict) -> bool:
     return bool(s.get("price")) or bool(s.get("in_stock")) or bool(s.get("out_since"))
 
 
-def _dashboard_sort_key(s: dict) -> int:
+def _stock_sort_key(s: dict) -> int:
+    """Sortier-Reihenfolge: 🟢 in stock oben (0), ⚠️ Fehler/nicht gefunden in der
+    Mitte (1), 🔴 out of stock ganz unten (2). Innerhalb gleicher Stufe greift
+    der stabile Sort → Config-Reihenfolge. Funktioniert auf Dashboard-Status-
+    Dicts wie auch auf state.json-Einträgen (Stats)."""
     if s.get("error") and not _has_last_known_state(s):
-        return 2
-    if not s.get("found") and not s.get("error"):
-        return 2
-    return 0 if s["in_stock"] else 1
+        return 1
+    if not s.get("found", True) and not s.get("error"):
+        return 1
+    return 0 if s.get("in_stock") else 2
 
 
 def _short_label(product_name: str, alias: str) -> str:
@@ -186,13 +190,12 @@ def build_dashboard_embed(
     for s in statuses:
         groups.setdefault(s.get("product_name") or s["variant"], []).append(s)
 
-    # Gruppen nach bestem Mitglied sortieren (in-stock zuerst), genau wie zuvor
-    # die einzelnen Einträge.
-    ordered = sorted(groups.items(), key=lambda kv: min(_dashboard_sort_key(m) for m in kv[1]))
+    # Gruppen nach bestem Mitglied sortieren (in-stock zuerst, OOS ganz unten).
+    ordered = sorted(groups.items(), key=lambda kv: min(_stock_sort_key(m) for m in kv[1]))
 
     blocks: list[str] = []
     for name, members in ordered:
-        members = sorted(members, key=_dashboard_sort_key)
+        members = sorted(members, key=_stock_sort_key)
         if len(members) == 1:
             s = members[0]
             disp = labels.get(s["variant"], s["variant"])
@@ -309,6 +312,7 @@ def build_stats_embed(cfg: dict, state: dict, usd_eur: Optional[float] = None) -
         product_data = products_state.get(product_state_key(product, urls), {})
         members = [(v, product_data[v]) for v in watch if product_data.get(v)]
         if members:
+            members.sort(key=lambda ve: _stock_sort_key(ve[1]))
             groups.append((emoji, name, members))
 
     # PS-Spiele als eigene Ein-Varianten-Gruppen einreihen — gleiches Rendering
@@ -325,7 +329,8 @@ def build_stats_embed(cfg: dict, state: dict, usd_eur: Optional[float] = None) -
         label = e.get("name") or game.get("name") or url
         groups.append((emoji, label, [(label, e)]))
 
-    groups.sort(key=lambda g: 0 if any(m[1].get("in_stock") for m in g[2]) else 1)
+    # Gleicher Schlüssel wie das Dashboard: in-stock-Produkte oben, OOS unten.
+    groups.sort(key=lambda g: min(_stock_sort_key(e) for _v, e in g[2]))
 
     for emoji, name, members in groups:
         if len(members) == 1:
