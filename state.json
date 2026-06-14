@@ -1,8 +1,8 @@
 {
   "bot_stats": {
     "first_check_at": "2026-05-20T18:50:44.075159+00:00",
-    "last_check_at": "2026-06-14T19:40:36.543611+00:00",
-    "total_checks": 3583,
+    "last_check_at": "2026-06-14T19:50:45.907442+00:00",
+    "total_checks": 3584,
     "total_restocks": 0
   },
   "dashboard_message_id": "1510095616322175107",
@@ -52,7 +52,7 @@
       "3835291"
     ]
   },
-  "last_deploy_sha": "8954bc02f6dcf998cc24d884c3f0cb8648180b60",
+  "last_deploy_sha": "48f2c9335b23a3e33686a76e6f39f2e6fdce1425",
   "playstation": {
     "https://store.playstation.com/de-de/product/EP1018-CUSA06511_00-LEGOCITYUNDERCOV": {
       "base_value": 5999,
@@ -62,7 +62,7 @@
       "highest_price": "€ 59.99",
       "highest_price_at": "2026-06-06T19:30:48.285006+00:00",
       "in_stock": true,
-      "last_check_at": "2026-06-14T19:41:05.587897+00:00",
+      "last_check_at": "2026-06-14T19:50:57.823860+00:00",
       "lowest_at": "2026-06-06T19:20:45.639056+00:00",
       "lowest_price": "€ 59.99",
       "lowest_price_at": "2026-06-06T19:30:48.285006+00:00",
@@ -238,6 +238,32 @@
           39.06,
           38.99,
           38.85
+        ]
+      }
+    },
+    "https://bgpharmadrugs.to/product/tretinoin/": {
+      "0.025% 20 grams": {
+        "found": true,
+        "highest_price": "€21.58",
+        "highest_price_at": "2026-06-14T19:50:57.083088+00:00",
+        "in_stock": true,
+        "lowest_price": "€21.58",
+        "lowest_price_at": "2026-06-14T19:50:57.083088+00:00",
+        "price": "€21.58",
+        "price_history": [
+          21.58
+        ]
+      },
+      "0.05% 30 grams": {
+        "found": true,
+        "highest_price": "€21.58",
+        "highest_price_at": "2026-06-14T19:50:57.083187+00:00",
+        "in_stock": true,
+        "lowest_price": "€21.58",
+        "lowest_price_at": "2026-06-14T19:50:57.083187+00:00",
+        "price": "€21.58",
+        "price_history": [
+          21.58
         ]
       }
     }
