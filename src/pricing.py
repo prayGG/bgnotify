@@ -43,27 +43,37 @@ def price_value(raw: str) -> Optional[float]:
         return None
 
 
+def _fmt_eur(value: float, approx: bool = False) -> str:
+    """Betrag in deutscher Schreibweise: Symbol HINTEN, Komma als Dezimaltrenner,
+    Punkt als Tausendertrenner — `1.234,56 €`. `approx` stellt ein `≈` voran
+    (für aus USD umgerechnete Preise)."""
+    s = f"{value:,.2f}".replace(",", "§").replace(".", ",").replace("§", ".")
+    return f"{'≈' if approx else ''}{s} €"
+
+
 def display_price(raw: str, rate: Optional[float]) -> str:
-    """Convert `$X.XX` to `≈€Y.YY` if a USD price + rate available; pass through otherwise."""
+    """Preis-String für die Anzeige: deutsches Format `21,58 €`. USD wird via
+    `rate` zu `≈21,58 €` umgerechnet; ohne Kurs bleibt ein USD-Preis roh."""
     if not raw:
         return ""
     m = _USD_PATTERN.search(raw)
-    if not m or rate is None:
-        return raw
-    try:
-        usd = float(m.group(1).replace(",", ""))
-    except ValueError:
-        return raw
-    return f"≈€{usd * rate:.2f}"
+    if m:
+        if rate is None:
+            return raw  # USD ohne Kurs — nicht umrechenbar, roh lassen
+        try:
+            return _fmt_eur(float(m.group(1).replace(",", "")) * rate, approx=True)
+        except ValueError:
+            return raw
+    val = price_value(raw)
+    return _fmt_eur(val) if val is not None else raw
 
 
 def fmt_price_value(value: float, sample: str, rate: Optional[float]) -> str:
-    """Format a numeric price using the currency style of `sample` (USD→EUR via rate)."""
+    """Numerischen Preis im deutschen Anzeigeformat (`21,58 €`). Ist `sample` ein
+    USD-Preis, wird via `rate` umgerechnet."""
     if "$" in (sample or ""):
         return display_price(f"${value:.2f}", rate)
-    if "€" in (sample or ""):
-        return f"€{value:.2f}"
-    return f"{value:.2f}"
+    return _fmt_eur(value)
 
 
 def fmt_price_cents(cents: Optional[int], currency: str = "EUR") -> str:

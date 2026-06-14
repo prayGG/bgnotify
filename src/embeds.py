@@ -24,12 +24,6 @@ COLOR_BLURPLE  = 0x5865F2    # Discord native blurple (Stats / Deploy)
 # --------------------------------------------------------------------------
 # Anzeige-Helfer
 # --------------------------------------------------------------------------
-def _price_change_suffix(prev_price: str, current_price: str) -> str:
-    if not prev_price or not current_price or prev_price == current_price:
-        return ""
-    return f"⠀·⠀_war {prev_price}_"
-
-
 def _humanize_duration(seconds: float) -> str:
     """Compact human-readable duration: '12 s', '4 min', '3 h', '2 T 14 h', '3 Wo'."""
     seconds = int(seconds)
@@ -145,12 +139,12 @@ def _dashboard_dot_segs(s: dict, usd_eur: Optional[float]) -> tuple[str, list[st
         if shown_price:
             segs.append(f"**{shown_price}**")
         if shown_prev and shown_price and shown_prev != shown_price:
-            segs.append(f"_war {shown_prev}_")
+            segs.append(f"_last {shown_prev}_")
     else:
         dot = "🔴"
         shown_last = display_price(s.get("price", ""), usd_eur)
         if shown_last:
-            segs.append(f"_zuletzt {shown_last}_")
+            segs.append(f"_last {shown_last}_")
     if uncertain:
         segs.append("⚠️_check unsicher_")
     return dot, segs, False
@@ -381,7 +375,7 @@ def build_oos_embed(item: dict, usd_eur: Optional[float] = None, labels: Optiona
     """Embed for an in-stock -> out-of-stock transition. Quieter than the
     restock alert — gray accent, last seen price, no order button, no pings."""
     last = display_price(item.get("last_price", ""), usd_eur)
-    last_line = f"_zuletzt {last}_\n\n" if last else ""
+    last_line = f"_last {last}_\n\n" if last else ""
     link = item.get("deep_link") or item.get("product_url") or ""
     link_line = f"[→⠀⠀Produktseite]({link})" if link else ""
     return {
@@ -400,11 +394,13 @@ def build_oos_embed(item: dict, usd_eur: Optional[float] = None, labels: Optiona
 def build_ps_drop_embed(drop: dict) -> dict:
     """Embed für eine PS-Preissenkung — grüner Akzent, neuer Preis groß,
     alter Preis + Rabatt als Kontext, Link in den Store."""
-    new_s = drop.get("new_price") or ""
-    old_s = drop.get("old_price") or ""
+    # PS-Preise sind EUR (de-de-Store) — display_price formatiert sie ins
+    # deutsche Anzeigeformat (Kurs nicht nötig, daher None).
+    new_s = display_price(drop.get("new_price") or "", None)
+    old_s = display_price(drop.get("old_price") or "", None)
     disc = drop.get("discount_text") or ""
     disc_suffix = f"⠀·⠀**{disc}**" if disc else ""
-    lines = f"### ⠀{new_s}\n_war {old_s}_{disc_suffix}" if old_s else f"### ⠀{new_s}"
+    lines = f"### ⠀{new_s}\n_last {old_s}_{disc_suffix}" if old_s else f"### ⠀{new_s}"
     return {
         "author": {"name": "✦⠀⠀preis gesenkt⠀⠀✦"},
         "title": drop.get("name") or "PlayStation",

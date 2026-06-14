@@ -245,7 +245,7 @@ def check_products(cfg: dict, state: dict) -> tuple[list[dict], list[dict], list
             entry["in_stock"] = in_stock_now
             # Only persist the displayed price when in stock — OOS variation
             # pages still expose a price, but it's not the actionable
-            # "next-purchase" price and would pollute the `_war XX_` hint.
+            # "next-purchase" price and would pollute the `_last XX_` hint.
             if in_stock_now and new_price:
                 entry["price"] = new_price
             entry["found"] = True
