@@ -31,7 +31,6 @@ from .config import (
     load_ping_role_ids,
     load_ping_user_ids,
     load_state,
-    product_emojis,
     save_state,
     variant_labels,
 )
@@ -77,7 +76,6 @@ def main() -> int:
     user_ids = load_ping_user_ids(cfg)
     role_ids = load_ping_role_ids(cfg)
     labels = variant_labels(cfg)
-    emojis = product_emojis(cfg)
 
     try:
         # 1 — Shop-Produkte
@@ -122,7 +120,7 @@ def main() -> int:
 
             new_id = notify.edit_in_place(
                 webhook,
-                build_dashboard_embed(statuses, usd_eur=usd_eur, labels=labels, emojis=emojis),
+                build_dashboard_embed(statuses, usd_eur=usd_eur, labels=labels),
                 message_id=state.get("dashboard_message_id", ""),
             )
             if new_id:

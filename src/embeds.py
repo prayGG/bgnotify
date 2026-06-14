@@ -11,7 +11,7 @@ from datetime import datetime, timezone
 from typing import Optional
 
 from .pricing import display_price, fmt_price_value, price_value
-from .config import product_emojis, product_state_key, product_urls, variant_labels
+from .config import product_state_key, product_urls, variant_labels
 
 log = logging.getLogger(__name__)
 
@@ -126,47 +126,18 @@ def _short_label(product_name: str, alias: str) -> str:
     return alias
 
 
-def _dashboard_status_line(s: dict, usd_eur: Optional[float]) -> str:
-    """Die Statuszeile EINER Variante (Bestand · Preis · Klick) — ohne Titel,
-    damit sie sowohl als Einzeleintrag wie auch als Gruppen-Unterzeile passt."""
-    link = s.get("deep_link") or s.get("product_url", "")
-    klick = f"⠀·⠀[Klick]({link})" if link else ""
+def _dashboard_dot_segs(s: dict, usd_eur: Optional[float]) -> tuple[str, list[str], bool]:
+    """(dot, segmente, is_error) für eine Variante. Der Status steckt allein im
+    Dot (🟢/🔴) — kein 'in stock'/'out of stock'-Text mehr, der Punkt ist
+    eindeutig genug und hält die Zeile kurz. Bei hartem Fehler/not-found ist
+    `is_error` True und segmente enthält den Hinweistext (Dot = ⚠️)."""
     uncertain = s.get("error") and _has_last_known_state(s)
-
     if s.get("error") and not _has_last_known_state(s):
-        sub = "⚠️⠀check failed"
-    elif not s["found"] and not s.get("error"):
-        sub = "⚠️⠀nicht gefunden"
-    elif s["in_stock"]:
-        shown_price = display_price(s.get("price", ""), usd_eur)
-        shown_prev = display_price(s.get("previous_price", ""), usd_eur)
-        price = f"⠀·⠀**{shown_price}**" if shown_price else ""
-        delta = _price_change_suffix(shown_prev, shown_price)
-        warn = "⠀·⠀⚠️_check unsicher_" if uncertain else ""
-        sub = f"🟢⠀in stock{price}{delta}{warn}"
-    else:
-        shown_last = display_price(s.get("price", ""), usd_eur)
-        last_suffix = f"⠀·⠀_zuletzt {shown_last}_" if shown_last else ""
-        warn = "⠀·⠀⚠️_check unsicher_" if uncertain else ""
-        sub = f"🔴⠀out of stock{last_suffix}{warn}"
-    return f"{sub}{klick}"
-
-
-def _dashboard_group_row(tree: str, short: str, s: dict, usd_eur: Optional[float]) -> str:
-    """Eine Varianten-Zeile innerhalb einer Produkt-Gruppe.
-
-    Status-Dot direkt nach dem Baum-Zeichen (├/└), damit die Dots aller Zeilen
-    senkrecht untereinander stehen. Bewusst kompakt — ohne den Text 'in stock'/
-    'out of stock' (der Dot reicht), damit die Zeile auf Discord nicht umbricht."""
-    link = s.get("deep_link") or s.get("product_url", "")
-    uncertain = s.get("error") and _has_last_known_state(s)
-
-    if s.get("error") and not _has_last_known_state(s):
-        return f"{tree}⠀⚠️⠀**{short}**⠀·⠀check failed"
+        return "⚠️", ["check failed"], True
     if not s["found"] and not s.get("error"):
-        return f"{tree}⠀⚠️⠀**{short}**⠀·⠀nicht gefunden"
+        return "⚠️", ["nicht gefunden"], True
 
-    segs = [f"**{short}**"]
+    segs: list[str] = []
     if s["in_stock"]:
         dot = "🟢"
         shown_price = display_price(s.get("price", ""), usd_eur)
@@ -182,7 +153,26 @@ def _dashboard_group_row(tree: str, short: str, s: dict, usd_eur: Optional[float
             segs.append(f"_zuletzt {shown_last}_")
     if uncertain:
         segs.append("⚠️_check unsicher_")
-    if link:
+    return dot, segs, False
+
+
+def _dashboard_status_line(s: dict, usd_eur: Optional[float]) -> str:
+    """Statuszeile EINES Einzelprodukts (Titel steht separat darüber)."""
+    link = s.get("deep_link") or s.get("product_url", "")
+    dot, segs, is_error = _dashboard_dot_segs(s, usd_eur)
+    if link and not is_error:
+        segs.append(f"[Klick]({link})")
+    detail = "⠀·⠀".join(segs)
+    return f"{dot}⠀{detail}" if detail else dot
+
+
+def _dashboard_group_row(tree: str, short: str, s: dict, usd_eur: Optional[float]) -> str:
+    """Varianten-Zeile innerhalb einer Produkt-Gruppe: Dot direkt nach dem
+    Baum-Zeichen (├/└), damit die Dots senkrecht untereinander stehen."""
+    link = s.get("deep_link") or s.get("product_url", "")
+    dot, segs, is_error = _dashboard_dot_segs(s, usd_eur)
+    segs = [f"**{short}**"] + segs
+    if link and not is_error:
         segs.append(f"[Klick]({link})")
     return f"{tree}⠀{dot}⠀" + "⠀·⠀".join(segs)
 
@@ -191,11 +181,9 @@ def _dashboard_group_row(tree: str, short: str, s: dict, usd_eur: Optional[float
 # Dashboard (persistente Status-Message, wird in place editiert)
 # --------------------------------------------------------------------------
 def build_dashboard_embed(
-    statuses: list[dict], usd_eur: Optional[float] = None, labels: Optional[dict] = None,
-    emojis: Optional[dict] = None,
+    statuses: list[dict], usd_eur: Optional[float] = None, labels: Optional[dict] = None
 ) -> dict:
     labels = labels or {}
-    emojis = emojis or {}
 
     # Varianten desselben Produkts zusammenfassen (erste-Sichtung-Reihenfolge),
     # damit z.B. beide Tretinoin-Optionen als EIN Block erscheinen statt als
@@ -217,9 +205,7 @@ def build_dashboard_embed(
             blocks.append(f"**{disp}**\n└⠀{_dashboard_status_line(s, usd_eur)}")
             continue
 
-        emoji = emojis.get(name) or ""
-        head = f"{emoji}⠀**{name}**" if emoji else f"**{name}**"
-        rows = [head]
+        rows = [f"**{name}**"]
         for i, s in enumerate(members):
             tree = "└" if i == len(members) - 1 else "├"
             short = _short_label(name, labels.get(s["variant"], s["variant"]))

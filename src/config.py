@@ -88,17 +88,6 @@ def product_state_key(product: dict, urls: list[str]) -> str:
     return urls[0]
 
 
-def product_emojis(cfg: dict) -> dict:
-    """{product_name: emoji} — nur für die Darstellung (Gruppen-Header im
-    Dashboard). Fehlt ein Emoji, wird der Produktname ohne Symbol gezeigt."""
-    out: dict = {}
-    for p in cfg.get("products") or []:
-        name = p.get("name")
-        if name and p.get("emoji"):
-            out[str(name)] = str(p["emoji"])
-    return out
-
-
 def variant_labels(cfg: dict) -> dict:
     """Optionale Anzeige-Aliase pro Variante: {match_string: label}.
 
