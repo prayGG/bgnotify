@@ -152,6 +152,41 @@ def _dashboard_status_line(s: dict, usd_eur: Optional[float]) -> str:
     return f"{sub}{klick}"
 
 
+def _dashboard_group_row(tree: str, short: str, s: dict, usd_eur: Optional[float]) -> str:
+    """Eine Varianten-Zeile innerhalb einer Produkt-Gruppe.
+
+    Status-Dot direkt nach dem Baum-Zeichen (├/└), damit die Dots aller Zeilen
+    senkrecht untereinander stehen. Bewusst kompakt — ohne den Text 'in stock'/
+    'out of stock' (der Dot reicht), damit die Zeile auf Discord nicht umbricht."""
+    link = s.get("deep_link") or s.get("product_url", "")
+    uncertain = s.get("error") and _has_last_known_state(s)
+
+    if s.get("error") and not _has_last_known_state(s):
+        return f"{tree}⠀⚠️⠀**{short}**⠀·⠀check failed"
+    if not s["found"] and not s.get("error"):
+        return f"{tree}⠀⚠️⠀**{short}**⠀·⠀nicht gefunden"
+
+    segs = [f"**{short}**"]
+    if s["in_stock"]:
+        dot = "🟢"
+        shown_price = display_price(s.get("price", ""), usd_eur)
+        shown_prev = display_price(s.get("previous_price", ""), usd_eur)
+        if shown_price:
+            segs.append(f"**{shown_price}**")
+        if shown_prev and shown_price and shown_prev != shown_price:
+            segs.append(f"_war {shown_prev}_")
+    else:
+        dot = "🔴"
+        shown_last = display_price(s.get("price", ""), usd_eur)
+        if shown_last:
+            segs.append(f"_zuletzt {shown_last}_")
+    if uncertain:
+        segs.append("⚠️_check unsicher_")
+    if link:
+        segs.append(f"[Klick]({link})")
+    return f"{tree}⠀{dot}⠀" + "⠀·⠀".join(segs)
+
+
 # --------------------------------------------------------------------------
 # Dashboard (persistente Status-Message, wird in place editiert)
 # --------------------------------------------------------------------------
@@ -187,9 +222,8 @@ def build_dashboard_embed(
         rows = [head]
         for i, s in enumerate(members):
             tree = "└" if i == len(members) - 1 else "├"
-            alias = labels.get(s["variant"], s["variant"])
-            short = _short_label(name, alias)
-            rows.append(f"{tree}⠀**{short}**⠀·⠀{_dashboard_status_line(s, usd_eur)}")
+            short = _short_label(name, labels.get(s["variant"], s["variant"]))
+            rows.append(_dashboard_group_row(tree, short, s, usd_eur))
         blocks.append("\n".join(rows))
 
     any_in_stock = any(s["in_stock"] for s in statuses if s.get("found") or _has_last_known_state(s))
