@@ -219,8 +219,13 @@ def _stats_body_lines(e: dict, usd_eur: Optional[float]) -> list[str]:
     if history:
         first_str = fmt_price_value(history[0], sample_price, usd_eur)
         last_str = fmt_price_value(history[-1], sample_price, usd_eur)
-        trend = f"**{first_str} → {last_str}**" if first_str != last_str else f"**{first_str}**"
-        lines.append(f"├⠀📈⠀{trend}")
+        if first_str != last_str:
+            trend = f"**{first_str} → {last_str}**"
+            icon = "📈" if history[-1] > history[0] else "📉"
+        else:
+            trend = f"**{first_str}**"
+            icon = "📊"
+        lines.append(f"├⠀{icon}⠀{trend}")
 
     oos_typical, oos_n = _typical_oos_duration(e.get("oos_periods", []))
     if oos_n:
