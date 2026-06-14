@@ -11,7 +11,7 @@ from datetime import datetime, timezone
 from typing import Optional
 
 from .pricing import display_price, fmt_price_value, price_value
-from .config import product_state_key, product_urls, variant_labels
+from .config import product_emojis, product_state_key, product_urls, variant_labels
 
 log = logging.getLogger(__name__)
 
@@ -104,20 +104,6 @@ def _typical_oos_duration(periods: list) -> tuple:
     return _humanize_duration(_median(durations)), len(durations)
 
 
-_SPARK_CHARS = "▁▂▃▄▅▆▇█"
-
-
-def _sparkline(values: list) -> str:
-    if not values or len(values) < 2:
-        return ""
-    lo, hi = min(values), max(values)
-    if hi == lo:
-        return _SPARK_CHARS[3] * len(values)
-    span = hi - lo
-    step = len(_SPARK_CHARS) - 1
-    return "".join(_SPARK_CHARS[min(int((v - lo) / span * step), step)] for v in values)
-
-
 def _has_last_known_state(s: dict) -> bool:
     return bool(s.get("price")) or bool(s.get("in_stock")) or bool(s.get("out_since"))
 
@@ -130,38 +116,81 @@ def _dashboard_sort_key(s: dict) -> int:
     return 0 if s["in_stock"] else 1
 
 
+def _short_label(product_name: str, alias: str) -> str:
+    """Anzeige-Alias ohne den vorangestellten Produktnamen — für Varianten, die
+    unter einem Gruppen-Header (`Tretinoin`) hängen, damit der Name nicht doppelt
+    steht (`Tretinoin 0.05% 30g` → `0.05% 30g`). Lässt unpassende Aliase roh."""
+    if product_name and alias.lower().startswith(product_name.lower()):
+        rest = alias[len(product_name):].lstrip(" -·–—").strip()
+        return rest or alias
+    return alias
+
+
+def _dashboard_status_line(s: dict, usd_eur: Optional[float]) -> str:
+    """Die Statuszeile EINER Variante (Bestand · Preis · Klick) — ohne Titel,
+    damit sie sowohl als Einzeleintrag wie auch als Gruppen-Unterzeile passt."""
+    link = s.get("deep_link") or s.get("product_url", "")
+    klick = f"⠀·⠀[Klick]({link})" if link else ""
+    uncertain = s.get("error") and _has_last_known_state(s)
+
+    if s.get("error") and not _has_last_known_state(s):
+        sub = "⚠️⠀check failed"
+    elif not s["found"] and not s.get("error"):
+        sub = "⚠️⠀nicht gefunden"
+    elif s["in_stock"]:
+        shown_price = display_price(s.get("price", ""), usd_eur)
+        shown_prev = display_price(s.get("previous_price", ""), usd_eur)
+        price = f"⠀·⠀**{shown_price}**" if shown_price else ""
+        delta = _price_change_suffix(shown_prev, shown_price)
+        warn = "⠀·⠀⚠️_check unsicher_" if uncertain else ""
+        sub = f"🟢⠀in stock{price}{delta}{warn}"
+    else:
+        shown_last = display_price(s.get("price", ""), usd_eur)
+        last_suffix = f"⠀·⠀_zuletzt {shown_last}_" if shown_last else ""
+        warn = "⠀·⠀⚠️_check unsicher_" if uncertain else ""
+        sub = f"🔴⠀out of stock{last_suffix}{warn}"
+    return f"{sub}{klick}"
+
+
 # --------------------------------------------------------------------------
 # Dashboard (persistente Status-Message, wird in place editiert)
 # --------------------------------------------------------------------------
 def build_dashboard_embed(
-    statuses: list[dict], usd_eur: Optional[float] = None, labels: Optional[dict] = None
+    statuses: list[dict], usd_eur: Optional[float] = None, labels: Optional[dict] = None,
+    emojis: Optional[dict] = None,
 ) -> dict:
     labels = labels or {}
+    emojis = emojis or {}
+
+    # Varianten desselben Produkts zusammenfassen (erste-Sichtung-Reihenfolge),
+    # damit z.B. beide Tretinoin-Optionen als EIN Block erscheinen statt als
+    # zwei lose Einträge. Einzelvarianten-Produkte bleiben optisch unverändert.
+    groups: dict[str, list[dict]] = {}
+    for s in statuses:
+        groups.setdefault(s.get("product_name") or s["variant"], []).append(s)
+
+    # Gruppen nach bestem Mitglied sortieren (in-stock zuerst), genau wie zuvor
+    # die einzelnen Einträge.
+    ordered = sorted(groups.items(), key=lambda kv: min(_dashboard_sort_key(m) for m in kv[1]))
+
     blocks: list[str] = []
-    for s in sorted(statuses, key=_dashboard_sort_key):
-        link = s.get("deep_link") or s.get("product_url", "")
-        klick = f"⠀·⠀[Klick]({link})" if link else ""
-        uncertain = s.get("error") and _has_last_known_state(s)
+    for name, members in ordered:
+        members = sorted(members, key=_dashboard_sort_key)
+        if len(members) == 1:
+            s = members[0]
+            disp = labels.get(s["variant"], s["variant"])
+            blocks.append(f"**{disp}**\n└⠀{_dashboard_status_line(s, usd_eur)}")
+            continue
 
-        if s.get("error") and not _has_last_known_state(s):
-            sub = "⚠️⠀check failed"
-        elif not s["found"] and not s.get("error"):
-            sub = "⚠️⠀nicht gefunden"
-        elif s["in_stock"]:
-            shown_price = display_price(s.get("price", ""), usd_eur)
-            shown_prev = display_price(s.get("previous_price", ""), usd_eur)
-            price = f"⠀·⠀**{shown_price}**" if shown_price else ""
-            delta = _price_change_suffix(shown_prev, shown_price)
-            warn = "⠀·⠀⚠️_check unsicher_" if uncertain else ""
-            sub = f"🟢⠀in stock{price}{delta}{warn}"
-        else:
-            shown_last = display_price(s.get("price", ""), usd_eur)
-            last_suffix = f"⠀·⠀_zuletzt {shown_last}_" if shown_last else ""
-            warn = "⠀·⠀⚠️_check unsicher_" if uncertain else ""
-            sub = f"🔴⠀out of stock{last_suffix}{warn}"
-
-        disp = labels.get(s["variant"], s["variant"])
-        blocks.append(f"**{disp}**\n└⠀{sub}{klick}")
+        emoji = emojis.get(name) or ""
+        head = f"{emoji}⠀**{name}**" if emoji else f"**{name}**"
+        rows = [head]
+        for i, s in enumerate(members):
+            tree = "└" if i == len(members) - 1 else "├"
+            alias = labels.get(s["variant"], s["variant"])
+            short = _short_label(name, alias)
+            rows.append(f"{tree}⠀**{short}**⠀·⠀{_dashboard_status_line(s, usd_eur)}")
+        blocks.append("\n".join(rows))
 
     any_in_stock = any(s["in_stock"] for s in statuses if s.get("found") or _has_last_known_state(s))
     any_hard_error = any(s.get("error") and not _has_last_known_state(s) for s in statuses)
@@ -179,6 +208,47 @@ def build_dashboard_embed(
 # --------------------------------------------------------------------------
 # Stats-Karte (persistente Message, wird in place editiert)
 # --------------------------------------------------------------------------
+def _stats_body_lines(e: dict, usd_eur: Optional[float]) -> list[str]:
+    """Die Detailzeilen EINER Variante (Sparkline, OOS-Dauer, tief/hoch,
+    Restocks) — ohne Titelzeile, damit sie unter einem Einzel- wie auch unter
+    einem Gruppen-Header hängen können."""
+    sample_price = e.get("price", "") or e.get("lowest_price", "")
+    lines: list[str] = []
+
+    history = e.get("price_history", [])
+    if history:
+        first_str = fmt_price_value(history[0], sample_price, usd_eur)
+        last_str = fmt_price_value(history[-1], sample_price, usd_eur)
+        trend = f"**{first_str} → {last_str}**" if first_str != last_str else f"**{first_str}**"
+        lines.append(f"├⠀📈⠀{trend}")
+
+    oos_typical, oos_n = _typical_oos_duration(e.get("oos_periods", []))
+    if oos_n:
+        lines.append(f"├⠀⏱⠀**OOS-Dauer Ø: {oos_typical}**⠀·⠀{oos_n}×")
+    else:
+        lines.append("├⠀⏱⠀OOS-Dauer Ø: —")
+
+    low = display_price(e.get("lowest_price", ""), usd_eur)
+    high = display_price(e.get("highest_price", ""), usd_eur)
+    low_ago = _humanize_ago(e.get("lowest_price_at", ""))
+    high_ago = _humanize_ago(e.get("highest_price_at", ""))
+    if low:
+        lines.append(f"├⠀tief {low}" + (f" ({low_ago})" if low_ago else ""))
+    if high:
+        lines.append(f"├⠀hoch {high}" + (f" ({high_ago})" if high_ago else ""))
+
+    rc = e.get("restock_count", 0)
+    last_restock = _humanize_ago(e.get("last_restock_at", ""))
+    if rc:
+        rline = f"└⠀🔄⠀**{rc} Restocks**"
+        if last_restock:
+            rline += f"⠀·⠀letzter {last_restock}"
+        lines.append(rline)
+    else:
+        lines.append("└⠀🔄⠀noch keine Restocks erkannt")
+    return lines
+
+
 def build_stats_embed(cfg: dict, state: dict, usd_eur: Optional[float] = None) -> dict:
     """Persistent stats card — edited in place each run. Pin manually once."""
     bot_stats = state.get("bot_stats", {})
@@ -206,22 +276,24 @@ def build_stats_embed(cfg: dict, state: dict, usd_eur: Optional[float] = None) -
         bot_lines.append(prefix + line)
     blocks = ["\n".join(bot_lines)]
 
-    entries: list[tuple[str, str, dict]] = []
+    # Produkte gruppieren: jede Gruppe = (emoji, name, [(variant, entry), …]).
+    # Ein Produkt mit mehreren Varianten (z.B. Tretinoin) bleibt so als eine
+    # Einheit zusammen statt in lose Einzelkarten zu zerfallen.
+    groups: list[tuple[str, str, list[tuple[str, dict]]]] = []
     for product in cfg.get("products") or []:
         urls = product_urls(product)
         if not urls:
             continue
         watch = product.get("watch_variants") or []
         emoji = product.get("emoji") or "💊"
+        name = product.get("name") or urls[0]
         product_data = products_state.get(product_state_key(product, urls), {})
-        for variant in watch:
-            e = product_data.get(variant)
-            if not e:
-                continue
-            entries.append((emoji, variant, e))
+        members = [(v, product_data[v]) for v in watch if product_data.get(v)]
+        if members:
+            groups.append((emoji, name, members))
 
-    # PS-Spiele in dieselbe Stats-Schleife einreihen — gleiche Entry-Form,
-    # daher identisches Rendering (Sparkline, tief/hoch, OOS-Dauer, Restocks).
+    # PS-Spiele als eigene Ein-Varianten-Gruppen einreihen — gleiches Rendering
+    # (Sparkline, tief/hoch, OOS-Dauer, Restocks).
     ps_state = state.get("playstation", {})
     for game in (cfg.get("playstation") or {}).get("games") or []:
         url = game.get("url")
@@ -232,51 +304,24 @@ def build_stats_embed(cfg: dict, state: dict, usd_eur: Optional[float] = None) -
             continue
         emoji = game.get("emoji") or "🎮"
         label = e.get("name") or game.get("name") or url
-        entries.append((emoji, label, e))
+        groups.append((emoji, label, [(label, e)]))
 
-    entries.sort(key=lambda t: 0 if t[2].get("in_stock") else 1)
+    groups.sort(key=lambda g: 0 if any(m[1].get("in_stock") for m in g[2]) else 1)
 
-    for emoji, variant, e in entries:
-        sample_price = e.get("price", "") or e.get("lowest_price", "")
-        lines = [f"{emoji}⠀**{labels.get(variant, variant)}**"]
+    for emoji, name, members in groups:
+        if len(members) == 1:
+            variant, e = members[0]
+            head = f"{emoji}⠀**{labels.get(variant, variant)}**"
+            blocks.append("\n".join([head] + _stats_body_lines(e, usd_eur)))
+            continue
 
-        history = e.get("price_history", [])
-        spark = _sparkline(history)
-        if spark:
-            first_str = fmt_price_value(history[0], sample_price, usd_eur)
-            last_str = fmt_price_value(history[-1], sample_price, usd_eur)
-            trend = f"**{first_str} → {last_str}**" if first_str != last_str else f"**{first_str}**"
-            lines.append(f"├⠀📈⠀`{spark}`⠀{trend}")
-        elif history:
-            only_str = fmt_price_value(history[0], sample_price, usd_eur)
-            lines.append(f"├⠀📈⠀**{only_str}**")
-
-        oos_typical, oos_n = _typical_oos_duration(e.get("oos_periods", []))
-        if oos_n:
-            lines.append(f"├⠀⏱⠀**OOS-Dauer Ø: {oos_typical}**⠀·⠀{oos_n}×")
-        else:
-            lines.append("├⠀⏱⠀OOS-Dauer Ø: —")
-
-        low = display_price(e.get("lowest_price", ""), usd_eur)
-        high = display_price(e.get("highest_price", ""), usd_eur)
-        low_ago = _humanize_ago(e.get("lowest_price_at", ""))
-        high_ago = _humanize_ago(e.get("highest_price_at", ""))
-        if low:
-            lines.append(f"├⠀tief {low}" + (f" ({low_ago})" if low_ago else ""))
-        if high:
-            lines.append(f"├⠀hoch {high}" + (f" ({high_ago})" if high_ago else ""))
-
-        rc = e.get("restock_count", 0)
-        last_restock = _humanize_ago(e.get("last_restock_at", ""))
-        if rc:
-            rline = f"└⠀🔄⠀**{rc} Restocks**"
-            if last_restock:
-                rline += f"⠀·⠀letzter {last_restock}"
-            lines.append(rline)
-        else:
-            lines.append("└⠀🔄⠀noch keine Restocks erkannt")
-
-        blocks.append("\n".join(lines))
+        # Mehrere Varianten: ein Gruppen-Header (Emoji + Produktname), darunter
+        # je Variante ein Unterblock mit verkürztem Label.
+        sub_blocks = [f"{emoji}⠀**{name}**"]
+        for variant, e in members:
+            short = _short_label(name, labels.get(variant, variant))
+            sub_blocks.append("\n".join([f"**{short}**"] + _stats_body_lines(e, usd_eur)))
+        blocks.append("\n\n".join(sub_blocks))
 
     return {
         "author": {"name": "✦⠀⠀bgnotify · stats⠀⠀✦"},

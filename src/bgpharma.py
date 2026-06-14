@@ -202,6 +202,28 @@ def _parse_variable_form(soup: BeautifulSoup) -> tuple[Optional[int], list[dict]
     return product_id, inline, attr_options
 
 
+def _variation_price(v: dict) -> str:
+    """Anzeigepreis einer Varianten-dict (inline-JSON ODER AJAX-Antwort).
+
+    Bevorzugt das fertig gerenderte `price_html` (trägt das Währungssymbol).
+    Bei kleinen variablen Produkten (≤ WC-Threshold) liegen die Varianten inline
+    im Seiten-JSON, wo `price_html` aber oft LEER ist — dann nehmen wir den
+    numerischen `display_price` und formatieren ihn als EUR (der Scraper erzwingt
+    via Cookies durchgängig EUR, genau wie im price_html-Pfad)."""
+    raw = _strip_html(v.get("price_html") or "")
+    if raw:
+        return raw
+    amount = v.get("display_price")
+    if amount is None:
+        amount = v.get("display_regular_price")
+    if amount is None:
+        return ""
+    try:
+        return f"€{float(amount):.2f}"
+    except (TypeError, ValueError):
+        return ""
+
+
 def _match_inline(variations: list[dict], wanted: str) -> Optional[dict]:
     needle = _normalize(wanted)
     for v in variations:
@@ -305,7 +327,7 @@ def _check_variable(
                 out[name] = {
                     "found": True,
                     "in_stock": bool(v.get("is_in_stock")) and bool(v.get("is_purchasable", True)),
-                    "price": _strip_html(v.get("price_html") or ""),
+                    "price": _variation_price(v),
                     "variation_id": v.get("variation_id"),
                     "deep_link": _deep_link(url, attr_n, attr_v),
                 }
@@ -334,7 +356,7 @@ def _check_variable(
         out[name] = {
             "found": True,
             "in_stock": bool(data.get("is_in_stock")) and bool(data.get("is_purchasable", True)),
-            "price": _strip_html(data.get("price_html") or ""),
+            "price": _variation_price(data),
             "variation_id": data.get("variation_id"),
             "deep_link": deep,
         }

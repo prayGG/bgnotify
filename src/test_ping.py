@@ -24,7 +24,14 @@ import sys
 from typing import Optional
 
 from . import forum, notify
-from .config import STATE_PATH, load_config, load_ping_role_ids, load_ping_user_ids, variant_labels
+from .config import (
+    STATE_PATH,
+    load_config,
+    load_ping_role_ids,
+    load_ping_user_ids,
+    product_emojis,
+    variant_labels,
+)
 from .deploy import build_updates_embed
 from .embeds import (
     build_dashboard_embed,
@@ -107,6 +114,7 @@ def main() -> int:
     state_copy = copy.deepcopy(on_disk_state)
     statuses, _restocks_unused, _oos_unused = check_products(cfg, state_copy)
     labels = variant_labels(cfg)
+    emojis = product_emojis(cfg)
 
     results: list[tuple[str, str, object]] = []  # (test_name, channel, True | False | "skip-reason")
 
@@ -114,7 +122,7 @@ def main() -> int:
     log.info("test 1/6 → dashboard preview (status)")
     ok = notify.send_test(
         main_wh,
-        build_dashboard_embed(statuses, usd_eur=usd_eur, labels=labels),
+        build_dashboard_embed(statuses, usd_eur=usd_eur, labels=labels, emojis=emojis),
         "🧪 **TEST** · Dashboard-Preview · _Live-Daten, postet als neue Message, "
         "die echte persistente Dashboard-Message wird NICHT überschrieben._",
     )

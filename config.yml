@@ -128,3 +128,16 @@ products:
       - "https://bgpharmadrugs.to/product/minoxidil-5-mg-100-sigma-audley/"
     watch_variants:
       - "Minoxidil 5 mg"
+
+  - name: "Tretinoin"
+    url: "https://bgpharmadrugs.to/product/tretinoin/"
+    emoji: "🧴"
+    # Variable product mit zwei Optionen. Die Dropdown-Labels enthalten kein
+    # "Tretinoin", daher bleibt der watch_variant roh (exakter Match-String +
+    # state.json-Key) und nur die Anzeige bekommt einen lesbaren Alias.
+    watch_variants:
+      - "0.025% 20 grams"
+      - "0.05% 30 grams"
+    variant_labels:
+      "0.025% 20 grams": "Tretinoin 0.025% 20g"
+      "0.05% 30 grams": "Tretinoin 0.05% 30g"
