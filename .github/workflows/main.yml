@@ -11,13 +11,15 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # Flacher Klon: der Commit-Step unten holt main ohnehin selbst per
-      # `git fetch origin main` + reset --hard. Die volle History (>3700
-      # Commits) wird nie gebraucht, fetch-depth: 0 kostete nur Zeit.
+      # Volle History nötig: deploy.py (announce_deploy) prüft per
+      # `git cat-file -e <last_deploy_sha>`, ob der zuletzt angekündigte
+      # Commit erreichbar ist, und filtert dann die "update state"-Commits
+      # aus prev..HEAD. Mit einem flachen Klon ist last_sha unerreichbar →
+      # HEAD-only-Fallback feuert "update state" als Deploy bei jedem Lauf.
       - uses: actions/checkout@v4
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          fetch-depth: 1
+          fetch-depth: 0
 
       - name: Setup Python
         uses: actions/setup-python@v5
