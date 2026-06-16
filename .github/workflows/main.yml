@@ -11,15 +11,19 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      # Flacher Klon: der Commit-Step unten holt main ohnehin selbst per
+      # `git fetch origin main` + reset --hard. Die volle History (>3700
+      # Commits) wird nie gebraucht, fetch-depth: 0 kostete nur Zeit.
       - uses: actions/checkout@v4
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          fetch-depth: 0
+          fetch-depth: 1
 
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+          cache: pip
 
       - name: Install dependencies
         run: pip install -r requirements.txt
@@ -30,6 +34,7 @@ jobs:
       # need a real browser. The order check self-gates by interval in code,
       # so the binary is present but only actually driven when due.
       - name: Cache Playwright browsers
+        id: playwright-cache
         uses: actions/cache@v4
         with:
           path: ~/.cache/ms-playwright
@@ -38,7 +43,10 @@ jobs:
       # No --with-deps: ubuntu-latest has every shared lib Playwright needs
       # pre-installed; the only "missing" packages with --with-deps were
       # emoji/CJK fonts, which we don't need for HTML-only scraping.
+      # Nur bei Cache-Miss: bei Hit liegt der Browser schon unter
+      # ~/.cache/ms-playwright, der Install-Step wäre reine Wartezeit.
       - name: Install Playwright Chromium
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
         run: python -m playwright install chromium
 
       - name: Run Bot
