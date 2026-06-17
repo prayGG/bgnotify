@@ -36,16 +36,36 @@ UA = (
     "(KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
 )
 
-# Per-run cache of fetched product pages, keyed by URL. Several configured
-# products share one page (e.g. every peptide lives on /product/peptides/),
-# so without this each one would re-GET the same HTML. The caller resets this
-# once per scrape via reset_page_cache() so data never goes stale across runs.
-_PAGE_CACHE: dict[str, str] = {}
+# Per-run cache of *parsed* product pages, keyed by URL. Several configured
+# products share one page (e.g. every peptide lives on /product/peptides/), so
+# without this each one would re-GET *and* re-parse the same (large) HTML and
+# rebuild the same 50+ option variation form. We cache the parsed representation
+# `(soup, is_simple, form)` so a shared page is fetched and parsed exactly once
+# per run. The caller resets it via reset_page_cache() so data never goes stale
+# across runs.
+_PAGE_CACHE: dict[str, tuple] = {}
+
+# One HTTP session per run. Keep-alive + connection pooling means the page GETs
+# and the per-variant AJAX POSTs to the shop reuse a single TCP/TLS connection
+# instead of paying a fresh handshake on every call (the peptides page alone
+# fires one AJAX request per watched variant).
+_SESSION: Optional[requests.Session] = None
+
+
+def _session() -> requests.Session:
+    global _SESSION
+    if _SESSION is None:
+        _SESSION = requests.Session()
+    return _SESSION
 
 
 def reset_page_cache() -> None:
-    """Drop the per-run page cache. Call once at the start of a scrape run."""
+    """Drop the per-run page cache + session. Call once at the start of a run."""
+    global _SESSION
     _PAGE_CACHE.clear()
+    if _SESSION is not None:
+        _SESSION.close()
+        _SESSION = None
 
 
 def _normalize(s: str) -> str:
@@ -96,18 +116,16 @@ def _with_currency_param(url: str) -> str:
 
 
 def _fetch(url: str, session: requests.Session) -> str:
-    """GET with retries for transient HTTP errors (timeouts, 5xx, network)."""
+    """GET with retries for transient errors only (timeouts, 5xx, network).
+
+    4xx responses are deterministic client errors (e.g. a 404 for a removed
+    product page) — retrying just burns backoff sleeps on something that will
+    never succeed, so those raise immediately.
+    """
     last_err: Optional[Exception] = None
     for attempt in range(_MAX_ATTEMPTS):
         try:
             r = session.get(_with_currency_param(url), **_force_eur_kwargs())
-            if 500 <= r.status_code < 600 and attempt < _MAX_ATTEMPTS - 1:
-                wait = 2 ** attempt
-                log.warning("fetch %s → %s, retry in %ds", url, r.status_code, wait)
-                time.sleep(wait)
-                continue
-            r.raise_for_status()
-            return r.text
         except requests.RequestException as e:
             last_err = e
             if attempt < _MAX_ATTEMPTS - 1:
@@ -116,6 +134,13 @@ def _fetch(url: str, session: requests.Session) -> str:
                 time.sleep(wait)
                 continue
             raise
+        if 500 <= r.status_code < 600 and attempt < _MAX_ATTEMPTS - 1:
+            wait = 2 ** attempt
+            log.warning("fetch %s → %s, retry in %ds", url, r.status_code, wait)
+            time.sleep(wait)
+            continue
+        r.raise_for_status()  # 4xx → raise now (no retry); 2xx → return body
+        return r.text
     if last_err:
         raise last_err
     raise RuntimeError(f"fetch {url} exhausted retries")
@@ -306,11 +331,11 @@ def _ajax_variation(
 
 def _check_variable(
     session: requests.Session,
-    soup: BeautifulSoup,
     url: str,
     watch_variants: list[str],
+    form: tuple,
 ) -> dict[str, dict]:
-    product_id, inline, attr_options = _parse_variable_form(soup)
+    product_id, inline, attr_options = form
     if product_id is None:
         log.warning("no variations_form / product_id on %s", url)
         return {n: _not_found() for n in watch_variants}
@@ -363,24 +388,30 @@ def _check_variable(
     return out
 
 
-def check(url: str, watch_variants: list[str]) -> dict[str, dict]:
+def check(
+    url: str, watch_variants: list[str], session: Optional[requests.Session] = None
+) -> dict[str, dict]:
     """Return {variant_or_label: {"found", "in_stock", "price", "variation_id"}}.
 
     For simple products, `watch_variants[0]` is used as the result key (label
     for notifications). If no variants are provided, the URL is used.
     """
-    session = requests.Session()
-    page = _PAGE_CACHE.get(url)
-    if page is None:
+    session = session or _session()
+    cached = _PAGE_CACHE.get(url)
+    if cached is None:
         page = _fetch(url, session)
-        _PAGE_CACHE[url] = page
-    soup = BeautifulSoup(page, "html.parser")
+        soup = BeautifulSoup(page, "html.parser")
+        is_simple = _is_simple_product(soup)
+        form = None if is_simple else _parse_variable_form(soup)
+        cached = (soup, is_simple, form)
+        _PAGE_CACHE[url] = cached
+    soup, is_simple, form = cached
 
-    if _is_simple_product(soup):
+    if is_simple:
         label = watch_variants[0] if watch_variants else url
         return {label: _check_simple_from_soup(soup, url)}
 
-    return _check_variable(session, soup, url, watch_variants)
+    return _check_variable(session, url, watch_variants, form)
 
 
 if __name__ == "__main__":

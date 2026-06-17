@@ -46,24 +46,28 @@ _ENV_SCRIPT = re.compile(
 
 
 def _fetch(url: str) -> str:
-    """GET the product page with retries for transient HTTP/network errors."""
+    """GET the product page, retrying transient errors only (5xx/network).
+
+    4xx responses are deterministic (e.g. a delisted game's 404) — retrying
+    them just wastes backoff, so they raise immediately.
+    """
     headers = {"User-Agent": UA, "Accept-Language": "de-DE,de;q=0.9,en;q=0.7"}
     last_err: Optional[Exception] = None
     for attempt in range(_MAX_ATTEMPTS):
         try:
             r = requests.get(url, headers=headers, timeout=20)
-            if 500 <= r.status_code < 600 and attempt < _MAX_ATTEMPTS - 1:
-                time.sleep(2 ** attempt)
-                continue
-            r.raise_for_status()
-            r.encoding = "utf-8"  # € arrives as UTF-8; requests guesses latin-1
-            return r.text
         except requests.RequestException as e:
             last_err = e
             if attempt < _MAX_ATTEMPTS - 1:
                 time.sleep(2 ** attempt)
                 continue
             raise
+        if 500 <= r.status_code < 600 and attempt < _MAX_ATTEMPTS - 1:
+            time.sleep(2 ** attempt)
+            continue
+        r.raise_for_status()
+        r.encoding = "utf-8"  # € arrives as UTF-8; requests guesses latin-1
+        return r.text
     if last_err:
         raise last_err
     raise RuntimeError(f"fetch {url} exhausted retries")

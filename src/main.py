@@ -21,6 +21,7 @@ Die Module dahinter:
 """
 from __future__ import annotations
 
+import concurrent.futures
 import logging
 import os
 import sys
@@ -78,9 +79,15 @@ def main() -> int:
     labels = variant_labels(cfg)
 
     try:
-        # 1 — Shop-Produkte
-        statuses, restocks, oos_alerts = check_products(cfg, state)
-        usd_eur = fetch_usd_eur_rate()
+        # 1 — Shop-Produkte. Den (unabhängigen) USD/EUR-Kurs holen wir parallel
+        # in einem Thread: er trifft einen anderen Host als der Shop, also
+        # überlappt seine Latenz mit dem Scrapen statt sie davorzuhängen.
+        # fetch_usd_eur_rate fängt intern alle Fehler ab (→ None), result()
+        # kann also nicht werfen.
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+            rate_future = pool.submit(fetch_usd_eur_rate)
+            statuses, restocks, oos_alerts = check_products(cfg, state)
+            usd_eur = rate_future.result()
         log.info("USD->EUR rate: %s", usd_eur)
 
         # 2 — Deploy-Announcement
@@ -108,7 +115,11 @@ def main() -> int:
         elif ps_drops:
             log.info("playstation: %d price drop(s) but stock webhook is empty", len(ps_drops))
 
-        # 6 — Discord aktualisieren (persistente Karten + Alerts)
+        # 6 — Discord aktualisieren. Dashboard + Stats sind persistente Karten im
+        # Status-Channel und brauchen daher den Haupt-Webhook. Restock-/OOS-
+        # Alerts gehen unabhängig davon in den Stock-Channel — deshalb NICHT an
+        # `webhook` gekoppelt (sonst feuern sie nicht, wenn nur der Stock-Webhook
+        # gesetzt ist). send_* sind no-ops bei leerer URL.
         if webhook:
             new_stats_id = notify.edit_in_place(
                 webhook,
@@ -126,12 +137,12 @@ def main() -> int:
             if new_id:
                 state["dashboard_message_id"] = new_id
 
-            for r in restocks:
-                notify.send_restock_alert(
-                    stock_webhook, build_restock_embed(r, usd_eur=usd_eur, labels=labels), user_ids, role_ids,
-                )
-            for o in oos_alerts:
-                notify.send_oos_alert(stock_webhook, build_oos_embed(o, usd_eur=usd_eur, labels=labels))
+        for r in restocks:
+            notify.send_restock_alert(
+                stock_webhook, build_restock_embed(r, usd_eur=usd_eur, labels=labels), user_ids, role_ids,
+            )
+        for o in oos_alerts:
+            notify.send_oos_alert(stock_webhook, build_oos_embed(o, usd_eur=usd_eur, labels=labels))
     except Exception as e:
         # Harter Crash: erst melden + State sichern, dann den Run trotzdem
         # fehlschlagen lassen, damit der Workflow rot wird.
