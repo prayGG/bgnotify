@@ -1,15 +1,13 @@
 {
   "bot_stats": {
     "first_check_at": "2026-05-20T18:50:44.075159+00:00",
-    "last_check_at": "2026-06-17T14:40:52.325784+00:00",
-    "total_checks": 3985,
+    "last_check_at": "2026-06-17T14:50:51.525270+00:00",
+    "total_checks": 3986,
     "total_restocks": 0
   },
   "dashboard_message_id": "1510095616322175107",
   "error_report": {
-    "active": true,
-    "fingerprint": "1631fbd804a9509b59911af86d3869258c89b4ec",
-    "last_sent_at": "2026-06-12T13:50:47.022988+00:00"
+    "active": false
   },
   "forum": {
     "last_check_at": "2026-06-17T13:11:00.067073+00:00",
@@ -52,7 +50,7 @@
       "3835291"
     ]
   },
-  "last_deploy_sha": "509a57c543ebee4a7d4e088c9e0d91579d582e5f",
+  "last_deploy_sha": "cb971e67f1e6baa968f6f40e84f0385ac93e47d1",
   "playstation": {
     "https://store.playstation.com/de-de/product/EP1018-CUSA06511_00-LEGOCITYUNDERCOV": {
       "base_value": 5999,
@@ -62,7 +60,7 @@
       "highest_price": "€ 59.99",
       "highest_price_at": "2026-06-06T19:30:48.285006+00:00",
       "in_stock": true,
-      "last_check_at": "2026-06-17T14:41:05.541655+00:00",
+      "last_check_at": "2026-06-17T14:50:56.303891+00:00",
       "lowest_at": "2026-06-06T19:20:45.639056+00:00",
       "lowest_price": "€ 59.99",
       "lowest_price_at": "2026-06-06T19:30:48.285006+00:00",
@@ -76,23 +74,16 @@
     }
   },
   "products": {
-    "combined:Minoxidil 5 mg": {
+    "https://bgpharmadrugs.to/product/minoxytop-5-mg-minoxidil-tablets-ip/": {
       "Minoxidil 5 mg": {
         "found": true,
-        "highest_price": "€ 30.38",
-        "highest_price_at": "2026-06-08T17:00:58.694608+00:00",
+        "highest_price": "€ 30.22",
+        "highest_price_at": "2026-06-17T14:50:55.842568+00:00",
         "in_stock": false,
-        "lowest_price": "€ 30.04",
-        "lowest_price_at": "2026-05-31T01:40:41.606882+00:00",
-        "out_since": "2026-05-26T19:40:37.853930+00:00",
-        "price": "€ 30.06",
+        "lowest_price": "€ 30.22",
+        "lowest_price_at": "2026-06-17T14:50:55.842568+00:00",
+        "out_since": "2026-06-17T14:50:55.842568+00:00",
         "price_history": [
-          30.06,
-          30.1,
-          30.04,
-          30.13,
-          30.38,
-          30.32,
           30.22
         ]
       }
