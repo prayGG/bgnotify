@@ -123,9 +123,11 @@ products:
 
   - name: "Minoxidil 5 mg"
     emoji: "💊"
-    urls:
-      - "https://bgpharmadrugs.to/product/minoxytop-5-mg-minoxidil-tablets-ip/"
-      - "https://bgpharmadrugs.to/product/minoxidil-5-mg-100-sigma-audley/"
+    # War früher ein Combined-Produkt aus zwei Quellen; die zweite
+    # (minoxidil-5-mg-100-sigma-audley) liefert seit Juni 2026 dauerhaft 404
+    # (Produktseite entfernt) und hat in jedem Lauf einen Fehler-Report
+    # ausgelöst. Jetzt nur noch die lebende minoxytop-Quelle.
+    url: "https://bgpharmadrugs.to/product/minoxytop-5-mg-minoxidil-tablets-ip/"
     watch_variants:
       - "Minoxidil 5 mg"
 
