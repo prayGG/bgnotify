@@ -1,8 +1,8 @@
 {
   "bot_stats": {
     "first_check_at": "2026-05-20T18:50:44.075159+00:00",
-    "last_check_at": "2026-06-18T01:00:59.249347+00:00",
-    "total_checks": 4047,
+    "last_check_at": "2026-06-18T01:10:41.657741+00:00",
+    "total_checks": 4048,
     "total_restocks": 0
   },
   "dashboard_message_id": "1510095616322175107",
@@ -53,7 +53,7 @@
       "3840397"
     ]
   },
-  "last_deploy_sha": "71d02804041ca58c51f45668f59505db65d36513",
+  "last_deploy_sha": "16cdb25fb1f061f4d3193d264301161814c39e40",
   "playstation": {
     "https://store.playstation.com/de-de/product/EP1018-CUSA06511_00-LEGOCITYUNDERCOV": {
       "base_value": 5999,
@@ -63,7 +63,7 @@
       "highest_price": "€ 59.99",
       "highest_price_at": "2026-06-06T19:30:48.285006+00:00",
       "in_stock": true,
-      "last_check_at": "2026-06-18T01:01:04.496562+00:00",
+      "last_check_at": "2026-06-18T01:10:46.116094+00:00",
       "lowest_at": "2026-06-06T19:20:45.639056+00:00",
       "lowest_price": "€ 59.99",
       "lowest_price_at": "2026-06-06T19:30:48.285006+00:00",
@@ -80,27 +80,28 @@
     "https://bgpharmadrugs.to/product/minoxytop-5-mg-minoxidil-tablets-ip/": {
       "Minoxidil 5 mg": {
         "found": true,
-        "highest_price": "€ 30.22",
-        "highest_price_at": "2026-06-17T14:50:55.842568+00:00",
+        "highest_price": "€ 30.42",
+        "highest_price_at": "2026-06-18T01:10:45.909237+00:00",
         "in_stock": false,
         "lowest_price": "€ 30.22",
         "lowest_price_at": "2026-06-17T14:50:55.842568+00:00",
         "out_since": "2026-06-17T14:50:55.842568+00:00",
         "price_history": [
-          30.22
+          30.22,
+          30.42
         ]
       }
     },
     "https://bgpharmadrugs.to/product/modafinil/": {
       "ASPENDOS tablets 100 mg * 30 Medochemie": {
         "found": true,
-        "highest_price": "€ 42.54",
-        "highest_price_at": "2026-06-08T17:00:58.694587+00:00",
+        "highest_price": "€ 42.58",
+        "highest_price_at": "2026-06-18T01:10:45.909223+00:00",
         "in_stock": true,
         "lowest_price": "€ 42.06",
         "lowest_price_at": "2026-05-31T01:40:41.606861+00:00",
-        "previous_price": "€ 42.45",
-        "price": "€ 42.31",
+        "previous_price": "€ 42.31",
+        "price": "€ 42.58",
         "price_history": [
           42.2,
           42.14,
@@ -112,15 +113,16 @@
           42.18,
           42.54,
           42.45,
-          42.31
+          42.31,
+          42.58
         ]
       }
     },
     "https://bgpharmadrugs.to/product/peptides/": {
       "BPC157/TB500 mix 5mg each": {
         "found": true,
-        "highest_price": "€ 26.04",
-        "highest_price_at": "2026-06-08T17:00:58.694568+00:00",
+        "highest_price": "€ 26.07",
+        "highest_price_at": "2026-06-18T01:10:45.909215+00:00",
         "in_stock": false,
         "lowest_price": "€ 25.75",
         "lowest_price_at": "2026-05-31T01:40:41.606843+00:00",
@@ -134,18 +136,19 @@
           25.82,
           26.04,
           25.99,
-          25.9
+          25.9,
+          26.07
         ]
       },
       "GHK CU 100 mg": {
         "found": true,
-        "highest_price": "€ 21.70",
-        "highest_price_at": "2026-06-08T17:00:58.694485+00:00",
+        "highest_price": "€ 21.73",
+        "highest_price_at": "2026-06-18T01:10:45.909166+00:00",
         "in_stock": true,
         "lowest_price": "€ 17.18",
         "lowest_price_at": "2026-05-25T23:30:30.287557+00:00",
-        "previous_price": "€ 21.66",
-        "price": "€ 21.58",
+        "previous_price": "€ 21.58",
+        "price": "€ 21.73",
         "price_history": [
           17.2,
           17.21,
@@ -156,7 +159,8 @@
           21.52,
           21.7,
           21.66,
-          21.58
+          21.58,
+          21.73
         ]
       },
       "IGF-1 LR3 1 mg": {
@@ -189,13 +193,13 @@
       },
       "Tirzepatide 30 mg": {
         "found": true,
-        "highest_price": "€ 43.40",
-        "highest_price_at": "2026-06-08T17:00:58.694537+00:00",
+        "highest_price": "€ 43.45",
+        "highest_price_at": "2026-06-18T01:10:45.909197+00:00",
         "in_stock": true,
         "lowest_price": "€ 42.91",
         "lowest_price_at": "2026-05-31T01:40:41.606813+00:00",
-        "previous_price": "€ 43.32",
-        "price": "€ 43.17",
+        "previous_price": "€ 43.17",
+        "price": "€ 43.45",
         "price_history": [
           43.06,
           42.99,
@@ -207,15 +211,16 @@
           43.04,
           43.4,
           43.32,
-          43.17
+          43.17,
+          43.45
         ]
       }
     },
     "https://bgpharmadrugs.to/product/roaccutane-20-mg-30-roche/": {
       "Roaccutane 20 mg 30 Roche": {
         "found": true,
-        "highest_price": "€ 39.06",
-        "highest_price_at": "2026-06-08T17:00:58.694598+00:00",
+        "highest_price": "€ 39.11",
+        "highest_price_at": "2026-06-18T01:10:45.909231+00:00",
         "in_stock": false,
         "lowest_price": "€ 38.62",
         "lowest_price_at": "2026-05-31T01:40:41.606872+00:00",
@@ -233,33 +238,38 @@
           38.74,
           39.06,
           38.99,
-          38.85
+          38.85,
+          39.11
         ]
       }
     },
     "https://bgpharmadrugs.to/product/tretinoin/": {
       "0.025% 20 grams": {
         "found": true,
-        "highest_price": "€21.58",
-        "highest_price_at": "2026-06-14T19:50:57.083088+00:00",
+        "highest_price": "€21.73",
+        "highest_price_at": "2026-06-18T01:10:45.909244+00:00",
         "in_stock": true,
         "lowest_price": "€21.58",
         "lowest_price_at": "2026-06-14T19:50:57.083088+00:00",
-        "price": "€21.58",
+        "previous_price": "€21.58",
+        "price": "€21.73",
         "price_history": [
-          21.58
+          21.58,
+          21.73
         ]
       },
       "0.05% 30 grams": {
         "found": true,
-        "highest_price": "€21.58",
-        "highest_price_at": "2026-06-14T19:50:57.083187+00:00",
+        "highest_price": "€21.73",
+        "highest_price_at": "2026-06-18T01:10:45.909251+00:00",
         "in_stock": true,
         "lowest_price": "€21.58",
         "lowest_price_at": "2026-06-14T19:50:57.083187+00:00",
-        "price": "€21.58",
+        "previous_price": "€21.58",
+        "price": "€21.73",
         "price_history": [
-          21.58
+          21.58,
+          21.73
         ]
       }
     }
