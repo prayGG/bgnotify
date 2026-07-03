@@ -1,9 +1,9 @@
 {
   "bot_stats": {
     "first_check_at": "2026-05-20T18:50:44.075159+00:00",
-    "last_check_at": "2026-07-03T21:30:44.503166+00:00",
-    "total_checks": 6328,
-    "total_restocks": 1
+    "last_check_at": "2026-07-03T21:40:40.905577+00:00",
+    "total_checks": 6329,
+    "total_restocks": 2
   },
   "dashboard_message_id": "1510095616322175107",
   "error_report": {
@@ -59,7 +59,7 @@
       "3856206"
     ]
   },
-  "last_deploy_sha": "1fc89b9d1e403cfe78b9bd161ee8d74c4ab97006",
+  "last_deploy_sha": "29bbbbc5f8cd28148d60154aebd12b452662ccd0",
   "playstation": {
     "https://store.playstation.com/de-de/product/EP1018-CUSA06511_00-LEGOCITYUNDERCOV": {
       "base_value": 5999,
@@ -69,7 +69,7 @@
       "highest_price": "€ 59.99",
       "highest_price_at": "2026-06-06T19:30:48.285006+00:00",
       "in_stock": true,
-      "last_check_at": "2026-07-03T21:30:48.968440+00:00",
+      "last_check_at": "2026-07-03T21:40:45.550640+00:00",
       "lowest_at": "2026-06-06T19:20:45.639056+00:00",
       "lowest_price": "€ 5.39",
       "lowest_price_at": "2026-06-30T23:00:58.217710+00:00",
@@ -218,14 +218,20 @@
       },
       "Retatrutide 30 mg": {
         "found": true,
-        "highest_price": "€ 69.45",
-        "highest_price_at": "2026-06-08T17:00:58.694555+00:00",
-        "in_stock": false,
+        "highest_price": "€ 70.29",
+        "highest_price_at": "2026-07-03T21:40:45.261306+00:00",
+        "in_stock": true,
+        "last_restock_at": "2026-07-03T21:40:45.261306+00:00",
         "lowest_price": "€ 68.66",
         "lowest_price_at": "2026-05-31T01:40:41.606830+00:00",
-        "out_since": "2026-06-15T21:50:52.715133+00:00",
-        "previous_price": "€ 69.31",
-        "price": "€ 69.07",
+        "oos_periods": [
+          {
+            "end": "2026-07-03T21:40:45.261306+00:00",
+            "start": "2026-06-15T21:50:52.715133+00:00"
+          }
+        ],
+        "previous_price": "€ 69.07",
+        "price": "€ 70.29",
         "price_history": [
           68.79,
           68.83,
@@ -236,8 +242,10 @@
           68.86,
           69.45,
           69.31,
-          69.07
-        ]
+          69.07,
+          70.29
+        ],
+        "restock_count": 1
       },
       "Tirzepatide 30 mg": {
         "found": true,
