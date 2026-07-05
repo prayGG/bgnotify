@@ -1,8 +1,8 @@
 {
   "bot_stats": {
     "first_check_at": "2026-05-20T18:50:44.075159+00:00",
-    "last_check_at": "2026-07-05T05:00:50.776923+00:00",
-    "total_checks": 6517,
+    "last_check_at": "2026-07-05T05:10:36.254573+00:00",
+    "total_checks": 6518,
     "total_restocks": 2
   },
   "dashboard_message_id": "1510095616322175107",
@@ -60,7 +60,7 @@
       "3857109"
     ]
   },
-  "last_deploy_sha": "4e4e866734d6da5e539351e9e3eb4e2e0b079c8c",
+  "last_deploy_sha": "e3b6da46314b9a7b4b9688ba99014a254baffd5c",
   "playstation": {
     "https://store.playstation.com/de-de/product/EP1018-CUSA06511_00-LEGOCITYUNDERCOV": {
       "base_value": 5999,
@@ -70,7 +70,7 @@
       "highest_price": "€ 59.99",
       "highest_price_at": "2026-06-06T19:30:48.285006+00:00",
       "in_stock": true,
-      "last_check_at": "2026-07-05T05:00:55.373868+00:00",
+      "last_check_at": "2026-07-05T05:10:40.151072+00:00",
       "lowest_at": "2026-06-06T19:20:45.639056+00:00",
       "lowest_price": "€ 5.39",
       "lowest_price_at": "2026-06-30T23:00:58.217710+00:00",
@@ -105,7 +105,8 @@
           30.76,
           30.73,
           30.62,
-          30.75
+          30.75,
+          30.6
         ]
       }
     },
@@ -117,8 +118,8 @@
         "in_stock": true,
         "lowest_price": "€ 42.06",
         "lowest_price_at": "2026-05-31T01:40:41.606861+00:00",
-        "previous_price": "€ 42.87",
-        "price": "€ 43.05",
+        "previous_price": "€ 43.05",
+        "price": "€ 42.85",
         "price_history": [
           42.2,
           42.14,
@@ -139,7 +140,8 @@
           43.07,
           43.02,
           42.87,
-          43.05
+          43.05,
+          42.85
         ]
       }
     },
@@ -150,16 +152,16 @@
         "highest_price_at": "2026-06-24T13:20:53.973995+00:00",
         "in_stock": true,
         "last_restock_at": "2026-06-24T20:40:52.064447+00:00",
-        "lowest_price": "€ 21.87",
-        "lowest_price_at": "2026-06-30T01:30:49.851449+00:00",
+        "lowest_price": "€ 21.86",
+        "lowest_price_at": "2026-07-05T05:10:39.959247+00:00",
         "oos_periods": [
           {
             "end": "2026-06-24T20:40:52.064447+00:00",
             "start": "2026-06-17T20:50:44.984934+00:00"
           }
         ],
-        "previous_price": "€ 21.87",
-        "price": "€ 21.97",
+        "previous_price": "€ 21.97",
+        "price": "€ 21.86",
         "price_history": [
           25.76,
           25.8,
@@ -177,7 +179,8 @@
           21.97,
           21.95,
           21.87,
-          21.97
+          21.97,
+          21.86
         ],
         "restock_count": 1
       },
@@ -231,8 +234,8 @@
             "start": "2026-06-15T21:50:52.715133+00:00"
           }
         ],
-        "previous_price": "€ 69.07",
-        "price": "€ 70.29",
+        "previous_price": "€ 70.29",
+        "price": "€ 69.95",
         "price_history": [
           68.79,
           68.83,
@@ -244,7 +247,8 @@
           69.45,
           69.31,
           69.07,
-          70.29
+          70.29,
+          69.95
         ],
         "restock_count": 1
       },
@@ -255,8 +259,8 @@
         "in_stock": true,
         "lowest_price": "€ 42.91",
         "lowest_price_at": "2026-05-31T01:40:41.606813+00:00",
-        "previous_price": "€ 43.74",
-        "price": "€ 43.93",
+        "previous_price": "€ 43.93",
+        "price": "€ 43.72",
         "price_history": [
           43.06,
           42.99,
@@ -277,7 +281,8 @@
           43.94,
           43.9,
           43.74,
-          43.93
+          43.93,
+          43.72
         ]
       }
     },
@@ -312,7 +317,8 @@
           39.55,
           39.51,
           39.37,
-          39.54
+          39.54,
+          39.35
         ]
       }
     },
@@ -324,8 +330,8 @@
         "in_stock": true,
         "lowest_price": "€21.58",
         "lowest_price_at": "2026-06-14T19:50:57.083088+00:00",
-        "previous_price": "€21.87",
-        "price": "€21.97",
+        "previous_price": "€21.97",
+        "price": "€21.86",
         "price_history": [
           21.58,
           21.73,
@@ -336,7 +342,8 @@
           21.97,
           21.95,
           21.87,
-          21.97
+          21.97,
+          21.86
         ]
       },
       "0.05% 30 grams": {
@@ -346,8 +353,8 @@
         "in_stock": true,
         "lowest_price": "€21.58",
         "lowest_price_at": "2026-06-14T19:50:57.083187+00:00",
-        "previous_price": "€21.87",
-        "price": "€21.97",
+        "previous_price": "€21.97",
+        "price": "€21.86",
         "price_history": [
           21.58,
           21.73,
@@ -358,7 +365,8 @@
           21.97,
           21.95,
           21.87,
-          21.97
+          21.97,
+          21.86
         ]
       }
     }
