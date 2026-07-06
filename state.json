@@ -1,8 +1,8 @@
 {
   "bot_stats": {
     "first_check_at": "2026-05-20T18:50:44.075159+00:00",
-    "last_check_at": "2026-07-06T05:01:04.873685+00:00",
-    "total_checks": 6661,
+    "last_check_at": "2026-07-06T05:10:41.713780+00:00",
+    "total_checks": 6662,
     "total_restocks": 2
   },
   "dashboard_message_id": "1510095616322175107",
@@ -10,7 +10,7 @@
     "active": false
   },
   "forum": {
-    "last_check_at": "2026-07-06T03:10:43.398775+00:00",
+    "last_check_at": "2026-07-06T05:10:46.275949+00:00",
     "seeded": true,
     "seen_post_ids": [
       "3818721",
@@ -60,7 +60,7 @@
       "3857109"
     ]
   },
-  "last_deploy_sha": "4c5c0e5b9011c3406f9fe36c55d6c2d84d32d515",
+  "last_deploy_sha": "06a88bb4db057c8625cd88a8f1d7effc27222135",
   "playstation": {
     "https://store.playstation.com/de-de/product/EP1018-CUSA06511_00-LEGOCITYUNDERCOV": {
       "base_value": 5999,
@@ -70,7 +70,7 @@
       "highest_price": "€ 59.99",
       "highest_price_at": "2026-06-06T19:30:48.285006+00:00",
       "in_stock": true,
-      "last_check_at": "2026-07-06T05:01:09.619370+00:00",
+      "last_check_at": "2026-07-06T05:10:49.613309+00:00",
       "lowest_at": "2026-06-06T19:20:45.639056+00:00",
       "lowest_price": "€ 5.39",
       "lowest_price_at": "2026-06-30T23:00:58.217710+00:00",
@@ -106,7 +106,8 @@
           30.73,
           30.62,
           30.75,
-          30.6
+          30.6,
+          30.61
         ]
       }
     },
@@ -118,8 +119,8 @@
         "in_stock": true,
         "lowest_price": "€ 42.06",
         "lowest_price_at": "2026-05-31T01:40:41.606861+00:00",
-        "previous_price": "€ 43.05",
-        "price": "€ 42.85",
+        "previous_price": "€ 42.85",
+        "price": "€ 42.86",
         "price_history": [
           42.2,
           42.14,
@@ -141,7 +142,8 @@
           43.02,
           42.87,
           43.05,
-          42.85
+          42.85,
+          42.86
         ]
       }
     },
@@ -234,8 +236,8 @@
             "start": "2026-06-15T21:50:52.715133+00:00"
           }
         ],
-        "previous_price": "€ 70.29",
-        "price": "€ 69.95",
+        "previous_price": "€ 69.95",
+        "price": "€ 69.97",
         "price_history": [
           68.79,
           68.83,
@@ -248,7 +250,8 @@
           69.31,
           69.07,
           70.29,
-          69.95
+          69.95,
+          69.97
         ],
         "restock_count": 1
       },
@@ -259,8 +262,8 @@
         "in_stock": true,
         "lowest_price": "€ 42.91",
         "lowest_price_at": "2026-05-31T01:40:41.606813+00:00",
-        "previous_price": "€ 43.93",
-        "price": "€ 43.72",
+        "previous_price": "€ 43.72",
+        "price": "€ 43.73",
         "price_history": [
           43.06,
           42.99,
@@ -282,7 +285,8 @@
           43.9,
           43.74,
           43.93,
-          43.72
+          43.72,
+          43.73
         ]
       }
     },
@@ -318,7 +322,8 @@
           39.51,
           39.37,
           39.54,
-          39.35
+          39.35,
+          39.36
         ]
       }
     },
