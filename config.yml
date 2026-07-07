@@ -50,15 +50,6 @@ orders:
       password_env: BG_PASSWORD_2
       ping_env: WEITERE_ID_HIER      # bestehendes Secret mit der Discord-ID für Konto b
 
-# PlayStation-Store-Spiele, deren Preis beobachtet wird. Jeder Eintrag braucht
-# nur Name + URL (die normale /de-de/-Produktseite). Der Bot liest den Kaufpreis
-# aus dem eingebetteten Seiten-JSON (kein Browser nötig) und pingt, sobald der
-# Preis unter den zuletzt gesehenen fällt. Erstkontakt setzt nur die Baseline.
-playstation:
-  games:
-    - name: "LEGO City Undercover"
-      url: "https://store.playstation.com/de-de/product/EP1018-CUSA06511_00-LEGOCITYUNDERCOV"
-
 notifications:
   # Discord User-IDs werden bei Restocks gepingt. Damit die IDs NICHT im
   # public Repo stehen, kommen sie über env var `PING_USER_IDS`
