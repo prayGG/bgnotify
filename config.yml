@@ -68,7 +68,7 @@ products:
     url: "https://bgpharmadrugs.to/product/peptides/"
     emoji: "🧪"
     watch_variants:
-      - "GHK CU 100 mg"
+      - "GHK CU 50 mg"
 
   - name: "Tirzepatide"
     url: "https://bgpharmadrugs.to/product/peptides/"
