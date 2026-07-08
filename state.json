@@ -1,8 +1,8 @@
 {
   "bot_stats": {
     "first_check_at": "2026-05-20T18:50:44.075159+00:00",
-    "last_check_at": "2026-07-08T13:50:47.331739+00:00",
-    "total_checks": 7002,
+    "last_check_at": "2026-07-08T14:01:26.943235+00:00",
+    "total_checks": 7003,
     "total_restocks": 2
   },
   "dashboard_message_id": "1510095616322175107",
@@ -63,7 +63,7 @@
       "3860885"
     ]
   },
-  "last_deploy_sha": "f7000aa1f82372bdd316ff94c28694908b1c839a",
+  "last_deploy_sha": "0324903fb913efff8d443060166454c3a6aa18ee",
   "playstation": {},
   "products": {
     "https://bgpharmadrugs.to/product/minoxytop-5-mg-minoxidil-tablets-ip/": {
@@ -198,6 +198,18 @@
           21.95,
           21.87,
           21.97
+        ]
+      },
+      "GHK CU 50 mg": {
+        "found": true,
+        "highest_price": "€ 15.72",
+        "highest_price_at": "2026-07-08T14:01:30.983127+00:00",
+        "in_stock": true,
+        "lowest_price": "€ 15.72",
+        "lowest_price_at": "2026-07-08T14:01:30.983127+00:00",
+        "price": "€ 15.72",
+        "price_history": [
+          15.72
         ]
       },
       "IGF-1 LR3 1 mg": {
