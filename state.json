@@ -1,8 +1,8 @@
 {
   "bot_stats": {
     "first_check_at": "2026-05-20T18:50:44.075159+00:00",
-    "last_check_at": "2026-07-23T13:10:36.434221+00:00",
-    "total_checks": 9144,
+    "last_check_at": "2026-07-23T13:20:38.483739+00:00",
+    "total_checks": 9145,
     "total_restocks": 2
   },
   "dashboard_message_id": "1510095616322175107",
@@ -68,7 +68,7 @@
       "3874725"
     ]
   },
-  "last_deploy_sha": "df9a387e70c0e027d1ab151c0abce361106e723f",
+  "last_deploy_sha": "a1510fb63573ebfc877eb01c9c2e9f0c78c53b74",
   "playstation": {},
   "products": {
     "https://bgpharmadrugs.to/product/minoxytop-5-mg-minoxidil-tablets-ip/": {
@@ -102,7 +102,8 @@
           30.58,
           30.61,
           30.66,
-          30.69
+          30.69,
+          30.67
         ]
       }
     },
@@ -114,10 +115,9 @@
         "in_stock": true,
         "lowest_price": "€ 42.06",
         "lowest_price_at": "2026-05-31T01:40:41.606861+00:00",
-        "previous_price": "€ 42.92",
-        "price": "€ 42.97",
+        "previous_price": "€ 42.97",
+        "price": "€ 42.94",
         "price_history": [
-          42.16,
           42.17,
           42.08,
           42.14,
@@ -146,7 +146,8 @@
           42.81,
           42.86,
           42.92,
-          42.97
+          42.97,
+          42.94
         ]
       }
     },
@@ -165,8 +166,8 @@
             "start": "2026-06-17T20:50:44.984934+00:00"
           }
         ],
-        "previous_price": "€ 21.90",
-        "price": "€ 21.92",
+        "previous_price": "€ 21.92",
+        "price": "€ 21.91",
         "price_history": [
           25.76,
           25.8,
@@ -195,7 +196,8 @@
           21.84,
           21.87,
           21.9,
-          21.92
+          21.92,
+          21.91
         ],
         "restock_count": 1
       },
@@ -271,8 +273,8 @@
             "start": "2026-06-15T21:50:52.715133+00:00"
           }
         ],
-        "previous_price": "€ 70.08",
-        "price": "€ 70.15",
+        "previous_price": "€ 70.15",
+        "price": "€ 70.11",
         "price_history": [
           68.79,
           68.83,
@@ -296,7 +298,8 @@
           69.9,
           69.98,
           70.08,
-          70.15
+          70.15,
+          70.11
         ],
         "restock_count": 1
       },
@@ -307,10 +310,9 @@
         "in_stock": true,
         "lowest_price": "€ 42.91",
         "lowest_price_at": "2026-05-31T01:40:41.606813+00:00",
-        "previous_price": "€ 43.80",
-        "price": "€ 43.85",
+        "previous_price": "€ 43.85",
+        "price": "€ 43.82",
         "price_history": [
-          43.02,
           43.03,
           42.94,
           42.99,
@@ -339,7 +341,8 @@
           43.69,
           43.74,
           43.8,
-          43.85
+          43.85,
+          43.82
         ]
       }
     },
@@ -355,7 +358,6 @@
         "previous_price": "€ 38.99",
         "price": "€ 38.85",
         "price_history": [
-          38.72,
           38.73,
           38.65,
           38.7,
@@ -384,7 +386,8 @@
           39.32,
           39.36,
           39.42,
-          39.46
+          39.46,
+          39.44
         ]
       }
     },
@@ -396,8 +399,8 @@
         "in_stock": true,
         "lowest_price": "€21.58",
         "lowest_price_at": "2026-06-14T19:50:57.083088+00:00",
-        "previous_price": "€21.90",
-        "price": "€21.92",
+        "previous_price": "€21.92",
+        "price": "€21.91",
         "price_history": [
           21.58,
           21.73,
@@ -419,7 +422,8 @@
           21.84,
           21.87,
           21.9,
-          21.92
+          21.92,
+          21.91
         ]
       },
       "0.05% 30 grams": {
@@ -429,8 +433,8 @@
         "in_stock": true,
         "lowest_price": "€21.58",
         "lowest_price_at": "2026-06-14T19:50:57.083187+00:00",
-        "previous_price": "€21.90",
-        "price": "€21.92",
+        "previous_price": "€21.92",
+        "price": "€21.91",
         "price_history": [
           21.58,
           21.73,
@@ -452,7 +456,8 @@
           21.84,
           21.87,
           21.9,
-          21.92
+          21.92,
+          21.91
         ]
       }
     }
