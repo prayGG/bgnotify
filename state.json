@@ -1,9 +1,9 @@
 {
   "bot_stats": {
     "first_check_at": "2026-05-20T18:50:44.075159+00:00",
-    "last_check_at": "2026-07-24T17:40:35.768754+00:00",
-    "total_checks": 9315,
-    "total_restocks": 2
+    "last_check_at": "2026-07-24T17:50:39.824748+00:00",
+    "total_checks": 9316,
+    "total_restocks": 3
   },
   "dashboard_message_id": "1510095616322175107",
   "error_report": {
@@ -71,7 +71,7 @@
       "3875707"
     ]
   },
-  "last_deploy_sha": "509e45ac5eee5c3eb6bee1027127d5002d18441d",
+  "last_deploy_sha": "3fb475cf44c8b16f8257291428b6430e11a6ab1b",
   "playstation": {},
   "products": {
     "https://bgpharmadrugs.to/product/minoxytop-5-mg-minoxidil-tablets-ip/": {
@@ -354,12 +354,18 @@
         "found": true,
         "highest_price": "€ 39.61",
         "highest_price_at": "2026-06-25T01:40:46.889982+00:00",
-        "in_stock": false,
+        "in_stock": true,
+        "last_restock_at": "2026-07-24T17:50:45.440111+00:00",
         "lowest_price": "€ 38.62",
         "lowest_price_at": "2026-05-31T01:40:41.606872+00:00",
-        "out_since": "2026-06-13T20:10:46.910560+00:00",
-        "previous_price": "€ 38.99",
-        "price": "€ 38.85",
+        "oos_periods": [
+          {
+            "end": "2026-07-24T17:50:45.440111+00:00",
+            "start": "2026-06-13T20:10:46.910560+00:00"
+          }
+        ],
+        "previous_price": "€ 38.85",
+        "price": "€ 39.44",
         "price_history": [
           38.73,
           38.65,
@@ -391,7 +397,8 @@
           39.42,
           39.46,
           39.44
-        ]
+        ],
+        "restock_count": 1
       }
     },
     "https://bgpharmadrugs.to/product/tretinoin/": {
