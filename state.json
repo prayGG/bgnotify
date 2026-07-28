@@ -1,8 +1,8 @@
 {
   "bot_stats": {
     "first_check_at": "2026-05-20T18:50:44.075159+00:00",
-    "last_check_at": "2026-07-28T02:10:42.553076+00:00",
-    "total_checks": 9796,
+    "last_check_at": "2026-07-28T02:20:38.922401+00:00",
+    "total_checks": 9797,
     "total_restocks": 3
   },
   "dashboard_message_id": "1510095616322175107",
@@ -72,7 +72,7 @@
       "3879081"
     ]
   },
-  "last_deploy_sha": "6a96c7ef727db432826c46e73ee808726b2855e6",
+  "last_deploy_sha": "c288ab200e9af2dd2a2f96b520ec0c9cd378a87f",
   "playstation": {},
   "products": {
     "https://bgpharmadrugs.to/product/minoxytop-5-mg-minoxidil-tablets-ip/": {
@@ -109,7 +109,8 @@
           30.69,
           30.67,
           30.76,
-          30.69
+          30.69,
+          30.77
         ]
       }
     },
@@ -121,10 +122,9 @@
         "in_stock": true,
         "lowest_price": "€ 42.06",
         "lowest_price_at": "2026-05-31T01:40:41.606861+00:00",
-        "previous_price": "€ 43.06",
-        "price": "€ 42.97",
+        "previous_price": "€ 42.97",
+        "price": "€ 43.08",
         "price_history": [
-          42.14,
           42.06,
           42.18,
           42.54,
@@ -153,7 +153,8 @@
           42.97,
           42.94,
           43.06,
-          42.97
+          42.97,
+          43.08
         ]
       }
     },
@@ -172,10 +173,9 @@
             "start": "2026-06-17T20:50:44.984934+00:00"
           }
         ],
-        "previous_price": "€ 21.97",
-        "price": "€ 21.92",
+        "previous_price": "€ 21.92",
+        "price": "€ 21.98",
         "price_history": [
-          25.8,
           25.75,
           25.82,
           26.04,
@@ -204,7 +204,8 @@
           21.92,
           21.91,
           21.97,
-          21.92
+          21.92,
+          21.98
         ],
         "restock_count": 1
       },
@@ -241,13 +242,13 @@
       },
       "GHK CU 50 mg": {
         "found": true,
-        "highest_price": "€ 15.82",
-        "highest_price_at": "2026-07-25T09:20:35.660042+00:00",
+        "highest_price": "€ 15.83",
+        "highest_price_at": "2026-07-28T02:20:43.918372+00:00",
         "in_stock": true,
         "lowest_price": "€ 15.72",
         "lowest_price_at": "2026-07-08T14:01:30.983127+00:00",
-        "previous_price": "€ 15.82",
-        "price": "€ 15.79",
+        "previous_price": "€ 15.79",
+        "price": "€ 15.83",
         "price_history": [
           15.72,
           15.76,
@@ -260,7 +261,8 @@
           15.77,
           15.78,
           15.82,
-          15.79
+          15.79,
+          15.83
         ]
       },
       "IGF-1 LR3 1 mg": {
@@ -270,8 +272,8 @@
       },
       "Retatrutide 30 mg": {
         "found": true,
-        "highest_price": "€ 70.30",
-        "highest_price_at": "2026-07-25T09:20:35.660086+00:00",
+        "highest_price": "€ 70.34",
+        "highest_price_at": "2026-07-28T02:20:43.918411+00:00",
         "in_stock": true,
         "last_restock_at": "2026-07-03T21:40:45.261306+00:00",
         "lowest_price": "€ 68.66",
@@ -282,8 +284,8 @@
             "start": "2026-06-15T21:50:52.715133+00:00"
           }
         ],
-        "previous_price": "€ 70.30",
-        "price": "€ 70.16",
+        "previous_price": "€ 70.16",
+        "price": "€ 70.34",
         "price_history": [
           68.79,
           68.83,
@@ -310,7 +312,8 @@
           70.15,
           70.11,
           70.3,
-          70.16
+          70.16,
+          70.34
         ],
         "restock_count": 1
       },
@@ -321,10 +324,9 @@
         "in_stock": true,
         "lowest_price": "€ 42.91",
         "lowest_price_at": "2026-05-31T01:40:41.606813+00:00",
-        "previous_price": "€ 43.94",
-        "price": "€ 43.85",
+        "previous_price": "€ 43.85",
+        "price": "€ 43.96",
         "price_history": [
-          42.99,
           42.91,
           43.04,
           43.4,
@@ -353,7 +355,8 @@
           43.85,
           43.82,
           43.94,
-          43.85
+          43.85,
+          43.96
         ]
       }
     },
@@ -372,10 +375,9 @@
             "start": "2026-06-13T20:10:46.910560+00:00"
           }
         ],
-        "previous_price": "€ 39.55",
-        "price": "€ 39.46",
+        "previous_price": "€ 39.46",
+        "price": "€ 39.56",
         "price_history": [
-          38.7,
           38.62,
           38.74,
           39.06,
@@ -404,7 +406,8 @@
           39.46,
           39.44,
           39.55,
-          39.46
+          39.46,
+          39.56
         ],
         "restock_count": 1
       }
@@ -417,8 +420,8 @@
         "in_stock": true,
         "lowest_price": "€21.58",
         "lowest_price_at": "2026-06-14T19:50:57.083088+00:00",
-        "previous_price": "€21.97",
-        "price": "€21.92",
+        "previous_price": "€21.92",
+        "price": "€21.98",
         "price_history": [
           21.58,
           21.73,
@@ -443,7 +446,8 @@
           21.92,
           21.91,
           21.97,
-          21.92
+          21.92,
+          21.98
         ]
       },
       "0.05% 30 grams": {
@@ -453,8 +457,8 @@
         "in_stock": true,
         "lowest_price": "€21.58",
         "lowest_price_at": "2026-06-14T19:50:57.083187+00:00",
-        "previous_price": "€21.97",
-        "price": "€21.92",
+        "previous_price": "€21.92",
+        "price": "€21.98",
         "price_history": [
           21.58,
           21.73,
@@ -479,7 +483,8 @@
           21.92,
           21.91,
           21.97,
-          21.92
+          21.92,
+          21.98
         ]
       }
     }
