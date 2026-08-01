@@ -1,8 +1,8 @@
 {
   "bot_stats": {
     "first_check_at": "2026-05-20T18:50:44.075159+00:00",
-    "last_check_at": "2026-08-01T20:10:37.645714+00:00",
-    "total_checks": 10479,
+    "last_check_at": "2026-08-01T20:20:46.641038+00:00",
+    "total_checks": 10480,
     "total_restocks": 3
   },
   "dashboard_message_id": "1510095616322175107",
@@ -78,7 +78,7 @@
       "3883475"
     ]
   },
-  "last_deploy_sha": "20883898f21f4be1b01b4672c7b14ddc93f81b0a",
+  "last_deploy_sha": "b9ca06ced4abe61c2d5e22c92952d44928aeeba9",
   "playstation": {},
   "products": {
     "https://bgpharmadrugs.to/product/minoxytop-5-mg-minoxidil-tablets-ip/": {
