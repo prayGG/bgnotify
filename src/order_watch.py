@@ -105,11 +105,20 @@ def _check_one_account(name: str, webhook: str, user: str, pw: str,
 
         prev = order_map.get(oid)
         if prev is None:
-            order_map[oid] = {"status": slug, "tracking_posted": False}
+            # Erstkontakt mit dieser Bestellung. Bereits abgeschlossene/stornierte
+            # Altlasten werden nur still übernommen — sonst knallt bei frischem
+            # oder von Hand geleertem State die ganze Bestellhistorie in den
+            # Channel. `tracking_posted` gleich mitsetzen, damit auch deren
+            # Tracking-Karte nicht nachkommt.
+            stale = slug in _TERMINAL_STATUS
+            order_map[oid] = {"status": slug, "tracking_posted": stale}
             prev = order_map[oid]
             if items:
                 prev["items"] = items
-            notify.send_order_update(webhook, build_order_status_embed(o, fresh=True, items=prev.get("items")), ping_ids, role_ids)
+            if stale:
+                log.info("orders: #%s (%s) still übernommen — Altbestellung", oid, slug)
+            else:
+                notify.send_order_update(webhook, build_order_status_embed(o, fresh=True, items=prev.get("items")), ping_ids, role_ids)
         else:
             if items and not prev.get("items"):
                 prev["items"] = items  # Artikel einmalig sichern
