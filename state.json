@@ -1,8 +1,8 @@
 {
   "bot_stats": {
     "first_check_at": "2026-05-20T18:50:44.075159+00:00",
-    "last_check_at": "2026-08-03T06:40:32.836896+00:00",
-    "total_checks": 10689,
+    "last_check_at": "2026-08-03T06:50:35.461547+00:00",
+    "total_checks": 10690,
     "total_restocks": 3
   },
   "dashboard_message_id": "1510095616322175107",
@@ -78,7 +78,7 @@
       "3883475"
     ]
   },
-  "last_deploy_sha": "e5dde01955e8a1abdf2705a35d1c3cf8a75c88a6",
+  "last_deploy_sha": "d8700b3176861dcbc50cf08619e24e9a0b9c17ea",
   "playstation": {},
   "products": {
     "https://bgpharmadrugs.to/product/minoxytop-5-mg-minoxidil-tablets-ip/": {
@@ -118,7 +118,8 @@
           30.69,
           30.77,
           30.52,
-          30.36
+          30.36,
+          30.31
         ]
       }
     },
@@ -130,10 +131,9 @@
         "in_stock": true,
         "lowest_price": "€ 42.06",
         "lowest_price_at": "2026-05-31T01:40:41.606861+00:00",
-        "previous_price": "€ 42.73",
-        "price": "€ 42.50",
+        "previous_price": "€ 42.50",
+        "price": "€ 42.44",
         "price_history": [
-          42.54,
           42.45,
           42.31,
           42.58,
@@ -162,7 +162,8 @@
           42.97,
           43.08,
           42.73,
-          42.5
+          42.5,
+          42.44
         ]
       }
     },
@@ -173,18 +174,17 @@
         "highest_price_at": "2026-06-24T13:20:53.973995+00:00",
         "in_stock": true,
         "last_restock_at": "2026-06-24T20:40:52.064447+00:00",
-        "lowest_price": "€ 21.68",
-        "lowest_price_at": "2026-07-31T09:50:44.393457+00:00",
+        "lowest_price": "€ 21.65",
+        "lowest_price_at": "2026-08-03T06:50:40.663252+00:00",
         "oos_periods": [
           {
             "end": "2026-06-24T20:40:52.064447+00:00",
             "start": "2026-06-17T20:50:44.984934+00:00"
           }
         ],
-        "previous_price": "€ 21.80",
-        "price": "€ 21.68",
+        "previous_price": "€ 21.68",
+        "price": "€ 21.65",
         "price_history": [
-          26.04,
           25.99,
           25.9,
           26.07,
@@ -213,7 +213,8 @@
           21.92,
           21.98,
           21.8,
-          21.68
+          21.68,
+          21.65
         ],
         "restock_count": 1
       },
@@ -253,10 +254,10 @@
         "highest_price": "€ 15.83",
         "highest_price_at": "2026-07-28T02:20:43.918372+00:00",
         "in_stock": true,
-        "lowest_price": "€ 15.61",
-        "lowest_price_at": "2026-07-31T09:50:44.393402+00:00",
-        "previous_price": "€ 15.70",
-        "price": "€ 15.61",
+        "lowest_price": "€ 15.59",
+        "lowest_price_at": "2026-08-03T06:50:40.663203+00:00",
+        "previous_price": "€ 15.61",
+        "price": "€ 15.59",
         "price_history": [
           15.72,
           15.76,
@@ -272,7 +273,8 @@
           15.79,
           15.83,
           15.7,
-          15.61
+          15.61,
+          15.59
         ]
       },
       "IGF-1 LR3 1 mg": {
@@ -294,8 +296,8 @@
             "start": "2026-06-15T21:50:52.715133+00:00"
           }
         ],
-        "previous_price": "€ 69.77",
-        "price": "€ 69.38",
+        "previous_price": "€ 69.38",
+        "price": "€ 69.29",
         "price_history": [
           68.79,
           68.83,
@@ -325,7 +327,8 @@
           70.16,
           70.34,
           69.77,
-          69.38
+          69.38,
+          69.29
         ],
         "restock_count": 1
       },
@@ -336,10 +339,9 @@
         "in_stock": true,
         "lowest_price": "€ 42.91",
         "lowest_price_at": "2026-05-31T01:40:41.606813+00:00",
-        "previous_price": "€ 43.60",
-        "price": "€ 43.36",
+        "previous_price": "€ 43.36",
+        "price": "€ 43.31",
         "price_history": [
-          43.4,
           43.32,
           43.17,
           43.45,
@@ -368,7 +370,8 @@
           43.85,
           43.96,
           43.6,
-          43.36
+          43.36,
+          43.31
         ]
       }
     },
@@ -387,10 +390,9 @@
             "start": "2026-06-13T20:10:46.910560+00:00"
           }
         ],
-        "previous_price": "€ 39.24",
-        "price": "€ 39.03",
+        "previous_price": "€ 39.03",
+        "price": "€ 38.97",
         "price_history": [
-          39.06,
           38.99,
           38.85,
           39.11,
@@ -419,7 +421,8 @@
           39.46,
           39.56,
           39.24,
-          39.03
+          39.03,
+          38.97
         ],
         "restock_count": 1
       }
@@ -432,8 +435,8 @@
         "in_stock": true,
         "lowest_price": "€21.58",
         "lowest_price_at": "2026-06-14T19:50:57.083088+00:00",
-        "previous_price": "€21.80",
-        "price": "€21.68",
+        "previous_price": "€21.68",
+        "price": "€21.65",
         "price_history": [
           21.58,
           21.73,
@@ -461,7 +464,8 @@
           21.92,
           21.98,
           21.8,
-          21.68
+          21.68,
+          21.65
         ]
       },
       "0.05% 30 grams": {
@@ -471,8 +475,8 @@
         "in_stock": true,
         "lowest_price": "€21.58",
         "lowest_price_at": "2026-06-14T19:50:57.083187+00:00",
-        "previous_price": "€21.80",
-        "price": "€21.68",
+        "previous_price": "€21.68",
+        "price": "€21.65",
         "price_history": [
           21.58,
           21.73,
@@ -500,7 +504,8 @@
           21.92,
           21.98,
           21.8,
-          21.68
+          21.68,
+          21.65
         ]
       }
     }
