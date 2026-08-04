@@ -1,20 +1,34 @@
-"""Hermes-Sendungsverfolgung: aktuellen Status zu einer Tracking-URL holen.
+"""Hermes-Sendungsverfolgung: kompletten Sendungsverlauf zu einer Tracking-URL holen.
 
 Ein offizielles API gibt es nicht — Hermes' Track&Trace-Schnittstelle setzt einen
 Vertrag voraus. Deshalb wird die öffentliche Sendungsseite mit Playwright geladen
-(sie rendert die Ereignisse per JS nach) und der jüngste Eintrag geparst.
+(sie rendert den Verlauf per JS nach) und ausgewertet.
 
-Bewusst defensiv: mehrere Erkennungswege, und wenn keiner greift, `None` statt
-Raten. So postet der Bot lieber nichts, als etwas Falsches.
+Seitenaufbau (Stand 2026-06):
+
+    Deine Sendungsdetails
+    Deine Sendung
+    H1023311179870001047                     <- Sendungsnummer
+    Sendung wurde an der Empfangsadresse zugestellt.   <- Kurzstatus
+    Zugestellt am:Freitag, 12.06.2026        <- Detailfelder "Label:Wert"
+    Uhrzeit:14:28 Uhr
+    Zustellort:Empfangsadresse
+    Sendungsverlauf                          <- ab hier die Ereignisse
+    Sonntag, 07.06.2026
+    22:02
+    Die Sendung wurde Hermes elektronisch angekündigt. ...
+    ...                                      <- ÄLTESTE zuerst, neueste zuletzt
 
 Debug:
     python -m src.hermes "https://tracking.hermesworld.com/?TrackID=..."
 """
 from __future__ import annotations
 
+import hashlib
 import logging
 import re
 import sys
+from datetime import datetime
 from typing import Optional
 
 log = logging.getLogger(__name__)
@@ -22,25 +36,43 @@ log = logging.getLogger(__name__)
 UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
       "(KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36")
 
-# Bekannte Status-Formulierungen, grob von "früh" nach "spät". Wird als
-# Fallback genutzt, wenn kein strukturierter Eintrag gefunden wird.
-_STATUS_PHRASES = [
-    "sendung angekündigt", "sendung avisiert", "auftrag erfasst",
-    "im paketzentrum", "im logistikzentrum", "sortiert",
-    "auf dem weg", "unterwegs", "in zustellung", "im zustellfahrzeug",
-    "im paketshop", "abholbereit", "zur abholung",
-    "zugestellt", "ausgeliefert", "empfangen",
-    "nicht angetroffen", "zurückgesendet", "retoure",
-]
+_WEEKDAYS = "Montag|Dienstag|Mittwoch|Donnerstag|Freitag|Samstag|Sonntag"
+_DATE_RE = re.compile(rf"^(?:{_WEEKDAYS}),?\s*(\d{{1,2}}\.\d{{1,2}}\.\d{{2,4}})\s*$", re.I)
+_TIME_RE = re.compile(r"^(\d{1,2}:\d{2})(\s*Uhr)?\s*$", re.I)
+_FIELD_RE = re.compile(r"^([A-Za-zÄÖÜäöü][A-Za-zÄÖÜäöü .\-]{2,30}?):\s*(.+)$")
+_NUMBER_RE = re.compile(r"^[A-Z]?\d{12,25}$")
 
+_HISTORY_MARKER = "sendungsverlauf"
 _TERMINAL = ("zugestellt", "zustellung erfolgt", "ausgeliefert", "empfangen",
-             "zurückgesendet", "retoure")
+             "zurückgesendet", "retoure", "abgeholt")
 
 
 def is_terminal(status: str) -> bool:
     """Sendung abgeschlossen? Dann muss nicht weiter gepollt werden."""
     s = (status or "").lower()
     return any(t in s for t in _TERMINAL)
+
+
+def event_key(e: dict) -> str:
+    """Stabiler Fingerabdruck eines Ereignisses.
+
+    Damit erkennen wir Neues unabhängig davon, in welcher Reihenfolge Hermes
+    den Verlauf ausliefert (die Seite zeigt neueste zuerst, der Textabzug
+    älteste zuerst) und ohne den Wortlaut kennen zu müssen.
+    """
+    raw = f"{e.get('date','')}|{e.get('time','')}|{e.get('text','')}"
+    return hashlib.sha1(raw.encode("utf-8", "replace")).hexdigest()[:12]
+
+
+def event_sort_key(e: dict) -> tuple:
+    """Chronologisch sortierbar. Unparsbares wandert ans Ende (statt zu knallen)."""
+    for fmt in ("%d.%m.%Y %H:%M", "%d.%m.%y %H:%M", "%d.%m.%Y", "%d.%m.%y"):
+        stamp = f"{e.get('date','')} {e.get('time','')}".strip()
+        try:
+            return (0, datetime.strptime(stamp, fmt))
+        except ValueError:
+            continue
+    return (1, datetime.max)
 
 
 def _fetch_text(url: str, timeout_ms: int = 45000) -> str:
@@ -61,10 +93,9 @@ def _fetch_text(url: str, timeout_ms: int = 45000) -> str:
                 "Object.defineProperty(navigator, 'webdriver', {get: () => undefined});"
             )
             page = ctx.new_page()
-            # networkidle: die Ereignisliste kommt per XHR nach.
             page.goto(url, wait_until="networkidle", timeout=timeout_ms)
             try:
-                page.wait_for_timeout(1500)  # letzte Nachzügler
+                page.wait_for_timeout(1500)   # letzte Nachzügler
             except Exception:
                 pass
             return page.inner_text("body")
@@ -72,66 +103,88 @@ def _fetch_text(url: str, timeout_ms: int = 45000) -> str:
             browser.close()
 
 
-def _clean(s: str) -> str:
-    return re.sub(r"\s+", " ", s or "").strip()
+def _lines(text: str) -> list[str]:
+    return [re.sub(r"\s+", " ", l).strip() for l in (text or "").splitlines() if l.strip()]
 
 
-def parse_status(text: str) -> Optional[str]:
-    """Jüngsten Status aus dem Seitentext ziehen.
+def parse_shipment(text: str) -> dict:
+    """Seitentext → {number, summary, details, events}.
 
-    1. Zeile mit Datum + Text (typische Ereigniszeile) — die oberste gewinnt,
-       Hermes listet neueste zuerst.
-    2. Sonst: erste bekannte Status-Formulierung im Text.
+    `events` ist chronologisch (älteste zuerst, wie auf der Seite) mit je
+    `date`, `time` und `text`. Fehlt etwas, bleibt das Feld leer — nie raten.
     """
-    lines = [_clean(l) for l in (text or "").splitlines()]
-    lines = [l for l in lines if l]
+    lines = _lines(text)
+    out: dict = {"number": "", "summary": "", "details": {}, "events": []}
 
-    # 1) Ereigniszeile: beginnt mit Datum (12.08.2026 / 12.08.26 / 12. August).
-    #    Hermes listet neueste zuerst → die oberste gewinnt.
-    date_re = re.compile(
-        r"^\d{1,2}[.\-/]\s?\d{1,2}[.\-/]\s?\d{2,4}"          # 12.08.2026
-        r"|^\d{1,2}\.\s*[A-Za-zäöüÄÖÜ]+\.?(\s*\d{2,4})?",     # 12. August 2026
-        re.I,
-    )
-    time_re = re.compile(r"^\s*\d{1,2}[:.]\d{2}(\s*Uhr)?\b", re.I)
-    for i, line in enumerate(lines):
-        if not date_re.match(line):
+    # Verlauf vom Kopfbereich trennen.
+    split = next((i for i, l in enumerate(lines) if l.lower() == _HISTORY_MARKER), None)
+    head = lines[:split] if split is not None else lines
+    body = lines[split + 1:] if split is not None else []
+
+    # --- Kopf: Sendungsnummer, Kurzstatus, Detailfelder ---
+    for line in head:
+        if not out["number"] and _NUMBER_RE.match(line.replace(" ", "")):
+            out["number"] = line.replace(" ", "")
             continue
-        # Datum und ggf. Uhrzeit abschneiden — was übrig bleibt, ist der Status.
-        rest = time_re.sub("", date_re.sub("", line)).strip(" ,;–-|")
-        if len(rest) > 3:
-            return rest[:200]
-        # Zeile enthielt nur Datum/Uhrzeit → Status steht in der nächsten Zeile.
-        for nxt in lines[i + 1:i + 3]:
-            cand = time_re.sub("", nxt).strip(" ,;–-|")
-            if len(cand) > 3 and not date_re.match(cand):
-                return cand[:200]
-        break
+        m = _FIELD_RE.match(line)
+        if m:
+            out["details"][m.group(1).strip()] = m.group(2).strip()
+            continue
+        # Erster längerer Satz nach der Nummer = Kurzstatus
+        if out["number"] and not out["summary"] and len(line) > 15 and ":" not in line:
+            out["summary"] = line
 
-    # 2) Bekannte Formulierung
-    low = (text or "").lower()
-    for phrase in _STATUS_PHRASES:
-        idx = low.find(phrase)
-        if idx >= 0:
-            for line in lines:
-                if phrase in line.lower():
-                    return line[:200]
-            return phrase
+    # --- Verlauf: Datum / Uhrzeit / Text ---
+    cur_date = ""
+    cur_time = ""
+    buf: list[str] = []
 
-    return None
+    def flush() -> None:
+        if cur_date and buf:
+            out["events"].append({
+                "date": cur_date,
+                "time": cur_time,
+                "text": " ".join(buf).strip(),
+            })
+
+    for line in body:
+        md = _DATE_RE.match(line)
+        if md:
+            flush()
+            buf = []
+            cur_date, cur_time = md.group(1), ""
+            continue
+        mt = _TIME_RE.match(line)
+        if mt and cur_date and not buf:
+            cur_time = mt.group(1)
+            continue
+        if cur_date:
+            buf.append(line)
+    flush()
+
+    # Immer chronologisch (älteste zuerst) — die Seite liefert je nach Ansicht
+    # mal so, mal so. Danach kann sich der Rest des Codes darauf verlassen.
+    out["events"].sort(key=event_sort_key)
+
+    # Kurzstatus notfalls aus dem jüngsten Ereignis ableiten.
+    if not out["summary"] and out["events"]:
+        out["summary"] = out["events"][-1]["text"]
+
+    return out
 
 
-def fetch_status(url: str) -> Optional[str]:
-    """Aktuellen Sendungsstatus oder None (Seite nicht lesbar / Format unbekannt)."""
+def fetch_shipment(url: str) -> Optional[dict]:
+    """Sendungsdaten holen; None wenn die Seite nicht lesbar/auswertbar ist."""
     try:
         text = _fetch_text(url)
     except Exception as e:
         log.warning("hermes: Seite nicht ladbar (%s): %s", url[:60], e)
         return None
-    status = parse_status(text)
-    if not status:
-        log.warning("hermes: kein Status erkennbar — Layout geändert? (%s)", url[:60])
-    return status
+    data = parse_shipment(text)
+    if not data["events"] and not data["summary"]:
+        log.warning("hermes: nichts erkennbar — Layout geändert? (%s)", url[:60])
+        return None
+    return data
 
 
 if __name__ == "__main__":
@@ -140,7 +193,11 @@ if __name__ == "__main__":
         print("usage: python -m src.hermes <tracking-url>")
         raise SystemExit(2)
     raw = _fetch_text(sys.argv[1])
-    print("--- Seitentext (erste 2000 Zeichen) ---")
-    print(raw[:2000])
-    print("--- erkannter Status ---")
-    print(parse_status(raw))
+    data = parse_shipment(raw)
+    print(f"Nummer : {data['number']}")
+    print(f"Status : {data['summary']}")
+    for k, v in data["details"].items():
+        print(f"  {k}: {v}")
+    print(f"Ereignisse ({len(data['events'])}):")
+    for e in data["events"]:
+        print(f"  {e['date']} {e['time']}  {e['text']}")

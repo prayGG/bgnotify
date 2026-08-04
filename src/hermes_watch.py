@@ -109,18 +109,32 @@ def check_shipments(cfg: dict, webhook: str, ping_ids: list[str], role_ids: list
     targets = own_ping if own_ping is not None else ping_ids
 
     entry["last_check_at"] = datetime.now(timezone.utc).isoformat()   # vor der Abfrage → Backoff
-    status = hermes.fetch_status(url)
+    data = hermes.fetch_shipment(url)
 
-    if status:
-        prev = entry.get("status", "")
-        if status != prev:
+    if data:
+        events = data.get("events") or []          # bereits chronologisch sortiert
+        # Abgleich über Fingerabdrücke statt über Position/Anzahl: so ist es egal,
+        # in welcher Reihenfolge Hermes liefert, und unbekannte Meldungstexte
+        # funktionieren automatisch mit.
+        seen: list[str] = list(entry.get("seen_keys") or [])
+        known = set(seen)
+        new_events = [e for e in events if hermes.event_key(e) not in known]
+
+        if new_events:
+            first = not seen
             notify.send_order_update(
-                webhook, build_shipment_embed(label, status, url, first=not prev),
+                webhook, build_shipment_embed(label, data, new_events, url, first=first),
                 targets, role_ids,
             )
-            entry["status"] = status
-            log.info("hermes: '%s' → %s", label, status)
+            # Nur die Fingerabdrücke der aktuell sichtbaren Ereignisse behalten —
+            # so wächst der Gist nicht unbegrenzt.
+            entry["seen_keys"] = [hermes.event_key(e) for e in events]
+            entry["status"] = data.get("summary", "")
+            if data.get("number"):
+                entry["number"] = data["number"]
+            log.info("hermes: '%s' → %d neue(s) Ereignis(se), zuletzt: %s",
+                     label, len(new_events), new_events[-1].get("text", "")[:60])
         else:
-            log.info("hermes: '%s' unverändert (%s)", label, status)
+            log.info("hermes: '%s' unverändert (%d Ereignisse)", label, len(events))
 
     orders.save_order_state(token, gist_id, st)

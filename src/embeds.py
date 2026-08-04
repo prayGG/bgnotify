@@ -495,20 +495,44 @@ def build_order_status_embed(order: dict, fresh: bool = False, items: Optional[l
     }
 
 
-def build_shipment_embed(label: str, status: str, url: str, first: bool = False) -> dict:
+_MAX_EVENTS_IN_EMBED = 12
+
+
+def build_shipment_embed(label: str, data: dict, new_events: list[dict], url: str,
+                         first: bool = False) -> dict:
     """Statusmeldung zu einer manuell eingetragenen Sendung (Gist `manual_tracking`).
 
-    Für Sendungen, deren Bestellung der Bot nicht sehen kann — z.B. wenn das
-    zugehörige Kundenkonto gar nicht hinterlegt ist. Der Link kommt von Hand,
-    den Status holt der Bot bei Hermes.
+    Zeigt **jedes neue Ereignis mit Zeitstempel** — beim ersten Mal den ganzen
+    bisherigen Verlauf, danach nur noch, was seit der letzten Meldung dazukam.
+    Ist die Sendung zugestellt, kommen die Zustelldetails (Datum/Uhrzeit/Ort) mit.
     """
-    head = "🚚⠀**Sendung wird verfolgt**" if first else "📍⠀**Sendungsstatus**"
+    head = "🚚⠀**Sendung wird verfolgt**" if first else "📍⠀**Neuer Sendungsstatus**"
+
+    shown = new_events[-_MAX_EVENTS_IN_EMBED:]
+    more = len(new_events) - len(shown)
+    parts = [head]
+    if more > 0:
+        parts.append(f"_… {more} ältere Ereignisse ausgelassen_")
+    for e in shown:
+        when = " · ".join(x for x in (e.get("date", ""), e.get("time", "")) if x)
+        parts.append(f"\n**{when}**\n{e.get('text', '')}")
+
+    # Zustelldetails nur wenn vorhanden (erscheinen erst nach der Zustellung).
+    det = data.get("details") or {}
+    keep = [(k, v) for k, v in det.items()
+            if k.lower().startswith(("zugestellt", "uhrzeit", "zustellort", "abgeholt"))]
+    if keep:
+        parts.append("\n" + "\n".join(f"`{k}:` {v}" for k, v in keep))
+
+    parts.append(f"\n**[→⠀⠀Sendung verfolgen]({url})**")
+
+    number = data.get("number") or ""
     return {
         "author": {"name": "✦⠀⠀sendung⠀⠀✦"},
         "title": label,
-        "description": f"{head}\n**{status}**\n\n**[→⠀⠀Sendung verfolgen]({url})**",
+        "description": "\n".join(parts)[:4000],
         "color": _ORDER_TRACKING_COLOR,
-        "footer": {"text": "via Hermes"},
+        "footer": {"text": f"via Hermes · {number}" if number else "via Hermes"},
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }
 
