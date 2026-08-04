@@ -495,6 +495,24 @@ def build_order_status_embed(order: dict, fresh: bool = False, items: Optional[l
     }
 
 
+def build_shipment_embed(label: str, status: str, url: str, first: bool = False) -> dict:
+    """Statusmeldung zu einer manuell eingetragenen Sendung (Gist `manual_tracking`).
+
+    Für Sendungen, deren Bestellung der Bot nicht sehen kann — z.B. wenn das
+    zugehörige Kundenkonto gar nicht hinterlegt ist. Der Link kommt von Hand,
+    den Status holt der Bot bei Hermes.
+    """
+    head = "🚚⠀**Sendung wird verfolgt**" if first else "📍⠀**Sendungsstatus**"
+    return {
+        "author": {"name": "✦⠀⠀sendung⠀⠀✦"},
+        "title": label,
+        "description": f"{head}\n**{status}**\n\n**[→⠀⠀Sendung verfolgen]({url})**",
+        "color": _ORDER_TRACKING_COLOR,
+        "footer": {"text": "via Hermes"},
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }
+
+
 def build_order_tracking_embed(order_id: str, links: list[str], items: Optional[list[str]] = None,
                                url: Optional[str] = None) -> dict:
     body = "\n".join(f"**[→⠀⠀Sendung verfolgen]({l})**" for l in links)

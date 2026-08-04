@@ -45,6 +45,7 @@ from .embeds import (
     build_stats_embed,
 )
 from .forum_watch import check_forum
+from .hermes_watch import check_shipments
 from .order_watch import check_orders
 from .pricing import fetch_usd_eur_rate
 from .ps_watch import check_playstation
@@ -103,6 +104,10 @@ def main() -> int:
 
         # 4 — Bestellstatus (eigener Webhook, eigener Gist-Stand)
         check_orders(cfg, order_webhook, user_ids, role_ids)
+
+        # 4b — Von Hand eingetragene Hermes-Sendungen (Gist `manual_tracking`),
+        # für Pakete ohne hinterlegtes Kundenkonto.
+        check_shipments(cfg, order_webhook, user_ids, role_ids)
 
         # 5 — PlayStation-Preise. Preissenkungen pingen wie ein Restock und laufen
         # über den BG-notify-Channel (stock_webhook). Die PS-Statuses landen mit
