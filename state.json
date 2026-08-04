@@ -1,8 +1,8 @@
 {
   "bot_stats": {
     "first_check_at": "2026-05-20T18:50:44.075159+00:00",
-    "last_check_at": "2026-08-04T04:20:42.121907+00:00",
-    "total_checks": 10822,
+    "last_check_at": "2026-08-04T04:30:51.564236+00:00",
+    "total_checks": 10823,
     "total_restocks": 3
   },
   "dashboard_message_id": "1510095616322175107",
@@ -78,7 +78,7 @@
       "3883475"
     ]
   },
-  "last_deploy_sha": "a940782388d67e29ed1bb0bfb35f4a9a61719b51",
+  "last_deploy_sha": "804472aac52fa12cb6f513d7ec8b2a9eef3fcd0b",
   "playstation": {},
   "products": {
     "https://bgpharmadrugs.to/product/minoxytop-5-mg-minoxidil-tablets-ip/": {
@@ -91,7 +91,6 @@
         "lowest_price_at": "2026-06-17T14:50:55.842568+00:00",
         "out_since": "2026-06-17T14:50:55.842568+00:00",
         "price_history": [
-          30.42,
           30.53,
           30.55,
           30.73,
@@ -120,22 +119,22 @@
           30.36,
           30.31,
           35.0,
-          30.31
+          30.31,
+          35.0
         ]
       }
     },
     "https://bgpharmadrugs.to/product/modafinil/": {
       "ASPENDOS tablets 100 mg * 30 Medochemie": {
         "found": true,
-        "highest_price": "€ 43.13",
-        "highest_price_at": "2026-06-25T01:40:46.889976+00:00",
+        "highest_price": "49.00$",
+        "highest_price_at": "2026-08-04T04:30:53.751593+00:00",
         "in_stock": true,
         "lowest_price": "€ 42.06",
         "lowest_price_at": "2026-05-31T01:40:41.606861+00:00",
-        "previous_price": "€ 42.50",
-        "price": "€ 42.44",
+        "previous_price": "€ 42.44",
+        "price": "49.00$",
         "price_history": [
-          42.45,
           42.31,
           42.58,
           42.74,
@@ -164,7 +163,8 @@
           43.08,
           42.73,
           42.5,
-          42.44
+          42.44,
+          49.0
         ]
       }
     },
