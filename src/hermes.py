@@ -43,6 +43,15 @@ _FIELD_RE = re.compile(r"^([A-Za-zÄÖÜäöü][A-Za-zÄÖÜäöü .\-]{2,30}?):
 _NUMBER_RE = re.compile(r"^[A-Z]?\d{12,25}$")
 
 _HISTORY_MARKER = "sendungsverlauf"
+
+# Ab hier beginnt der Seitenfuß (Navigation, Rechtliches). Ohne diese Grenze
+# hängt sich der ganze Footer an das letzte Ereignis, weil danach keine
+# Datumszeile mehr folgt, an der das Sammeln enden würde.
+_FOOTER_MARKERS = (
+    "schnelleinstieg", "kundenservice", "globale hermes links",
+    "impressum", "datenschutz", "deine vorteile", "hermes germany gmbh",
+)
+_MAX_EVENT_CHARS = 400
 _TERMINAL = ("zugestellt", "zustellung erfolgt", "ausgeliefert", "empfangen",
              "zurückgesendet", "retoure", "abgeholt")
 
@@ -121,6 +130,12 @@ def parse_shipment(text: str) -> dict:
     head = lines[:split] if split is not None else lines
     body = lines[split + 1:] if split is not None else []
 
+    # Seitenfuß abschneiden — sonst landet die Navigation im letzten Ereignis.
+    cut = next((i for i, l in enumerate(body)
+                if any(m in l.lower() for m in _FOOTER_MARKERS)), None)
+    if cut is not None:
+        body = body[:cut]
+
     # --- Kopf: Sendungsnummer, Kurzstatus, Detailfelder ---
     for line in head:
         if not out["number"] and _NUMBER_RE.match(line.replace(" ", "")):
@@ -141,11 +156,11 @@ def parse_shipment(text: str) -> dict:
 
     def flush() -> None:
         if cur_date and buf:
-            out["events"].append({
-                "date": cur_date,
-                "time": cur_time,
-                "text": " ".join(buf).strip(),
-            })
+            # Deckel als zweites Netz, falls ein unbekannter Footer durchrutscht.
+            text = " ".join(buf).strip()
+            if len(text) > _MAX_EVENT_CHARS:
+                text = text[:_MAX_EVENT_CHARS].rsplit(" ", 1)[0] + " …"
+            out["events"].append({"date": cur_date, "time": cur_time, "text": text})
 
     for line in body:
         md = _DATE_RE.match(line)
