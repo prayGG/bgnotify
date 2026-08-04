@@ -1,8 +1,8 @@
 {
   "bot_stats": {
     "first_check_at": "2026-05-20T18:50:44.075159+00:00",
-    "last_check_at": "2026-08-04T22:01:07.024450+00:00",
-    "total_checks": 10928,
+    "last_check_at": "2026-08-04T22:10:34.210529+00:00",
+    "total_checks": 10929,
     "total_restocks": 3
   },
   "dashboard_message_id": "1510095616322175107",
@@ -82,7 +82,7 @@
       "3886427"
     ]
   },
-  "last_deploy_sha": "18ce66d04b705c6647490028b8bc09c173bbf798",
+  "last_deploy_sha": "12130fd495ece8bb48cf028f31f6d171e8e580da",
   "playstation": {},
   "products": {
     "https://bgpharmadrugs.to/product/minoxytop-5-mg-minoxidil-tablets-ip/": {
@@ -383,8 +383,8 @@
     "https://bgpharmadrugs.to/product/roaccutane-20-mg-30-roche/": {
       "Roaccutane 20 mg 30 Roche": {
         "found": true,
-        "highest_price": "€ 39.61",
-        "highest_price_at": "2026-06-25T01:40:46.889982+00:00",
+        "highest_price": "45.00$",
+        "highest_price_at": "2026-08-04T22:10:35.880747+00:00",
         "in_stock": true,
         "last_restock_at": "2026-07-24T17:50:45.440111+00:00",
         "lowest_price": "€ 38.62",
@@ -395,10 +395,9 @@
             "start": "2026-06-13T20:10:46.910560+00:00"
           }
         ],
-        "previous_price": "€ 39.03",
-        "price": "€ 38.97",
+        "previous_price": "€ 38.97",
+        "price": "45.00$",
         "price_history": [
-          38.99,
           38.85,
           39.11,
           39.25,
@@ -427,7 +426,8 @@
           39.56,
           39.24,
           39.03,
-          38.97
+          38.97,
+          45.0
         ],
         "restock_count": 1
       }
