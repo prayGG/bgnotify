@@ -40,13 +40,21 @@ _DEFAULT_INTERVAL = 60   # Minuten zwischen zwei Abfragen derselben Sendung
 def _parse_entry(val) -> tuple[str, list[str] | None]:
     """Gist-Eintrag auflösen → (url, ping_ids oder None für Standard).
 
-    Erlaubt ist der reine URL-String oder ein Dict mit `url` und optional `ping`.
+    Erlaubt ist der reine URL-String oder ein Dict:
+
+        "url"      Tracking-Link (Pflicht)
+        "ping_env" Name eines GitHub-Secrets, z.B. "WEITERE_ID_HIER" — bevorzugt,
+                   dann steht die Discord-ID nirgends im Gist
+        "ping"     Discord-ID(en) direkt, mehrere mit Komma (Fallback)
     """
     if isinstance(val, str):
         return val, None
     if isinstance(val, dict):
         url = val.get("url") or val.get("link") or ""
-        raw = val.get("ping") or val.get("ping_id") or ""
+        env_name = val.get("ping_env") or ""
+        raw = os.environ.get(env_name, "") if env_name else (val.get("ping") or val.get("ping_id") or "")
+        if env_name and not raw:
+            log.warning("hermes: Secret '%s' ist leer/fehlt — Standard-Ping", env_name)
         ids = parse_ids(str(raw)) if raw else None
         return url, (ids or None)
     return "", None
