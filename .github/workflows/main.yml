@@ -93,8 +93,18 @@ jobs:
       - name: Commit & Push state
         if: ${{ success() || failure() }}
         run: |
+          # Die Mail bestimmt, welchem GitHub-Account die Commits zugeordnet werden
+          # — und zwar über den Nutzernamen davor. "bot@users.noreply.github.com"
+          # landete deshalb beim Account `bot` (id 58210622), einem Fremden, der
+          # mit dem Repo nichts zu tun hat. Davor tat es "bot@bot.com" bei
+          # BunnyRunnerX. Beide hatten nie Zugriff, es ist reine Anzeige — aber die
+          # History soll nicht an fremden Profilen hängen.
+          #
+          # 41898282 ist der offizielle GitHub-Actions-Bot: kann niemandem gehören,
+          # niemand kann ihn sich später registrieren. Der Anzeigename bleibt
+          # "bgnotify-bot", damit `git log` lesbar bleibt.
           git config --global user.name "bgnotify-bot"
-          git config --global user.email "bot@users.noreply.github.com"
+          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
           # Sync to latest origin without rebasing the bot's just-written state.
           # Save state.json aside, hard-reset (gets any code commits), restore.
