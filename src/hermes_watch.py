@@ -4,11 +4,19 @@ Für Pakete, deren Bestellung der Bot nicht sehen kann (z.B. Konto eines
 Kollegen ist gar nicht hinterlegt): Link von Hand ins **private Gist**, den
 Rest macht der Bot. Bewusst nicht in `config.yml` — das Repo ist öffentlich.
 
-Gist-Format (`manual_tracking`), Label frei wählbar:
+Gist-Format (`manual_tracking`), Label frei wählbar — zwei Schreibweisen:
 
     "manual_tracking": {
-      "Kollege #123": "https://tracking.hermesworld.com/?TrackID=..."
+      "Ich #37143":   "https://tracking.hermesworld.com/?TrackID=...",
+      "Kollege #123": {
+        "url":  "https://tracking.hermesworld.com/?TrackID=...",
+        "ping": "123456789012345678"
+      }
     }
+
+Ohne `ping` wird wie gewohnt gepingt (Standard-IDs). Mit `ping` markiert die
+Nachricht genau diese Discord-ID(s) — so bekommt jeder nur seine eigene Sendung
+angezeigt. Mehrere IDs mit Komma trennen.
 
 Den Rest verwaltet der Bot selbst unter `manual_tracking_state`. Ist eine
 Sendung zugestellt, wird sie nicht mehr abgefragt (Eintrag kann dann weg).
@@ -21,11 +29,27 @@ import random
 from datetime import datetime, timezone
 
 from . import hermes, notify, orders
+from .config import parse_ids
 from .embeds import build_shipment_embed
 
 log = logging.getLogger(__name__)
 
 _DEFAULT_INTERVAL = 60   # Minuten zwischen zwei Abfragen derselben Sendung
+
+
+def _parse_entry(val) -> tuple[str, list[str] | None]:
+    """Gist-Eintrag auflösen → (url, ping_ids oder None für Standard).
+
+    Erlaubt ist der reine URL-String oder ein Dict mit `url` und optional `ping`.
+    """
+    if isinstance(val, str):
+        return val, None
+    if isinstance(val, dict):
+        url = val.get("url") or val.get("link") or ""
+        raw = val.get("ping") or val.get("ping_id") or ""
+        ids = parse_ids(str(raw)) if raw else None
+        return url, (ids or None)
+    return "", None
 
 
 def _due(entry: dict, interval_minutes: int) -> bool:
@@ -66,21 +90,23 @@ def check_shipments(cfg: dict, webhook: str, ping_ids: list[str], role_ids: list
 
     # Fällige, noch nicht abgeschlossene Sendungen sammeln.
     due = []
-    for label, url in manual.items():
-        if not isinstance(url, str) or not url.startswith("http"):
-            log.warning("hermes: '%s' ist keine URL — übersprungen", label)
+    for label, val in manual.items():
+        url, own_ping = _parse_entry(val)
+        if not url.startswith("http"):
+            log.warning("hermes: '%s' hat keine gültige URL — übersprungen", label)
             continue
         entry = states.setdefault(label, {})
         if hermes.is_terminal(entry.get("status", "")):
             continue                      # zugestellt → nicht weiter pollen
         if _due(entry, interval):
-            due.append((label, url, entry))
+            due.append((label, url, entry, own_ping))
 
     if not due:
         return
 
     due.sort(key=lambda t: t[2].get("last_check_at", ""))   # "" zuerst, dann ältester
-    label, url, entry = due[0]
+    label, url, entry, own_ping = due[0]
+    targets = own_ping if own_ping is not None else ping_ids
 
     entry["last_check_at"] = datetime.now(timezone.utc).isoformat()   # vor der Abfrage → Backoff
     status = hermes.fetch_status(url)
@@ -90,7 +116,7 @@ def check_shipments(cfg: dict, webhook: str, ping_ids: list[str], role_ids: list
         if status != prev:
             notify.send_order_update(
                 webhook, build_shipment_embed(label, status, url, first=not prev),
-                ping_ids, role_ids,
+                targets, role_ids,
             )
             entry["status"] = status
             log.info("hermes: '%s' → %s", label, status)
