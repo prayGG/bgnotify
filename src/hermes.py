@@ -48,8 +48,13 @@ _HISTORY_MARKER = "sendungsverlauf"
 # hängt sich der ganze Footer an das letzte Ereignis, weil danach keine
 # Datumszeile mehr folgt, an der das Sammeln enden würde.
 _FOOTER_MARKERS = (
+    # Seitenfuß
     "schnelleinstieg", "kundenservice", "globale hermes links",
     "impressum", "datenschutz", "deine vorteile", "hermes germany gmbh",
+    # Formularblock unter dem Verlauf (Benachrichtigungen / PLZ-Abfrage) — taucht
+    # bei noch nicht zugestellten Sendungen auf.
+    "pflichtfeld", "benachrichtigungen aktivieren", "empfänger-plz",
+    "zu deiner sicherheit", "e-mail benachrichtigung",
 )
 _MAX_EVENT_CHARS = 400
 _TERMINAL = ("zugestellt", "zustellung erfolgt", "ausgeliefert", "empfangen",

@@ -104,6 +104,12 @@ def check_shipments(cfg: dict, webhook: str, ping_ids: list[str], role_ids: list
             log.warning("hermes: '%s' hat keine gültige URL — übersprungen", label)
             continue
         entry = states.setdefault(label, {})
+        # Neuer Link unter altem Label = neue Sendung -> Stand zurücksetzen.
+        # Sonst würde ein "zugestellt" der Vorsendung die neue dauerhaft blockieren.
+        if entry.get("url") and entry["url"] != url:
+            log.info("hermes: '%s' hat einen neuen Link — Stand zurückgesetzt", label)
+            entry.clear()
+        entry["url"] = url
         if hermes.is_terminal(entry.get("status", "")):
             continue                      # zugestellt → nicht weiter pollen
         if _due(entry, interval):
