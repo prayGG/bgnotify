@@ -481,12 +481,19 @@ def _order_link(url: Optional[str]) -> str:
 
 
 def _titled(owner: Optional[str], order_id: str) -> str:
-    """Titel einer Bestell-/Tracking-Karte: mit Konto-Bezeichnung, falls gesetzt.
+    """Titel einer Bestell-/Tracking-Karte: nur die Konto-Bezeichnung, falls gesetzt.
 
-    Ohne `owner` bleibt es wie gehabt bei "#37143" — mit z.B. "pray · #37143",
-    damit man im gemeinsamen Channel sofort sieht, wessen Bestellung das ist.
+    Bewusst clean — genau wie bei den von Hand eingetragenen Hermes-Sendungen
+    steht oben einfach "pray" bzw. "mave". Die Bestellnummer geht dabei nicht
+    verloren, die rutscht in die Fußzeile (siehe `_foot`). Ohne `owner` bleibt
+    es wie gehabt bei "#37143".
     """
-    return f"{owner} · #{order_id}" if owner else f"#{order_id}"
+    return owner if owner else f"#{order_id}"
+
+
+def _foot(text: str, owner: Optional[str], order_id: str) -> str:
+    """Fußzeile: Quelle + Bestellnummer, sobald der Titel nur den Namen zeigt."""
+    return f"{text} · #{order_id}" if owner else text
 
 
 def build_order_status_embed(order: dict, fresh: bool = False, items: Optional[list[str]] = None,
@@ -500,7 +507,7 @@ def build_order_status_embed(order: dict, fresh: bool = False, items: Optional[l
         "title": _titled(owner, str(order.get('order_id', ''))),
         "description": f"{head}\n{emoji}⠀**{label}**" + _items_block(items) + _order_link(order.get("url")),
         "color": _ORDER_STATUS_COLOR.get(slug, COLOR_WARN),
-        "footer": {"text": "bgpharmadrugs.to"},
+        "footer": {"text": _foot("bgpharmadrugs.to", owner, str(order.get('order_id', '')))},
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }
 
@@ -555,7 +562,7 @@ def build_order_tracking_embed(order_id: str, links: list[str], items: Optional[
         "title": _titled(owner, order_id),
         "description": f"🚚⠀**Tracking ist da**\n{body}" + _items_block(items) + _order_link(url) + "\n\n_Details in deiner Mail_",
         "color": _ORDER_TRACKING_COLOR,
-        "footer": {"text": "via Hermes"},
+        "footer": {"text": _foot("via Hermes", owner, order_id)},
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }
 
