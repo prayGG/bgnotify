@@ -15,6 +15,7 @@ Supports two product types automatically:
 """
 from __future__ import annotations
 
+import concurrent.futures
 import html
 import json
 import logging
@@ -45,6 +46,16 @@ UA = (
 # across runs.
 _PAGE_CACHE: dict[str, tuple] = {}
 
+# Rohes HTML aus `prefetch()`, das `check()` gleich abholt statt selbst zu GETen.
+# Bewusst getrennt vom _PAGE_CACHE: geparst wird weiter im Hauptthread (BeautifulSoup
+# ist CPU-Arbeit, die unter dem GIL ohnehin nicht parallel läuft) — überlappt wird
+# nur das Warten auf den Shop.
+_HTML_CACHE: dict[str, str] = {}
+
+# Gleichzeitige GETs beim Vorladen. Klein gehalten: es sind ohnehin nur eine
+# Handvoll verschiedener Seiten und der Shop soll keinen Burst abbekommen.
+_PREFETCH_WORKERS = 4
+
 # One HTTP session per run. Keep-alive + connection pooling means the page GETs
 # and the per-variant AJAX POSTs to the shop reuse a single TCP/TLS connection
 # instead of paying a fresh handshake on every call (the peptides page alone
@@ -63,9 +74,44 @@ def reset_page_cache() -> None:
     """Drop the per-run page cache + session. Call once at the start of a run."""
     global _SESSION
     _PAGE_CACHE.clear()
+    _HTML_CACHE.clear()
     if _SESSION is not None:
         _SESSION.close()
         _SESSION = None
+
+
+def prefetch(urls: list[str]) -> None:
+    """Alle Produktseiten vorab parallel holen (best effort).
+
+    Vorher lief das streng nacheinander: jede Seite zahlte die volle Latenz zum
+    Shop, obwohl die Requests völlig unabhängig sind. Jetzt überlappen sie sich,
+    der Rest des Laufs findet das HTML fertig im Cache vor.
+
+    Bewusst fehlertolerant: Was hier schiefgeht, wird NICHT geloggt und nicht
+    gecacht — `check()` holt die Seite dann ganz normal selbst, inklusive Retry,
+    Fehlerbehandlung und der gewohnten Log-Zeile. Ein kaputter Prefetch kann den
+    Lauf also höchstens so langsam machen wie vorher, nie kaputt.
+
+    Jeder Thread bekommt seine eigene Session — `requests.Session` ist laut
+    Dokumentation nicht thread-safe, die gemeinsame bleibt dem Hauptthread
+    (und seinen Varianten-AJAX-Calls) vorbehalten.
+    """
+    todo = [u for u in dict.fromkeys(urls) if u not in _PAGE_CACHE and u not in _HTML_CACHE]
+    if len(todo) < 2:
+        return  # bei einer einzigen Seite gibt es nichts zu überlappen
+
+    def grab(url: str) -> tuple[str, Optional[str]]:
+        try:
+            with requests.Session() as s:
+                return url, _fetch(url, s)
+        except Exception:
+            return url, None  # still verwerfen — check() macht es ordentlich
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=min(_PREFETCH_WORKERS, len(todo))) as pool:
+        for url, page in pool.map(grab, todo):
+            if page is not None:
+                _HTML_CACHE[url] = page
+    log.info("prefetch: %d/%d Seite(n) vorgeladen", len(_HTML_CACHE), len(todo))
 
 
 def _normalize(s: str) -> str:
@@ -399,7 +445,8 @@ def check(
     session = session or _session()
     cached = _PAGE_CACHE.get(url)
     if cached is None:
-        page = _fetch(url, session)
+        # `prefetch()` hat die Seite ggf. schon geholt; sonst ganz normal selbst.
+        page = _HTML_CACHE.pop(url, None) or _fetch(url, session)
         soup = BeautifulSoup(page, "html.parser")
         is_simple = _is_simple_product(soup)
         form = None if is_simple else _parse_variable_form(soup)

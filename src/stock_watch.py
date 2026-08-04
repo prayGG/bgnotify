@@ -51,6 +51,10 @@ def _check_combined(urls: list[str], watch: list[str]) -> dict[str, dict]:
 
 def check_products(cfg: dict, state: dict) -> tuple[list[dict], list[dict], list[dict]]:
     bgpharma.reset_page_cache()  # products sharing a URL fetch it once per run
+    # Alle Seiten parallel vorladen, bevor die Schleife startet — sonst wartet
+    # jedes Produkt einzeln auf den Shop. Doppelte URLs (alle Peptide teilen sich
+    # eine Seite) filtert prefetch() selbst raus.
+    bgpharma.prefetch([u for p in (cfg.get("products") or []) for u in product_urls(p)])
     products_state = state.setdefault("products", {})
     bot_stats = state.setdefault("bot_stats", {})
     run_iso = datetime.now(timezone.utc).isoformat()

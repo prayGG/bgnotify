@@ -20,6 +20,12 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           fetch-depth: 0
+          # Der Bot committet jeden Lauf eine neue state.json — inzwischen >10.000
+          # Commits, Tendenz +145/Tag. `fetch-depth: 0` bräuchte davon jede einzelne
+          # Dateiversion. Mit dem Blob-Filter kommt nur der Commit-Graph (den
+          # deploy.py braucht), Dateiinhalte holt git bei Bedarf nach. Hält den
+          # Checkout konstant schnell, statt mit der History mitzuwachsen.
+          filter: blob:none
 
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -30,26 +36,35 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
-      # Cache the ~150 MB Chromium binary across runs. Key on requirements.txt
-      # so an upgrade re-downloads matching browser builds automatically.
-      # Unconditional now: both the forum scraper AND the order-status login
-      # need a real browser. The order check self-gates by interval in code,
-      # so the binary is present but only actually driven when due.
+      # Browser-Cache. Key on requirements.txt so an upgrade re-downloads matching
+      # browser builds automatically. Unconditional: both the forum scraper AND
+      # der Order-Login brauchen einen echten Browser. Die Checks takten sich im
+      # Code selbst, das Binary liegt also bereit, fährt aber nur wenn fällig.
+      #
+      # Das `-shell` im Key ist Absicht: es entwertet den alten, doppelt so großen
+      # Cache (siehe nächster Step), sonst würde der weiter restauriert.
       - name: Cache Playwright browsers
         id: playwright-cache
         uses: actions/cache@v4
         with:
           path: ~/.cache/ms-playwright
-          key: playwright-${{ runner.os }}-${{ hashFiles('requirements.txt') }}
+          key: playwright-shell-${{ runner.os }}-${{ hashFiles('requirements.txt') }}
 
-      # No --with-deps: ubuntu-latest has every shared lib Playwright needs
-      # pre-installed; the only "missing" packages with --with-deps were
-      # emoji/CJK fonts, which we don't need for HTML-only scraping.
-      # Nur bei Cache-Miss: bei Hit liegt der Browser schon unter
-      # ~/.cache/ms-playwright, der Install-Step wäre reine Wartezeit.
-      - name: Install Playwright Chromium
+      # NUR die Headless-Shell, nicht das komplette Chromium.
+      #
+      # `playwright install chromium` zieht seit 1.49 DREI Pakete: chromium (320 MB),
+      # chromium-headless-shell (192 MB) und ffmpeg. Nachgemessen mit DEBUG=pw:browser
+      # startet `p.chromium.launch(headless=True)` aber immer headless_shell — das
+      # volle Chromium lag also nur im Cache herum und wurde bei jedem Lauf mit
+      # entpackt, ohne je zu laufen. Identisches Verhalten, halber Cache.
+      #
+      # Kein --with-deps: ubuntu-latest hat alle nötigen shared libs vorinstalliert;
+      # die einzigen "fehlenden" Pakete wären Emoji-/CJK-Fonts, die wir fürs
+      # reine HTML-Scrapen nicht brauchen.
+      # Nur bei Cache-Miss — bei Hit wäre der Step reine Wartezeit.
+      - name: Install Playwright Chromium (headless shell)
         if: steps.playwright-cache.outputs.cache-hit != 'true'
-        run: python -m playwright install chromium
+        run: python -m playwright install chromium-headless-shell
 
       - name: Run Bot
         run: python -m src.main
