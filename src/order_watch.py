@@ -67,7 +67,8 @@ def _orders_due(acct: dict, interval_minutes: int, idle_interval_minutes: int) -
 
 
 def _check_one_account(name: str, webhook: str, user: str, pw: str,
-                       ping_ids: list[str], role_ids: list[str], acct: dict) -> None:
+                       ping_ids: list[str], role_ids: list[str], acct: dict,
+                       owner: str = "") -> None:
     """Login + Diff + Post für GENAU einen Account; mutiert `acct` in place.
 
     last_check_at wird VOR dem Login gesetzt → Fehler-Drossel (ein gescheiterter
@@ -118,16 +119,16 @@ def _check_one_account(name: str, webhook: str, user: str, pw: str,
             if stale:
                 log.info("orders: #%s (%s) still übernommen — Altbestellung", oid, slug)
             else:
-                notify.send_order_update(webhook, build_order_status_embed(o, fresh=True, items=prev.get("items")), ping_ids, role_ids)
+                notify.send_order_update(webhook, build_order_status_embed(o, fresh=True, items=prev.get("items"), owner=owner), ping_ids, role_ids)
         else:
             if items and not prev.get("items"):
                 prev["items"] = items  # Artikel einmalig sichern
             if prev.get("status") != slug:
-                notify.send_order_update(webhook, build_order_status_embed(o, items=prev.get("items")), ping_ids, role_ids)
+                notify.send_order_update(webhook, build_order_status_embed(o, items=prev.get("items"), owner=owner), ping_ids, role_ids)
                 prev["status"] = slug
 
         if not prev.get("tracking_posted") and detail and detail.get("tracking"):
-            notify.send_order_update(webhook, build_order_tracking_embed(oid, detail["tracking"], items=prev.get("items"), url=o.get("url")), ping_ids, role_ids)
+            notify.send_order_update(webhook, build_order_tracking_embed(oid, detail["tracking"], items=prev.get("items"), url=o.get("url"), owner=owner), ping_ids, role_ids)
             prev["tracking_posted"] = True
 
 
@@ -193,7 +194,8 @@ def check_orders(cfg: dict, default_webhook: str, default_ping_ids: list[str], r
         if not webhook:
             continue
         ping = parse_ids(os.environ.get(a["ping_env"], "")) if a.get("ping_env") else default_ping_ids
-        resolved.append({"name": a["name"], "user": user, "pw": pw, "webhook": webhook, "ping": ping})
+        resolved.append({"name": a["name"], "user": user, "pw": pw, "webhook": webhook,
+                         "ping": ping, "owner": a.get("label") or ""})
 
     if not resolved:
         log.info("orders: aktiviert, aber Secrets/Webhook fehlen — übersprungen")
@@ -210,7 +212,7 @@ def check_orders(cfg: dict, default_webhook: str, default_ping_ids: list[str], r
     acct = accounts_state[pick["name"]]
     try:
         _check_one_account(pick["name"], pick["webhook"], pick["user"], pick["pw"],
-                           pick["ping"], role_ids, acct)
+                           pick["ping"], role_ids, acct, pick.get("owner", ""))
     except Exception as e:  # Login/Incapsula/Netzwerk — nie den ganzen Bot reißen
         log.error("orders[%s]: fetch fehlgeschlagen: %s", pick["name"], e)
     # Immer speichern: last_check_at (in _check_one_account vor dem Login gesetzt)

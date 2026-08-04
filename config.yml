@@ -46,12 +46,17 @@ orders:
   # Werte selbst (Repo ist öffentlich). Pro Bot-Lauf wird höchstens EIN Konto
   # eingeloggt (Staggering), nie zwei gleichzeitig von derselben IP.
   # Ein Konto wird übersprungen, solange seine Secrets nicht existieren.
+  # `label` ist reine Anzeige: steht als Titel auf den Bestell-/Tracking-Karten
+  # ("pray · #37143" statt nur "#37143"), damit im gemeinsamen Channel sofort
+  # klar ist, wessen Bestellung das ist. Weglassen = wie vorher nur die Nummer.
   accounts:
     - name: a
+      label: pray
       username_env: BG_USERNAME
       password_env: BG_PASSWORD
       ping_env: DISCORDID            # Secret mit der Discord-User-ID für Konto a
     - name: b
+      label: mave
       username_env: BG_USERNAME_2
       password_env: BG_PASSWORD_2
       ping_env: WEITERE_ID_HIER      # bestehendes Secret mit der Discord-ID für Konto b

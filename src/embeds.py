@@ -480,14 +480,24 @@ def _order_link(url: Optional[str]) -> str:
     return f"\n\n**[→⠀⠀Bestellung ansehen]({url})**" if url else ""
 
 
-def build_order_status_embed(order: dict, fresh: bool = False, items: Optional[list[str]] = None) -> dict:
+def _titled(owner: Optional[str], order_id: str) -> str:
+    """Titel einer Bestell-/Tracking-Karte: mit Konto-Bezeichnung, falls gesetzt.
+
+    Ohne `owner` bleibt es wie gehabt bei "#37143" — mit z.B. "pray · #37143",
+    damit man im gemeinsamen Channel sofort sieht, wessen Bestellung das ist.
+    """
+    return f"{owner} · #{order_id}" if owner else f"#{order_id}"
+
+
+def build_order_status_embed(order: dict, fresh: bool = False, items: Optional[list[str]] = None,
+                             owner: Optional[str] = None) -> dict:
     slug = order.get("status", "")
     emoji = _ORDER_STATUS_EMOJI.get(slug, "📦")
     label = order.get("status_text") or slug or "—"
     head = "🆕⠀Neue Bestellung" if fresh else "Status-Update"
     return {
         "author": {"name": "✦⠀⠀bestellung⠀⠀✦"},
-        "title": f"#{order.get('order_id', '')}",
+        "title": _titled(owner, str(order.get('order_id', ''))),
         "description": f"{head}\n{emoji}⠀**{label}**" + _items_block(items) + _order_link(order.get("url")),
         "color": _ORDER_STATUS_COLOR.get(slug, COLOR_WARN),
         "footer": {"text": "bgpharmadrugs.to"},
@@ -538,11 +548,11 @@ def build_shipment_embed(label: str, data: dict, new_events: list[dict], url: st
 
 
 def build_order_tracking_embed(order_id: str, links: list[str], items: Optional[list[str]] = None,
-                               url: Optional[str] = None) -> dict:
+                               url: Optional[str] = None, owner: Optional[str] = None) -> dict:
     body = "\n".join(f"**[→⠀⠀Sendung verfolgen]({l})**" for l in links)
     return {
         "author": {"name": "✦⠀⠀tracking⠀⠀✦"},
-        "title": f"#{order_id}",
+        "title": _titled(owner, order_id),
         "description": f"🚚⠀**Tracking ist da**\n{body}" + _items_block(items) + _order_link(url) + "\n\n_Details in deiner Mail_",
         "color": _ORDER_TRACKING_COLOR,
         "footer": {"text": "via Hermes"},
