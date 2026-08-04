@@ -20,12 +20,11 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           fetch-depth: 0
-          # Der Bot committet jeden Lauf eine neue state.json — inzwischen >10.000
-          # Commits, Tendenz +145/Tag. `fetch-depth: 0` bräuchte davon jede einzelne
-          # Dateiversion. Mit dem Blob-Filter kommt nur der Commit-Graph (den
-          # deploy.py braucht), Dateiinhalte holt git bei Bedarf nach. Hält den
-          # Checkout konstant schnell, statt mit der History mitzuwachsen.
-          filter: blob:none
+          # Kein `filter: blob:none` — nachgemessen (3 Durchläufe) ist der
+          # gefilterte Klon hier ~350ms LANGSAMER. Die >10.000 state.json-Versionen
+          # klingen nach viel, deltakomprimieren aber auf ~4,5 MB Gesamt-History;
+          # der Filter spart davon 0,8 MB und kostet dafür serverseitiges
+          # Neu-Packen plus späteres Nachladen einzelner Blobs.
 
       - name: Setup Python
         uses: actions/setup-python@v5
