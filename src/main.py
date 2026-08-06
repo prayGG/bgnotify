@@ -105,8 +105,10 @@ def main() -> int:
         # 4 — Bestellstatus (eigener Webhook, eigener Gist-Stand)
         check_orders(cfg, order_webhook, user_ids, role_ids)
 
-        # 4b — Von Hand eingetragene Hermes-Sendungen (Gist `manual_tracking`),
-        # für Pakete ohne hinterlegtes Kundenkonto.
+        # 4b — Hermes-Sendungen verfolgen. Läuft bewusst NACH check_orders: was
+        # dort gerade an Tracking-Links gefunden wurde, steht im Gist unter
+        # `auto_tracking` und wird noch im selben Run mitgenommen. Dazu die von
+        # Hand eingetragenen (`manual_tracking`) ohne hinterlegtes Kundenkonto.
         check_shipments(cfg, order_webhook, user_ids, role_ids)
 
         # 5 — PlayStation-Preise. Preissenkungen pingen wie ein Restock und laufen

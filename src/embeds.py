@@ -466,6 +466,20 @@ _ORDER_STATUS_COLOR = {
 # Tracking/„unterwegs" — türkis, sitzt visuell zwischen blau (Bearbeitung) und
 # grün (angekommen). Bewusst NICHT grün, damit es sich von Completed abhebt.
 _ORDER_TRACKING_COLOR = 0x1ABC9C
+# Der Shop schreibt seine WooCommerce-Slugs auf Englisch raus ("Completed") —
+# gemeint ist dabei der Stand IM SHOP, nicht der des Pakets. Genau da entsteht
+# die Verwirrung: "Completed" heißt abgeschickt, nicht angekommen. Deshalb steht
+# unter jedem Status eine Zeile Klartext.
+_ORDER_STATUS_HINT = {
+    "pending":    "wartet auf Zahlung",
+    "processing": "bezahlt, wird bearbeitet",
+    "preparing":  "wird gepackt",
+    "on-hold":    "hängt — BG klärt etwas",
+    "completed":  "bei BG fertig & rausgeschickt — noch nicht zugestellt",
+    "cancelled":  "storniert",
+    "refunded":   "erstattet",
+    "failed":     "fehlgeschlagen",
+}
 
 
 def _items_block(items: Optional[list[str]]) -> str:
@@ -502,10 +516,12 @@ def build_order_status_embed(order: dict, fresh: bool = False, items: Optional[l
     emoji = _ORDER_STATUS_EMOJI.get(slug, "📦")
     label = order.get("status_text") or slug or "—"
     head = "🆕⠀Neue Bestellung" if fresh else "Status-Update"
+    hint = _ORDER_STATUS_HINT.get(slug, "")
+    status_block = f"{emoji}⠀**{label}**" + (f"\n_{hint}_" if hint else "")
     return {
         "author": {"name": "✦⠀⠀bestellung⠀⠀✦"},
         "title": _titled(owner, str(order.get('order_id', ''))),
-        "description": f"{head}\n{emoji}⠀**{label}**" + _items_block(items) + _order_link(order.get("url")),
+        "description": f"{head}\n{status_block}" + _items_block(items) + _order_link(order.get("url")),
         "color": _ORDER_STATUS_COLOR.get(slug, COLOR_WARN),
         "footer": {"text": _foot("bgpharmadrugs.to", owner, str(order.get('order_id', '')))},
         "timestamp": datetime.now(timezone.utc).isoformat(),
@@ -560,7 +576,8 @@ def build_order_tracking_embed(order_id: str, links: list[str], items: Optional[
     return {
         "author": {"name": "✦⠀⠀tracking⠀⠀✦"},
         "title": _titled(owner, order_id),
-        "description": f"🚚⠀**Tracking ist da**\n{body}" + _items_block(items) + _order_link(url) + "\n\n_Details in deiner Mail_",
+        "description": f"🚚⠀**Tracking ist da**\n{body}" + _items_block(items) + _order_link(url)
+                       + "\n\n_Der Verlauf kommt ab jetzt automatisch — jede Station als eigene Meldung._",
         "color": _ORDER_TRACKING_COLOR,
         "footer": {"text": _foot("via Hermes", owner, order_id)},
         "timestamp": datetime.now(timezone.utc).isoformat(),

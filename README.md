@@ -8,6 +8,10 @@ Privater Discord-Notify-Bot. Läuft als GitHub-Action und überwacht:
 - **Forum-Posts** — neue Posts eines bestimmten Autors (XenForo, via Playwright)
 - **Bestellstatus** — eigenes Kundenkonto, Status-Updates + Hermes-Tracking
   in einen privaten Channel (Stand im privaten Gist, nie im Repo)
+- **Sendungsverfolgung** — sobald bei einer Bestellung ein Tracking-Link
+  auftaucht, wird die Sendung automatisch weiterverfolgt: jede Hermes-Station
+  als eigene Meldung, bis zur Zustellung. Ohne hinterlegtes Kundenkonto geht
+  auch ein Link von Hand (privates Gist, `manual_tracking`)
 
 ## Architektur
 
@@ -47,7 +51,7 @@ src/
 |---|---|
 | `config.yml` | Produkte, Varianten, Intervalle, Webhook-Env-Namen (keine Secrets!) |
 | `state.json` | öffentlicher Bot-State (Preise, History, Message-IDs) — wird vom Workflow nach jedem Run zurückcommittet |
-| privates Gist | Order-State (Bestellungen, Cookies, on/off-Schalter `enabled`) |
+| privates Gist | Order-State (Bestellungen, Cookies, on/off-Schalter `enabled`, verfolgte Sendungen unter `auto_tracking` / `manual_tracking`) |
 
 ## Secrets (GitHub Actions)
 

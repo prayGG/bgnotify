@@ -1,8 +1,13 @@
-"""Manuell eingetragene Hermes-Sendungen verfolgen.
+"""Hermes-Sendungen verfolgen — automatisch erkannte und von Hand eingetragene.
 
-Für Pakete, deren Bestellung der Bot nicht sehen kann (z.B. Konto eines
-Kollegen ist gar nicht hinterlegt): Link von Hand ins **private Gist**, den
-Rest macht der Bot. Bewusst nicht in `config.yml` — das Repo ist öffentlich.
+Zwei Quellen, ein Ablauf:
+
+* `auto_tracking` — schreibt der Bestell-Watcher selbst, sobald bei einer
+  Bestellung ein Tracking-Link auftaucht (dieselbe Sendung, für die auch die
+  "Tracking ist da"-Karte rausging). Nichts zu tun.
+* `manual_tracking` — für Pakete, deren Bestellung der Bot nicht sehen kann
+  (z.B. Konto eines Kollegen ist gar nicht hinterlegt): Link von Hand ins
+  **private Gist**. Bewusst nicht in `config.yml` — das Repo ist öffentlich.
 
 Gist-Format (`manual_tracking`), Label frei wählbar — zwei Schreibweisen:
 
@@ -91,14 +96,21 @@ def check_shipments(cfg: dict, webhook: str, ping_ids: list[str], role_ids: list
 
     st = orders.load_order_state(token, gist_id)
     manual = st.get("manual_tracking") or {}
-    if not manual:
+    # `auto_tracking` füllt der Bestell-Watcher selbst: sobald bei einer Bestellung
+    # ein Tracking-Link auftaucht, steht die Sendung hier drin und wird ab dann
+    # genauso verfolgt wie eine von Hand eingetragene. Bei gleichem Label gewinnt
+    # der Handeintrag — von Hand gesetzt schlägt automatisch.
+    auto = st.get("auto_tracking") or {}
+    entries = {**auto, **manual}
+    if not entries:
         return
 
     states = st.setdefault("manual_tracking_state", {})
+    delivered: list[str] = []
 
     # Fällige, noch nicht abgeschlossene Sendungen sammeln.
     due = []
-    for label, val in manual.items():
+    for label, val in entries.items():
         url, own_ping = _parse_entry(val)
         if not url.startswith("http"):
             log.warning("hermes: '%s' hat keine gültige URL — übersprungen", label)
@@ -111,11 +123,23 @@ def check_shipments(cfg: dict, webhook: str, ping_ids: list[str], role_ids: list
             entry.clear()
         entry["url"] = url
         if hermes.is_terminal(entry.get("status", "")):
-            continue                      # zugestellt → nicht weiter pollen
+            # Zugestellt → nicht weiter pollen. Automatisch eingetragene Sendungen
+            # fliegen danach raus (das Gist soll nicht mit alten Paketen volllaufen);
+            # `tracking_posted` im Bestellstand verhindert ein Wieder-Eintragen.
+            if label in auto and label not in manual:
+                delivered.append(label)
+            continue
         if _due(entry, interval):
             due.append((label, url, entry, own_ping))
 
+    for label in delivered:
+        auto.pop(label, None)
+        states.pop(label, None)
+        log.info("hermes: '%s' zugestellt — Eintrag aufgeräumt", label)
+
     if not due:
+        if delivered:
+            orders.save_order_state(token, gist_id, st)
         return
 
     due.sort(key=lambda t: t[2].get("last_check_at", ""))   # "" zuerst, dann ältester

@@ -30,9 +30,13 @@ forum:
 # Bestellstatus aus dem BG-Kundenkonto. Login nur alle N Minuten (höflich +
 # unauffällig — Bestellungen bewegen sich über Stunden, nicht Minuten). Der
 # Login-Zeitpunkt wird zusätzlich um ±10% gejittert (kein exaktes Muster).
-# Von Hand eingetragene Hermes-Sendungen (Links stehen im PRIVATEN Gist unter
-# `manual_tracking`, nie hier — das Repo ist öffentlich). Für Pakete, deren
-# Kundenkonto der Bot nicht hat.
+# Hermes-Sendungsverfolgung. Findet der Bestell-Watcher bei einer Bestellung
+# einen Tracking-Link, trägt er ihn selbst ins private Gist (`auto_tracking`)
+# und meldet ab dann jede Station einzeln. Zusätzlich können Links von Hand
+# unter `manual_tracking` stehen (nur im PRIVATEN Gist, nie hier — das Repo ist
+# öffentlich), für Pakete, deren Kundenkonto der Bot nicht hat.
+# Takt = Abstand zwischen zwei Abfragen DERSELBEN Sendung; pro Lauf wird immer
+# nur eine Sendung abgefragt.
 tracking:
   check_interval_minutes: 60
 
