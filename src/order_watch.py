@@ -56,9 +56,30 @@ def _order_enabled(st: dict, name: str) -> bool:
     return False
 
 
+def _backfill_pending(acct: dict) -> bool:
+    """Wartet hier noch eine Bestellung darauf, ihren Tracking-Link an die
+    Sendungsverfolgung zu übergeben?
+
+    Trifft auf alles zu, dessen Tracking-Karte raus ist, bevor es das
+    automatische Verfolgen gab. Ob wirklich etwas nachgeholt wird, entscheidet
+    danach `want_detail` über das Bestelldatum (`_recent`) — hier zählt nur, ob
+    sich ein Login dafür überhaupt lohnt.
+    """
+    return any(o.get("tracking_posted") and not o.get("tracking_registered")
+               for o in (acct.get("orders") or {}).values())
+
+
 def _orders_due(acct: dict, interval_minutes: int, idle_interval_minutes: int) -> bool:
     """Ist dieser Account fällig? Zwei-Gang-Takt (offen→schnell, sonst Ruhe) mit
     ±10% Jitter. Kein last_check_at = noch nie geprüft = fällig."""
+    # Steht die einmalige Nachrüstung noch aus, ist der Account SOFORT fällig.
+    # Sonst bliebe eine laufende Sendung bis zum nächsten Idle-Takt (bis zu 24 h)
+    # ungetrackt: die Bestellung ist ja "completed", also terminal, also greift
+    # der Ruhe-Takt — genau dann, wenn das Paket unterwegs ist. `_backfill_done`
+    # deckelt das auf GENAU einen Lauf; danach wird wieder normal gedrosselt,
+    # auch wenn der Login gescheitert ist (kein Hämmern bei kaputtem Konto).
+    if not acct.get("_backfill_done") and _backfill_pending(acct):
+        return True
     has_open = any(v.get("status") not in _TERMINAL_STATUS for v in (acct.get("orders") or {}).values())
     effective = interval_minutes if has_open else idle_interval_minutes
     last = acct.get("last_check_at", "")
@@ -124,6 +145,9 @@ def _check_one_account(name: str, webhook: str, user: str, pw: str,
     order_map = acct.setdefault("orders", {})
     initialized = acct.get("_initialized", False)
     acct["last_check_at"] = datetime.now(timezone.utc).isoformat()
+    # Zusammen mit last_check_at VOR dem Login setzen: der Sofort-Lauf für die
+    # Nachrüstung ist damit verbraucht, egal wie er ausgeht.
+    acct["_backfill_done"] = True
 
     def want_detail(o: dict) -> bool:
         if not initialized:
