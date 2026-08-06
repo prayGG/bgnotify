@@ -42,8 +42,8 @@ log = logging.getLogger(__name__)
 _DEFAULT_INTERVAL = 60   # Minuten zwischen zwei Abfragen derselben Sendung
 
 
-def _parse_entry(val) -> tuple[str, list[str] | None]:
-    """Gist-Eintrag auflösen → (url, ping_ids oder None für Standard).
+def _parse_entry(val) -> tuple[str, list[str] | None, str]:
+    """Gist-Eintrag auflösen → (url, ping_ids oder None für Standard, owner).
 
     Erlaubt ist der reine URL-String oder ein Dict:
 
@@ -51,9 +51,11 @@ def _parse_entry(val) -> tuple[str, list[str] | None]:
         "ping_env" Name eines GitHub-Secrets, z.B. "WEITERE_ID_HIER" — bevorzugt,
                    dann steht die Discord-ID nirgends im Gist
         "ping"     Discord-ID(en) direkt, mehrere mit Komma (Fallback)
+        "owner"    Konto-Bezeichnung für den Kartentitel; setzt der Bestell-Watcher
+                   selbst. Fehlt sie, dient das Label als Titel.
     """
     if isinstance(val, str):
-        return val, None
+        return val, None, ""
     if isinstance(val, dict):
         url = val.get("url") or val.get("link") or ""
         env_name = val.get("ping_env") or ""
@@ -61,8 +63,8 @@ def _parse_entry(val) -> tuple[str, list[str] | None]:
         if env_name and not raw:
             log.warning("hermes: Secret '%s' ist leer/fehlt — Standard-Ping", env_name)
         ids = parse_ids(str(raw)) if raw else None
-        return url, (ids or None)
-    return "", None
+        return url, (ids or None), str(val.get("owner") or "")
+    return "", None, ""
 
 
 def _due(entry: dict, interval_minutes: int) -> bool:
@@ -111,7 +113,7 @@ def check_shipments(cfg: dict, webhook: str, ping_ids: list[str], role_ids: list
     # Fällige, noch nicht abgeschlossene Sendungen sammeln.
     due = []
     for label, val in entries.items():
-        url, own_ping = _parse_entry(val)
+        url, own_ping, owner = _parse_entry(val)
         if not url.startswith("http"):
             log.warning("hermes: '%s' hat keine gültige URL — übersprungen", label)
             continue
@@ -130,7 +132,7 @@ def check_shipments(cfg: dict, webhook: str, ping_ids: list[str], role_ids: list
                 delivered.append(label)
             continue
         if _due(entry, interval):
-            due.append((label, url, entry, own_ping))
+            due.append((label, url, entry, own_ping, owner))
 
     for label in delivered:
         auto.pop(label, None)
@@ -143,7 +145,7 @@ def check_shipments(cfg: dict, webhook: str, ping_ids: list[str], role_ids: list
         return
 
     due.sort(key=lambda t: t[2].get("last_check_at", ""))   # "" zuerst, dann ältester
-    label, url, entry, own_ping = due[0]
+    label, url, entry, own_ping, owner = due[0]
     targets = own_ping if own_ping is not None else ping_ids
 
     entry["last_check_at"] = datetime.now(timezone.utc).isoformat()   # vor der Abfrage → Backoff
@@ -161,7 +163,8 @@ def check_shipments(cfg: dict, webhook: str, ping_ids: list[str], role_ids: list
         if new_events:
             first = not seen
             notify.send_order_update(
-                webhook, build_shipment_embed(label, data, new_events, url, first=first),
+                webhook, build_shipment_embed(label, data, new_events, url, first=first,
+                                              owner=owner),
                 targets, role_ids,
             )
             # Nur die Fingerabdrücke der aktuell sichtbaren Ereignisse behalten —

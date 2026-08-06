@@ -124,6 +124,8 @@ def _register_tracking(auto: dict, order_id: str, links: list[str],
     for i, link in enumerate(links):
         label = base if i == 0 else f"{base} ({i + 1})"
         entry = {"url": link, "order_id": order_id}
+        if owner:
+            entry["owner"] = owner   # Kartentitel: "pray" — wie bei den Bestellkarten
         if ping_env:
             entry["ping_env"] = ping_env
         if auto.get(label) == entry:

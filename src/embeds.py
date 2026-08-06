@@ -495,19 +495,18 @@ def _order_link(url: Optional[str]) -> str:
 
 
 def _titled(owner: Optional[str], order_id: str) -> str:
-    """Titel einer Bestell-/Tracking-Karte: nur die Konto-Bezeichnung, falls gesetzt.
+    """Titel jeder Bestell-, Tracking- und Sendungskarte: nur die Konto-Bezeichnung.
 
-    Bewusst clean — genau wie bei den von Hand eingetragenen Hermes-Sendungen
-    steht oben einfach "pray" bzw. "mave". Die Bestellnummer geht dabei nicht
-    verloren, die rutscht in die Fußzeile (siehe `_foot`). Ohne `owner` bleibt
-    es wie gehabt bei "#37143".
+    Oben steht schlicht "pray" bzw. "mave" — dieselbe Zeile, egal ob die Karte aus
+    dem Kundenkonto kommt oder aus einer von Hand eingetragenen Sendung. Die
+    Bestellnummer taucht bewusst NIRGENDS auf: Konten ohne hinterlegte BG-Zugänge
+    (mave läuft nur über `manual_tracking`) haben nie eine, dann stünde sie mal da
+    und mal nicht. Wer die Nummer braucht, klickt "Bestellung ansehen".
+
+    Ohne `owner` — Konto ohne `label` in der config — bleibt die Nummer der
+    einzige Anker, sonst hätte die Karte gar keinen Titel.
     """
     return owner if owner else f"#{order_id}"
-
-
-def _foot(text: str, owner: Optional[str], order_id: str) -> str:
-    """Fußzeile: Quelle + Bestellnummer, sobald der Titel nur den Namen zeigt."""
-    return f"{text} · #{order_id}" if owner else text
 
 
 def build_order_status_embed(order: dict, fresh: bool = False, items: Optional[list[str]] = None,
@@ -523,7 +522,7 @@ def build_order_status_embed(order: dict, fresh: bool = False, items: Optional[l
         "title": _titled(owner, str(order.get('order_id', ''))),
         "description": f"{head}\n{status_block}" + _items_block(items) + _order_link(order.get("url")),
         "color": _ORDER_STATUS_COLOR.get(slug, COLOR_WARN),
-        "footer": {"text": _foot("bgpharmadrugs.to", owner, str(order.get('order_id', '')))},
+        "footer": {"text": "bgpharmadrugs.to"},
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }
 
@@ -532,12 +531,18 @@ _MAX_EVENTS_IN_EMBED = 12
 
 
 def build_shipment_embed(label: str, data: dict, new_events: list[dict], url: str,
-                         first: bool = False) -> dict:
-    """Statusmeldung zu einer manuell eingetragenen Sendung (Gist `manual_tracking`).
+                         first: bool = False, owner: Optional[str] = None,
+                         order_id: str = "") -> dict:
+    """Statusmeldung zu einer verfolgten Sendung.
 
     Zeigt **jedes neue Ereignis mit Zeitstempel** — beim ersten Mal den ganzen
     bisherigen Verlauf, danach nur noch, was seit der letzten Meldung dazukam.
     Ist die Sendung zugestellt, kommen die Zustelldetails (Datum/Uhrzeit/Ort) mit.
+
+    Gehört die Sendung zu einer Bestellung (`owner` bekannt), steht oben dasselbe
+    wie auf deren Bestell- und Tracking-Karten: "pray". Von Hand eingetragene
+    Sendungen haben kein Konto — die behalten ihr im Gist frei gewähltes Label,
+    das dann genauso schlicht der Name sein sollte ("mave").
     """
     head = "🚚⠀**Sendung wird verfolgt**" if first else "📍⠀**Neuer Sendungsstatus**"
 
@@ -559,13 +564,15 @@ def build_shipment_embed(label: str, data: dict, new_events: list[dict], url: st
 
     parts.append(f"\n**[→⠀⠀Sendung verfolgen]({url})**")
 
-    number = data.get("number") or ""
+    # Zu einer Bestellung gehörend → gleicher Titel wie deren Karten ("pray").
+    # Von Hand eingetragen → das im Gist frei gewählte Label ("mave").
+    title = _titled(owner, str(order_id)) if (owner or order_id) else label
     return {
         "author": {"name": "✦⠀⠀sendung⠀⠀✦"},
-        "title": label,
+        "title": title,
         "description": "\n".join(parts)[:4000],
         "color": _ORDER_TRACKING_COLOR,
-        "footer": {"text": f"via Hermes · {number}" if number else "via Hermes"},
+        "footer": {"text": "via Hermes"},
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }
 
@@ -579,7 +586,7 @@ def build_order_tracking_embed(order_id: str, links: list[str], items: Optional[
         "description": f"🚚⠀**Tracking ist da**\n{body}" + _items_block(items) + _order_link(url)
                        + "\n\n_Der Verlauf kommt ab jetzt automatisch — jede Station als eigene Meldung._",
         "color": _ORDER_TRACKING_COLOR,
-        "footer": {"text": _foot("via Hermes", owner, order_id)},
+        "footer": {"text": "via Hermes"},
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }
 
