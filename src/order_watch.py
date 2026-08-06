@@ -21,6 +21,12 @@ log = logging.getLogger(__name__)
 _TRACKABLE_STATUS = {"processing", "preparing", "on-hold", "completed"}
 # Endzustände — eine Bestellung in einem dieser Status gilt als "nicht offen".
 _TERMINAL_STATUS = {"completed", "cancelled", "refunded", "failed"}
+# Nachrüstung: Bestellungen, deren Tracking-Karte schon RAUS ist, bevor es das
+# automatische Verfolgen gab, holen ihren Link einmalig nach — aber nur, solange
+# die Bestellung jung ist. Ältere Hermes-Links sind ohnehin tot, und ohne diese
+# Grenze würde die halbe Bestellhistorie nochmal durch die Sendungsverfolgung
+# laufen.
+_BACKFILL_MAX_AGE_DAYS = 30
 
 
 def _truthy(v) -> bool:
@@ -66,9 +72,49 @@ def _orders_due(acct: dict, interval_minutes: int, idle_interval_minutes: int) -
     return (datetime.now(timezone.utc) - dt).total_seconds() >= threshold
 
 
+def _recent(order: dict, days: int = _BACKFILL_MAX_AGE_DAYS) -> bool:
+    """Bestellung jünger als `days`? Ohne lesbares Datum: nein (nichts nachrüsten)."""
+    iso = order.get("date_iso") or ""
+    if not iso:
+        return False
+    try:
+        dt = datetime.fromisoformat(iso.replace("Z", "+00:00"))
+    except ValueError:
+        return False
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return (datetime.now(timezone.utc) - dt).days <= days
+
+
+def _register_tracking(auto: dict, order_id: str, links: list[str],
+                       owner: str, ping_env: str) -> None:
+    """Gefundene Tracking-Links in den Gist-Block `auto_tracking` schreiben.
+
+    Damit übernimmt `hermes_watch` die Sendung ab dem nächsten Lauf von selbst:
+    Verlauf scrapen, jedes neue Ereignis posten, bei Zustellung aufhören. Vorher
+    endete die Kette bei der "Tracking ist da"-Karte — verfolgt wurden nur die
+    von Hand ins Gist getippten Sendungen (`manual_tracking`).
+
+    Label wie auf der Karte ("pray #37143"), damit Bestell- und Sendungskarten
+    optisch zusammengehören. Discord-IDs landen NICHT im Gist — gespeichert wird
+    nur der Name des Secrets, aufgelöst wird beim Posten.
+    """
+    base = f"{owner} #{order_id}" if owner else f"#{order_id}"
+    for i, link in enumerate(links):
+        label = base if i == 0 else f"{base} ({i + 1})"
+        entry = {"url": link, "order_id": order_id}
+        if ping_env:
+            entry["ping_env"] = ping_env
+        if auto.get(label) == entry:
+            continue
+        auto[label] = entry
+        log.info("orders: '%s' zur Hermes-Verfolgung eingetragen", label)
+
+
 def _check_one_account(name: str, webhook: str, user: str, pw: str,
                        ping_ids: list[str], role_ids: list[str], acct: dict,
-                       owner: str = "") -> None:
+                       owner: str = "", auto_tracking: dict | None = None,
+                       ping_env: str = "") -> None:
     """Login + Diff + Post für GENAU einen Account; mutiert `acct` in place.
 
     last_check_at wird VOR dem Login gesetzt → Fehler-Drossel (ein gescheiterter
@@ -87,14 +133,20 @@ def _check_one_account(name: str, webhook: str, user: str, pw: str,
             return True  # neue Bestellung → Detailseite für die Artikel (+ ggf. Tracking)
         if o["status"] not in _TRACKABLE_STATUS:
             return False
-        return not prev.get("tracking_posted")
+        if not prev.get("tracking_posted"):
+            return True
+        # Karte ist raus, die Sendung hängt aber noch nicht in der Verfolgung
+        # (Bestellung von vor dem Auto-Tracking) → Link einmalig nachholen.
+        return not prev.get("tracking_registered") and _recent(o)
 
     olist, details, cookies = orders.fetch(user, pw, want_detail, cookies=acct.get("cookies"))
     acct["cookies"] = cookies  # Session für nächsten Lauf merken (privates Gist)
 
     if not initialized:
         for o in olist:
-            order_map[o["order_id"]] = {"status": o["status"], "tracking_posted": o["status"] == "completed"}
+            done = o["status"] == "completed"
+            order_map[o["order_id"]] = {"status": o["status"], "tracking_posted": done,
+                                        "tracking_registered": done}
         acct["_initialized"] = True
         log.info("orders[%s]: Baseline gesetzt (%d Bestellungen), nichts gepostet", name, len(olist))
         return
@@ -112,7 +164,8 @@ def _check_one_account(name: str, webhook: str, user: str, pw: str,
             # Channel. `tracking_posted` gleich mitsetzen, damit auch deren
             # Tracking-Karte nicht nachkommt.
             stale = slug in _TERMINAL_STATUS
-            order_map[oid] = {"status": slug, "tracking_posted": stale}
+            order_map[oid] = {"status": slug, "tracking_posted": stale,
+                              "tracking_registered": stale}
             prev = order_map[oid]
             if items:
                 prev["items"] = items
@@ -127,9 +180,19 @@ def _check_one_account(name: str, webhook: str, user: str, pw: str,
                 notify.send_order_update(webhook, build_order_status_embed(o, items=prev.get("items"), owner=owner), ping_ids, role_ids)
                 prev["status"] = slug
 
-        if not prev.get("tracking_posted") and detail and detail.get("tracking"):
-            notify.send_order_update(webhook, build_order_tracking_embed(oid, detail["tracking"], items=prev.get("items"), url=o.get("url"), owner=owner), ping_ids, role_ids)
-            prev["tracking_posted"] = True
+        was_posted = bool(prev.get("tracking_posted"))
+        if detail and detail.get("tracking"):
+            if not was_posted:
+                notify.send_order_update(webhook, build_order_tracking_embed(oid, detail["tracking"], items=prev.get("items"), url=o.get("url"), owner=owner), ping_ids, role_ids)
+                prev["tracking_posted"] = True
+            # Ab hier übernimmt hermes_watch: Sendungsverlauf automatisch verfolgen.
+            if auto_tracking is not None and not prev.get("tracking_registered"):
+                _register_tracking(auto_tracking, oid, detail["tracking"], owner, ping_env)
+                prev["tracking_registered"] = True
+        elif detail and was_posted:
+            # Nachrüst-Versuch, aber kein Link mehr auf der Seite — nichts zu
+            # holen, also die Detailseite auch nicht in jedem Lauf neu laden.
+            prev["tracking_registered"] = True
 
 
 def check_orders(cfg: dict, default_webhook: str, default_ping_ids: list[str], role_ids: list[str]) -> None:
@@ -195,7 +258,8 @@ def check_orders(cfg: dict, default_webhook: str, default_ping_ids: list[str], r
             continue
         ping = parse_ids(os.environ.get(a["ping_env"], "")) if a.get("ping_env") else default_ping_ids
         resolved.append({"name": a["name"], "user": user, "pw": pw, "webhook": webhook,
-                         "ping": ping, "owner": a.get("label") or ""})
+                         "ping": ping, "owner": a.get("label") or "",
+                         "ping_env": a.get("ping_env") or ""})
 
     if not resolved:
         log.info("orders: aktiviert, aber Secrets/Webhook fehlen — übersprungen")
@@ -210,9 +274,13 @@ def check_orders(cfg: dict, default_webhook: str, default_ping_ids: list[str], r
     pick = due[0]
 
     acct = accounts_state[pick["name"]]
+    # Gefundene Tracking-Links landen hier drin; `check_shipments` (läuft im
+    # selben Run direkt danach) liest den Block und verfolgt die Sendung.
+    auto_tracking = st.setdefault("auto_tracking", {})
     try:
         _check_one_account(pick["name"], pick["webhook"], pick["user"], pick["pw"],
-                           pick["ping"], role_ids, acct, pick.get("owner", ""))
+                           pick["ping"], role_ids, acct, pick.get("owner", ""),
+                           auto_tracking, pick.get("ping_env", ""))
     except Exception as e:  # Login/Incapsula/Netzwerk — nie den ganzen Bot reißen
         log.error("orders[%s]: fetch fehlgeschlagen: %s", pick["name"], e)
     # Immer speichern: last_check_at (in _check_one_account vor dem Login gesetzt)
