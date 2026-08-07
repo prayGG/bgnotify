@@ -28,12 +28,16 @@ import {
 } from "./discord.js";
 import { publish, refreshIfStale } from "./panel.js";
 import { accountListView, statusView, trackListView } from "./views.js";
+import { addTracking, parseTrackingLink, removeTracking, setAccountEnabled } from "./actions.js";
+import { SUB_COMMAND } from "./catalog.js";
+import { loadAccountLabels } from "./repo.js";
 
-const InteractionType = { PING: 1, APPLICATION_COMMAND: 2 };
+const InteractionType = { PING: 1, APPLICATION_COMMAND: 2, AUTOCOMPLETE: 4 };
 const InteractionResponseType = {
   PONG: 1,
   CHANNEL_MESSAGE_WITH_SOURCE: 4,
   DEFERRED_CHANNEL_MESSAGE_WITH_SOURCE: 5,
+  AUTOCOMPLETE_RESULT: 8,
 };
 const EPHEMERAL = 1 << 6; // Antwort sieht nur, wer den Command aufgerufen hat
 
@@ -232,8 +236,79 @@ async function runPanel(interaction, env, state) {
 
 /** „track list" statt nur „track" — Untercommands stehen als Option vom Typ 1 drin. */
 function commandPath(data) {
-  const sub = (data?.options || []).find((o) => o.type === 1);
+  const sub = (data?.options || []).find((o) => o.type === SUB_COMMAND);
   return sub ? `${data.name} ${sub.name}` : data?.name || "";
+}
+
+/** Die eigentlichen Argumente — bei Untercommands liegen sie eine Ebene tiefer. */
+function optionValues(data) {
+  const sub = (data?.options || []).find((o) => o.type === SUB_COMMAND);
+  const opts = (sub ? sub.options : data?.options) || [];
+  return Object.fromEntries(opts.map((o) => [o.name, o.value]));
+}
+
+/** Die Option, in der der Nutzer gerade tippt (nur bei Autocomplete gesetzt). */
+function focusedOption(data) {
+  const sub = (data?.options || []).find((o) => o.type === SUB_COMMAND);
+  const opts = (sub ? sub.options : data?.options) || [];
+  return opts.find((o) => o.focused) || null;
+}
+
+function autocompleteResult(choices) {
+  // Discord nimmt höchstens 25 Vorschläge an und lehnt mehr komplett ab.
+  return json({
+    type: InteractionResponseType.AUTOCOMPLETE_RESULT,
+    data: { choices: choices.slice(0, 25) },
+  });
+}
+
+/**
+ * Vorschläge beim Tippen.
+ *
+ * Auch hier greift die Rollenprüfung: Die Vorschläge verraten Kontonamen und
+ * Sendungsbezeichnungen. Wer nicht darf, bekommt eine leere Liste statt einer
+ * Fehlermeldung — Discord hat für Autocomplete keine Möglichkeit, Text
+ * anzuzeigen, und eine leere Liste ist die ehrlichste stille Antwort.
+ */
+async function handleAutocomplete(interaction, env) {
+  if (!gistConfigured(env) || !interaction.guild_id) return autocompleteResult([]);
+
+  let data;
+  try {
+    data = await loadAll(env);
+  } catch {
+    return autocompleteResult([]);
+  }
+
+  const roleId = roleIdFor(data.commands, interaction.guild_id);
+  if (!roleId || !(interaction.member?.roles || []).includes(roleId)) {
+    return autocompleteResult([]);
+  }
+
+  const path = commandPath(interaction.data);
+  const focused = focusedOption(interaction.data);
+  const eingabe = String(focused?.value || "").toLowerCase();
+  const passt = (s) => s.toLowerCase().includes(eingabe);
+
+  if (path === "account enable" || path === "account disable") {
+    const labels = await loadAccountLabels();
+    const choices = Object.keys(data.orders.accounts || {})
+      .map((key) => ({ name: labels[key] ? `${labels[key]} (${key})` : key, value: key }))
+      .filter((c) => passt(c.name) || passt(c.value));
+    return autocompleteResult(choices);
+  }
+
+  if (path === "track remove") {
+    // Nur die selbst eingetragenen: automatisch übernommene Sendungen räumt
+    // der Bot nach der Zustellung ohnehin weg, die kann man nicht sinnvoll
+    // von Hand entfernen.
+    const choices = Object.keys(data.commands.tracking || {})
+      .filter(passt)
+      .map((label) => ({ name: label, value: label }));
+    return autocompleteResult(choices);
+  }
+
+  return autocompleteResult([]);
 }
 
 async function handleCommand(interaction, env, ctx) {
@@ -281,17 +356,46 @@ async function handleCommand(interaction, env, ctx) {
   // Channel hinterlassen.
   if (path !== "panel") refreshIfStale(env, state, interaction.guild_id, ctx);
 
+  const args = optionValues(interaction.data);
+  const userId = interaction.member.user.id;
+
   switch (path) {
     case "ping":
       return reply("pong — Signatur- und Rollenprüfung stehen.");
     case "status":
-      return replyEmbed(await statusView(data.orders));
+      return replyEmbed(await statusView(data.orders, state));
     case "track list":
-      return replyEmbed(await trackListView(data.orders));
+      return replyEmbed(await trackListView(data.orders, state));
     case "account list":
-      return replyEmbed(await accountListView(data.orders));
+      return replyEmbed(await accountListView(data.orders, state));
     case "panel":
       return deferTo(runPanel(interaction, env, state), ctx);
+
+    case "account enable":
+    case "account disable": {
+      const known = Object.keys(data.orders.accounts || {});
+      return reply(
+        await setAccountEnabled(env, state, args.konto, path.endsWith("enable"), known)
+      );
+    }
+
+    case "track add": {
+      const { url, suggested, error } = parseTrackingLink(args.link);
+      if (error) return reply(error);
+      const label = (args.name || suggested || "").trim();
+      if (!label) {
+        return reply(
+          "Aus dem Link lässt sich kein Name ableiten — gib einen mit an, z.B. `name: mave`."
+        );
+      }
+      return reply(await addTracking(env, state, label, url, userId));
+    }
+
+    case "track remove": {
+      const { text } = await removeTracking(env, state, args.name);
+      return reply(text);
+    }
+
     default:
       return reply(`Unbekannter Command: \`/${path}\``);
   }
@@ -333,6 +437,9 @@ export default {
     }
     if (interaction.type === InteractionType.APPLICATION_COMMAND) {
       return handleCommand(interaction, env, ctx);
+    }
+    if (interaction.type === InteractionType.AUTOCOMPLETE) {
+      return handleAutocomplete(interaction, env);
     }
     return new Response("unsupported interaction type", { status: 400 });
   },

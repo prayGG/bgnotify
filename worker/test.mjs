@@ -181,15 +181,19 @@ async function post(bodyObj, { tamper = false, env = FULL_ENV } = {}) {
   };
 }
 
-const cmd = (path, { roles = [ROLE], userId = OTHER, dm = false } = {}) => {
+const cmd = (path, { roles = [ROLE], userId = OTHER, dm = false, args = {} } = {}) => {
   const [name, sub] = path.split(" ");
+  const opts = Object.entries(args).map(([k, v]) => ({ name: k, value: v, type: 3 }));
+  const data = { name };
+  if (sub) data.options = [{ type: 1, name: sub, ...(opts.length ? { options: opts } : {}) }];
+  else if (opts.length) data.options = opts;
   return {
     type: 2,
     application_id: "app-1",
     token: "interaction-token",
     channel_id: CHANNEL,
     ...(dm ? { user: { id: userId } } : { guild_id: GUILD, member: { user: { id: userId }, roles } }),
-    data: { name, ...(sub ? { options: [{ type: 1, name: sub }] } : {}) },
+    data,
   };
 };
 
@@ -383,6 +387,81 @@ resetFake(ready());
 fake.commands.guilds[GUILD].panel = { channel_id: CHANNEL, message_id: "msg-1", version: catalogVersion() };
 r = await post(cmd("ping"));
 check("aktuelles Panel wird NICHT angefasst", fake.editedMessages.length === 0);
+
+// --------------------------------------------------------------------------
+section("/account enable · disable");
+// --------------------------------------------------------------------------
+resetFake({ ...ready(), orders: { accounts: { a: {}, b: {} }, enabled: { a: "on", b: "on" } } });
+r = await post(cmd("account disable", { args: { konto: "a" } }));
+check("schreibt den Wunsch nach commands.json", fake.commands.enabled?.a === "off", JSON.stringify(fake.commands.enabled));
+check("fasst order-state.json NICHT an", fake.patchedFiles.join(",") === "commands.json", fake.patchedFiles.join(","));
+check("meldet es verständlich", r.content?.includes("aus"), r.content);
+
+r = await post(cmd("account list"));
+check("/account list zeigt sofort „aus“", r.embed.description.includes("⚪"), r.embed.description.split("\n")[0]);
+
+r = await post(cmd("account enable", { args: { konto: "a" } }));
+check("wieder einschalten geht", fake.commands.enabled?.a === "on");
+
+r = await post(cmd("account disable", { args: { konto: "gibtsnicht" } }));
+check("unbekanntes Konto → Warnung, aber gesetzt", r.content?.includes("kenne ich nicht"), r.content);
+
+// --------------------------------------------------------------------------
+section("/track add · remove");
+// --------------------------------------------------------------------------
+resetFake(ready());
+r = await post(cmd("track add", { args: { link: "https://example.com/paket" } }));
+check("fremder Dienst → abgelehnt", r.content?.includes("Nur Hermes-Links"), r.content);
+check("… und nichts geschrieben", Object.keys(fake.commands.tracking || {}).length === 0);
+
+r = await post(cmd("track add", { args: { link: "nicht mal eine url" } }));
+check("Unsinn → abgelehnt", r.content?.includes("keine gültige URL"), r.content);
+
+r = await post(cmd("track add", {
+  args: { link: "https://www.myhermes.de/x?TrackID=H1023311266211701051", name: "mave" },
+}));
+check("Hermes-Link wird eingetragen", fake.commands.tracking?.mave?.url.includes("H1023311266211701051"));
+check("merkt sich, wer ihn eintrug", fake.commands.tracking?.mave?.added_by === OTHER);
+check("schreibt NUR commands.json", fake.patchedFiles.join(",") === "commands.json");
+
+r = await post(cmd("track list"));
+check("/track list zeigt ihn sofort", r.embed.description.includes("mave") && r.embed.description.includes("via Discord"), r.embed.description);
+
+r = await post(cmd("track add", { args: { link: "https://tracking.hermesworld.com/?TrackID=H999888777666" } }));
+const abgeleitet = Object.keys(fake.commands.tracking).find((k) => k !== "mave");
+check("ohne Namen wird einer abgeleitet", Boolean(abgeleitet), abgeleitet);
+
+r = await post(cmd("track remove", { args: { name: "mave" } }));
+check("entfernen klappt", !fake.commands.tracking.mave, r.content);
+
+r = await post(cmd("track remove", { args: { name: "gibtsnicht" } }));
+check("unbekannter Name → ehrliche Absage", r.content?.includes("steht nicht in der Liste"), r.content);
+
+// --------------------------------------------------------------------------
+section("Autocomplete");
+// --------------------------------------------------------------------------
+resetFake({
+  ...ready(),
+  configYml: "accounts:\n    - name: a\n      label: pray\n    - name: b\n      label: mave\n",
+  orders: { accounts: { a: {}, b: {} } },
+});
+r = await post({ ...cmd("account enable"), type: 4, data: { name: "account", options: [{ type: 1, name: "enable", options: [{ name: "konto", value: "", focused: true }] }] } });
+check("antwortet mit Typ 8", r.body.type === 8, `type=${r.body.type}`);
+check("schlägt beide Konten vor", r.body.data.choices.length === 2, JSON.stringify(r.body.data.choices));
+check("zeigt den Anzeigenamen", r.body.data.choices[0].name.includes("pray"), r.body.data.choices[0].name);
+check("liefert aber den Schlüssel", r.body.data.choices[0].value === "a");
+
+r = await post({ ...cmd("account enable"), type: 4, data: { name: "account", options: [{ type: 1, name: "enable", options: [{ name: "konto", value: "mav", focused: true }] }] } });
+check("filtert nach Eingabe", r.body.data.choices.length === 1 && r.body.data.choices[0].value === "b");
+
+const ohneRolle = { ...cmd("account enable", { roles: [] }), type: 4, data: { name: "account", options: [{ type: 1, name: "enable", options: [{ name: "konto", value: "", focused: true }] }] } };
+r = await post(ohneRolle);
+check("ohne Rolle → leere Liste statt Verrat", r.body.data.choices.length === 0);
+
+resetFake(ready());
+fake.commands.tracking = { mave: { url: "https://x" }, "pray #1": { url: "https://y" } };
+r = await post({ ...cmd("track remove"), type: 4, data: { name: "track", options: [{ type: 1, name: "remove", options: [{ name: "name", value: "", focused: true }] }] } });
+check("schlägt eingetragene Sendungen vor", r.body.data.choices.length === 2, JSON.stringify(r.body.data.choices.map((c) => c.value)));
 
 // --------------------------------------------------------------------------
 section("Katalog");

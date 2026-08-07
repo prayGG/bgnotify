@@ -28,25 +28,40 @@ function truthy(v) {
   return ["on", "an", "true", "yes", "y", "ja", "1"].includes(String(v).trim().toLowerCase());
 }
 
-/** An/Aus je Konto aus dem Gist-Feld `enabled` — gleiche Regeln wie im Bot. */
-function accountEnabled(st, name) {
+/**
+ * An/Aus je Konto — gleiche Regeln wie im Bot, plus der über Discord gesetzte
+ * Wunschzustand aus `commands.json`. Der hat Vorrang: Er ist das Neuere, und
+ * der Bot legt ihn beim nächsten Lauf genauso darüber. Ohne diesen Vorrang
+ * zeigte `/account list` direkt nach `/account disable` noch „an" — und niemand
+ * wüsste, ob der Command angekommen ist.
+ */
+function accountEnabled(st, cmd, name) {
+  const wunsch = cmd?.enabled?.[name];
+  if (wunsch !== undefined) return truthy(wunsch);
+
   const en = st.enabled;
   if (Array.isArray(en)) return en.includes(name);
   if (en && typeof en === "object") return truthy(en[name]);
   return en === true;
 }
 
-/** Sendungen aus beiden Quellen; bei gleichem Label schlägt der Handeintrag. */
-function shipments(st) {
-  const merged = { ...(st.auto_tracking || {}), ...(st.manual_tracking || {}) };
+/**
+ * Sendungen aus allen drei Quellen. Reihenfolge = Vorrang: automatisch
+ * übernommene zuerst, dann die von Hand im Gist, zuletzt die über Discord
+ * eingetragenen — die sind die jüngsten.
+ */
+function shipments(st, cmd) {
+  const viaDiscord = cmd?.tracking || {};
+  const merged = { ...(st.auto_tracking || {}), ...(st.manual_tracking || {}), ...viaDiscord };
   const states = st.manual_tracking_state || {};
   return Object.entries(merged).map(([label, val]) => {
     const url = typeof val === "string" ? val : val?.url || val?.link || "";
     const state = states[label] || {};
+    const auto = !(st.manual_tracking || {})[label] && !viaDiscord[label];
     return {
       label,
       url,
-      auto: !(st.manual_tracking || {})[label],
+      herkunft: viaDiscord[label] ? "via Discord" : auto ? "automatisch" : "von Hand",
       status: state.status || "",
       lastCheck: state.last_check_at || "",
       done: isTerminal(state.status || ""),
@@ -56,7 +71,7 @@ function shipments(st) {
 
 // --------------------------------------------------------------------------
 
-export async function statusView(st) {
+export async function statusView(st, cmd = {}) {
   const repo = await loadRepoState();
 
   const stats = repo.bot_stats || {};
@@ -65,8 +80,8 @@ export async function statusView(st) {
   const healthy = minutes < STALE_MINUTES;
 
   const accounts = Object.keys(st.accounts || {});
-  const active = accounts.filter((n) => accountEnabled(st, n));
-  const ships = shipments(st);
+  const active = accounts.filter((n) => accountEnabled(st, cmd, n));
+  const ships = shipments(st, cmd);
   const unterwegs = ships.filter((s) => !s.done);
 
   const fields = [
@@ -108,8 +123,8 @@ export async function statusView(st) {
   };
 }
 
-export async function trackListView(st) {
-  const ships = shipments(st);
+export async function trackListView(st, cmd = {}) {
+  const ships = shipments(st, cmd);
   if (!ships.length) {
     return {
       author: { name: "✦⠀⠀sendungen⠀⠀✦" },
@@ -123,11 +138,10 @@ export async function trackListView(st) {
 
   const lines = ships.map((s) => {
     const dot = s.done ? "✅" : "🚚";
-    const herkunft = s.auto ? "automatisch" : "von Hand";
     const head = s.url ? `[${s.label}](${s.url})` : s.label;
     const stand = s.status ? clip(s.status, 90) : "_noch nicht abgefragt_";
     const wann = s.lastCheck ? `⠀·⠀${ago(s.lastCheck)}` : "";
-    return `${dot}⠀**${head}**⠀·⠀_${herkunft}_\n⠀⠀⠀${stand}${wann}`;
+    return `${dot}⠀**${head}**⠀·⠀_${s.herkunft}_\n⠀⠀⠀${stand}${wann}`;
   });
 
   return {
@@ -139,7 +153,7 @@ export async function trackListView(st) {
   };
 }
 
-export async function accountListView(st) {
+export async function accountListView(st, cmd = {}) {
   const labels = await loadAccountLabels();
   const names = Object.keys(st.accounts || {});
 
@@ -153,7 +167,7 @@ export async function accountListView(st) {
 
   const lines = names.map((name) => {
     const acct = st.accounts[name] || {};
-    const on = accountEnabled(st, name);
+    const on = accountEnabled(st, cmd, name);
     const orders = Object.values(acct.orders || {});
     const offen = orders.filter((o) => !ORDER_DONE.has(o.status)).length;
 
@@ -171,7 +185,7 @@ export async function accountListView(st) {
     author: { name: "✦⠀⠀konten⠀⠀✦" },
     description: joinLines(lines),
     color: COLOR_OK,
-    footer: { text: "Konten schalten: /account enable · disable (kommt noch)" },
+    footer: { text: "schalten mit /account enable · /account disable" },
     timestamp: new Date().toISOString(),
   };
 }

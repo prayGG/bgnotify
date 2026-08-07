@@ -234,13 +234,14 @@ zusammengeführt.
 
 ---
 
-## 5 · Stand: Schritte 1 bis 3 sind gebaut
+## 5 · Stand: Schritte 1 bis 4 sind gebaut
 
 Auf `main`, gemergt.
 
 ```
 worker/
-├── src/index.js      Signatur-/Rollenprüfung, Routing, /setup, /panel, /ping
+├── src/index.js      Signatur-/Rollenprüfung, Routing, Autocomplete
+├── src/actions.js    die schreibenden Commands (Wunschzustand)
 ├── src/catalog.js    DIE Command-Liste — Quelle für Anmeldung UND Panel
 ├── src/panel.js      Befehlsübersicht bauen, posten, auffrischen
 ├── src/views.js      /status, /track list, /account list (nur lesend)
@@ -249,11 +250,33 @@ worker/
 ├── src/repo.js       öffentliche state.json + Kontonamen aus config.yml
 ├── src/format.js     Zeitangaben, Kürzen, Discord-Längengrenzen
 ├── register.js       meldet die Commands aus dem Katalog bei Discord an
-├── test.mjs          52 Fälle ohne Deploy
+├── test.mjs          75 Fälle ohne Deploy
 ├── wrangler.toml     Deploy-Konfiguration
 ├── package.json
 └── README.md         Einrichtungsanleitung
 ```
+
+**Schreibende Commands schreiben nicht dorthin, wo gelesen wird.** `/account
+disable` und `/track add` verändern Dinge, die in `order-state.json` stehen —
+der Datei des Bots. Statt sie anzufassen, legt der Worker einen
+**Wunschzustand** in `commands.json` ab, und der Bot legt ihn beim Lesen
+darüber:
+
+```
+/account disable a ──▶ commands.json {"enabled": {"a": "off"}}
+                                          │
+Bot-Lauf ──lädt order-state.json──▶ Wunsch darüber ──▶ Konto aus
+```
+
+Ein Wunsch statt einer Auftragsliste, weil er idempotent ist: Er muss nicht
+quittiert werden, und ein doppelt verarbeiteter Eintrag richtet keinen Schaden
+an. Echte Aufträge braucht erst, was einen Browser erfordert (Produkt
+aufnehmen, Login prüfen) — Schritt 6 und 7.
+
+Auf der Python-Seite macht das `src/commands.py`; `order_watch` fragt es beim
+An/Aus-Schalter, `hermes_watch` beim Zusammenstellen der Sendungen. Ist die
+Datei nicht lesbar, verhält sich der Bot exakt wie vorher — lieber der alte
+Stand als gar kein Lauf.
 
 **Die Befehlsübersicht** (`/panel`) steht dauerhaft in einem eigenen Channel und
 entsteht komplett aus `catalog.js`. Ändert sich der Katalog, ändert sich sein
@@ -299,7 +322,7 @@ Vier Entscheidungen im Code, die nicht offensichtlich sind:
    „denkt nach…".
 
 Getestet mit echten Ed25519-Schlüsseln gegen `worker.fetch()`, Discord und
-GitHub über ein ersetztes `fetch` nachgestellt — 22 Fälle, alle grün:
+GitHub über ein ersetztes `fetch` nachgestellt — 75 Fälle, alle grün:
 
 ```bash
 cd worker && node test.mjs

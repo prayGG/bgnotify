@@ -33,7 +33,7 @@ import os
 import random
 from datetime import datetime, timezone
 
-from . import hermes, notify, orders
+from . import commands, hermes, notify, orders
 from .config import parse_ids
 from .embeds import build_shipment_embed
 
@@ -103,7 +103,11 @@ def check_shipments(cfg: dict, webhook: str, ping_ids: list[str], role_ids: list
     # genauso verfolgt wie eine von Hand eingetragene. Bei gleichem Label gewinnt
     # der Handeintrag — von Hand gesetzt schlägt automatisch.
     auto = st.get("auto_tracking") or {}
-    entries = {**auto, **manual}
+    # Per `/track add` in Discord eingetragene Sendungen stehen in einer eigenen
+    # Gist-Datei, die dem Worker gehoert. Sie kommen zuletzt und gewinnen damit
+    # bei gleichem Label — sie sind die juengste Aussage.
+    via_command = commands.tracking_entries(commands.load_commands(token, gist_id))
+    entries = {**auto, **manual, **via_command}
     if not entries:
         return
 

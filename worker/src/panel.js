@@ -8,7 +8,7 @@
  * bestehende Nachricht **bearbeitet** statt eine zweite gepostet.
  */
 
-import { catalogVersion, flatten } from "./catalog.js";
+import { catalogVersion, flatten, signature } from "./catalog.js";
 import { createMessage, editMessage } from "./discord.js";
 import { saveState } from "./gist.js";
 
@@ -19,8 +19,10 @@ export function buildEmbed() {
   const ansehen = all.filter((c) => !c.ownerOnly);
   const verwaltung = all.filter((c) => c.ownerOnly);
 
+  // Mit Argumenten in der Zeile — `<pflicht>` und `[freiwillig]`. Sonst müsste
+  // man raten, ob ein Command noch etwas braucht.
   const render = (list) =>
-    list.map((c) => `**\`/${c.path}\`**\n${c.help}`).join("\n\n");
+    list.map((c) => `**\`${signature(c)}\`**\n${c.help}`).join("\n\n");
 
   const fields = [];
   if (ansehen.length) {

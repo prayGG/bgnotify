@@ -10,6 +10,10 @@
  * Discord beim Tippen einblendet (max. 100 Zeichen, harte Grenze der API).
  */
 
+// Discord-Optionstypen, die hier vorkommen.
+export const SUB_COMMAND = 1;
+export const STRING = 3;
+
 export const COMMANDS = [
   {
     name: "status",
@@ -25,6 +29,29 @@ export const COMMANDS = [
         description: "Verfolgte Sendungen mit letztem Stand",
         help: "Alle Sendungen, die der Bot beobachtet — von Hand eingetragene wie automatisch aus Bestellungen übernommene, jeweils mit letztem Stand und letzter Abfrage.",
       },
+      {
+        name: "add",
+        description: "Hermes-Link eintragen",
+        help: "Trägt eine Sendung zur Verfolgung ein. Ab dem nächsten Lauf meldet der Bot jedes neue Ereignis und hört bei Zustellung von selbst auf.",
+        options: [
+          { name: "link", description: "Hermes-Sendungslink", type: STRING, required: true },
+          { name: "name", description: "Anzeigename, z.B. „mave“ (sonst aus dem Link)", type: STRING },
+        ],
+      },
+      {
+        name: "remove",
+        description: "Sendung nicht mehr verfolgen",
+        help: "Entfernt einen von Hand eingetragenen Eintrag. Automatisch übernommene Sendungen verschwinden ohnehin nach der Zustellung.",
+        options: [
+          {
+            name: "name",
+            description: "welche Sendung",
+            type: STRING,
+            required: true,
+            autocomplete: true,
+          },
+        ],
+      },
     ],
   },
   {
@@ -35,6 +62,22 @@ export const COMMANDS = [
         name: "list",
         description: "Konten mit An/Aus-Zustand",
         help: "Welche Konten hinterlegt sind, ob sie an oder aus sind, wann sie zuletzt geprüft wurden und wie viele Bestellungen offen sind.",
+      },
+      {
+        name: "enable",
+        description: "Konto einschalten",
+        help: "Ab dem nächsten Lauf prüft der Bot dieses Konto wieder. Einschalten, wenn du bestellt hast.",
+        options: [
+          { name: "konto", description: "welches Konto", type: STRING, required: true, autocomplete: true },
+        ],
+      },
+      {
+        name: "disable",
+        description: "Konto ausschalten",
+        help: "Der Bot loggt sich für dieses Konto nicht mehr ein — null Zugriffe, bis du es wieder einschaltest.",
+        options: [
+          { name: "konto", description: "welches Konto", type: STRING, required: true, autocomplete: true },
+        ],
       },
     ],
   },
@@ -57,7 +100,7 @@ export const COMMANDS = [
   },
 ];
 
-/** Flache Liste `{ path, description, help, ownerOnly }` — `path` wie „track list". */
+/** Flache Liste `{ path, description, help, ownerOnly, options }` — `path` wie „track list". */
 export function flatten() {
   const out = [];
   for (const c of COMMANDS) {
@@ -67,14 +110,29 @@ export function flatten() {
           path: `${c.name} ${s.name}`,
           description: s.description,
           help: s.help,
+          options: s.options || [],
           ownerOnly: c.ownerOnly || s.ownerOnly || false,
         });
       }
     } else {
-      out.push({ path: c.name, description: c.description, help: c.help, ownerOnly: !!c.ownerOnly });
+      out.push({
+        path: c.name,
+        description: c.description,
+        help: c.help,
+        options: c.options || [],
+        ownerOnly: !!c.ownerOnly,
+      });
     }
   }
   return out;
+}
+
+/** „/track add <link> [name]" — Pflichtoptionen spitz, freiwillige eckig. */
+export function signature(entry) {
+  const args = entry.options
+    .map((o) => (o.required ? `<${o.name}>` : `[${o.name}]`))
+    .join(" ");
+  return `/${entry.path}${args ? " " + args : ""}`;
 }
 
 /**
@@ -102,10 +160,13 @@ export function toDiscordPayload() {
     };
     if (c.subcommands) {
       base.options = c.subcommands.map((s) => ({
-        type: 1, // SUB_COMMAND
+        type: SUB_COMMAND,
         name: s.name,
         description: s.description,
+        ...(s.options ? { options: s.options } : {}),
       }));
+    } else if (c.options) {
+      base.options = c.options;
     }
     return base;
   });

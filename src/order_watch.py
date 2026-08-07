@@ -11,7 +11,7 @@ import os
 import random
 from datetime import datetime, timezone
 
-from . import notify, orders
+from . import commands, notify, orders
 from .config import parse_ids
 from .embeds import build_order_status_embed, build_order_tracking_embed
 
@@ -35,7 +35,7 @@ def _truthy(v) -> bool:
     return str(v).strip().lower() in ("on", "an", "true", "yes", "y", "ja", "1")
 
 
-def _order_enabled(st: dict, name: str) -> bool:
+def _order_enabled(st: dict, name: str, cmds: dict | None = None) -> bool:
     """An/Aus-Schalter aus dem Gist-Feld `enabled` — pro Konto:
 
     - Dict (empfohlen): `{"a": "on", "b": "off"}`  → einfach on/off pro Konto
@@ -45,7 +45,15 @@ def _order_enabled(st: dict, name: str) -> bool:
 
     So aktivierst du Tracking nur wenn du wirklich bestellt hast (Gist editieren,
     kein Code-Commit) — in Bestellpausen also NULL authentifizierte Logins.
+
+    `/account enable|disable` in Discord schreibt denselben Schalter nach
+    `commands.json`; der hat Vorrang, weil er das Neuere ist. So kann man das
+    Konto vom Handy aus scharf schalten, ohne JSON zu tippen.
     """
+    per_command = commands.enabled_override(cmds or {}, name)
+    if per_command is not None:
+        return per_command
+
     en = st.get("enabled", False)
     if isinstance(en, dict):
         return _truthy(en.get(name, False))
@@ -265,7 +273,8 @@ def check_orders(cfg: dict, default_webhook: str, default_ping_ids: list[str], r
 
     # An/Aus-Schalter: nur aktivierte Konten (Gist-Feld `enabled`) → in
     # Bestellpausen keine Logins. Standard = aus.
-    enabled_names = [a["name"] for a in cfg_accounts if _order_enabled(st, a["name"])]
+    cmds = commands.load_commands(token, gist_id)
+    enabled_names = [a["name"] for a in cfg_accounts if _order_enabled(st, a["name"], cmds)]
     if not enabled_names:
         log.info("orders: alle Konten 'off' (Gist `enabled`) — übersprungen.")
         return
