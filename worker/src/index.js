@@ -6,14 +6,18 @@
  * Worker beantwortet den Command und schreibt in das private Gist; Meldungen
  * in die Channels laufen weiterhin über die Webhooks des Actions-Bots.
  *
- * Stand: Schritt 3 — Signatur- und Rollenprüfung, `/setup`, `/panel`, `/ping`
- * und die nur-lesenden Ansichten `/status`, `/track list`, `/account list`.
+ * Stand: alles außer `/product`.
+ *   lesen      /status, /track list, /account list
+ *   schreiben  /account enable|disable, /track add|remove, /account add|remove
+ *   auslösen   /run
+ *   Rest       /ping, /setup, /panel
  *
  * Erwartete Secrets (via `wrangler secret put`):
  *   DISCORD_PUBLIC_KEY   Public Key der Discord-App (hex) — Pflicht
  *   DISCORD_BOT_TOKEN    Bot-Token (Rolle anlegen, Panel posten)
  *   GIST_TOKEN           klassischer PAT mit ausschließlich `gist`-Recht
  *   GIST_ID              ID des privaten Gists
+ *   GITHUB_TOKEN         fein-granular: Actions + Secrets, nur dieses Repo
  */
 
 import { gistConfigured, loadAll, roleIdFor, saveState } from "./gist.js";
@@ -39,7 +43,7 @@ import {
   setAccountEnabled,
   triggerRun,
 } from "./actions.js";
-import { githubConfigured } from "./github.js";
+import { dispatchRun, githubConfigured } from "./github.js";
 import { ACCOUNT_ADD, accountAddModal, modalValues } from "./modal.js";
 import { SUB_COMMAND } from "./catalog.js";
 import { loadAccountLabels } from "./repo.js";
@@ -244,6 +248,19 @@ async function runAccountAdd(interaction, env, state, werte) {
       env, state, slot, werte.label, werte.user, werte.pass,
       interaction.member.user.id
     );
+
+    // Gleich einen Lauf anstoßen, damit der Login sofort geprüft wird statt
+    // erst beim nächsten Takt. Scheitert das, ist das Konto trotzdem angelegt —
+    // deshalb nur eine abgeschwächte Zeile statt eines Fehlers.
+    let pruefung = "Der Login wird gerade geprüft — das Ergebnis kommt gleich hier in den Channel.";
+    try {
+      await dispatchRun(env);
+      state.last_run_at = new Date().toISOString();
+      await saveState(env, state);
+    } catch {
+      pruefung = "Ob der Login stimmt, prüft der nächste Lauf — mit `/run` geht es sofort.";
+    }
+
     await editOriginalResponse(
       interaction,
       [
@@ -252,8 +269,7 @@ async function runAccountAdd(interaction, env, state, werte) {
         "Die Zugangsdaten sind verschlüsselt als GitHub-Secret abgelegt — im Gist stehen nur",
         "der Anzeigename und die Platznummer.",
         "",
-        "Ob der Login stimmt, zeigt sich beim nächsten Lauf. Mit `/account enable` einschalten,",
-        "sobald du bestellt hast, und `/run` stößt sofort einen Lauf an.",
+        pruefung,
       ].join("\n")
     );
   } catch (err) {

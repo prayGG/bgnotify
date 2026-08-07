@@ -148,6 +148,15 @@ export async function addAccount(env, state, slot, label, user, pass, discordId)
   state.accounts[String(slot)] = {
     label,
     added_at: new Date().toISOString(),
+    // Bittet den nächsten Lauf um eine Login-Prüfung. Der Worker kann sie nicht
+    // selbst machen: BG sitzt hinter Incapsula, der Login braucht ein echtes
+    // Chromium — und das gibt es hier nicht zum Nulltarif.
+    //
+    // Das Flag wird nie wieder gelöscht, und das ist kein Versehen: Diese Datei
+    // gehört dem Worker, er erfährt vom Ausgang nichts. Beendet wird die Prüfung
+    // auf der anderen Seite, sobald `login_checked_at` im Stand des Bots steht.
+    // Spart eine Quittung über die Dateigrenze hinweg.
+    verify: true,
   };
   await saveState(env, state);
 }

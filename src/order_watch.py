@@ -13,7 +13,11 @@ from datetime import datetime, timezone
 
 from . import commands, notify, orders
 from .config import parse_ids
-from .embeds import build_order_status_embed, build_order_tracking_embed
+from .embeds import (
+    build_account_check_embed,
+    build_order_status_embed,
+    build_order_tracking_embed,
+)
 
 log = logging.getLogger(__name__)
 
@@ -62,6 +66,22 @@ def _order_enabled(st: dict, name: str, cmds: dict | None = None) -> bool:
     if isinstance(en, list):
         return name in en
     return False
+
+
+def _verify_pending(cmds: dict, name: str, acct: dict) -> bool:
+    """Wartet dieses Konto noch auf seine erste Login-Prüfung?
+
+    `verify` setzt der Worker beim Anlegen in `commands.json` — und löscht es
+    nie wieder, denn diese Datei gehört ihm allein und er erfährt nichts vom
+    Ausgang. Beendet wird die Prüfung stattdessen hier: Sobald
+    `login_checked_at` im Stand des Bots steht, greift sie nicht mehr. So
+    braucht es keine Quittung über die Dateigrenze hinweg.
+    """
+    if not name.startswith("s"):
+        return False   # fest in config.yml verdrahtet — nichts zu prüfen
+    slot = name[1:]
+    eintrag = (cmds.get("accounts") or {}).get(slot) or {}
+    return bool(eintrag.get("verify")) and not acct.get("login_checked_at")
 
 
 def _backfill_pending(acct: dict) -> bool:
@@ -308,22 +328,47 @@ def check_orders(cfg: dict, default_webhook: str, default_ping_ids: list[str], r
 
     # Fällige Accounts sammeln, dann nur den am längsten überfälligen prüfen.
     due = [r for r in resolved if _orders_due(accounts_state.setdefault(r["name"], {}), interval, idle)]
-    if not due:
+
+    # Frisch per `/account add` hinterlegte Konten warten auf ihre erste
+    # Login-Prüfung — die geht IMMER vor. Ohne diesen Vorzug könnte sie hinter
+    # dem Ruhe-Takt eines anderen Kontos bis zu 24 Stunden hängen, und derjenige,
+    # der gerade sein Passwort eingetippt hat, wüsste solange nicht, ob es stimmt.
+    wartend = [r for r in resolved
+               if _verify_pending(cmds, r["name"], accounts_state.setdefault(r["name"], {}))]
+    if not due and not wartend:
         log.info("orders: nichts fällig (%d Account(s))", len(resolved))
         return
+
     due.sort(key=lambda r: accounts_state[r["name"]].get("last_check_at", ""))  # "" zuerst, dann ältester
-    pick = due[0]
+    pick = wartend[0] if wartend else due[0]
 
     acct = accounts_state[pick["name"]]
     # Gefundene Tracking-Links landen hier drin; `check_shipments` (läuft im
     # selben Run direkt danach) liest den Block und verfolgt die Sendung.
     auto_tracking = st.setdefault("auto_tracking", {})
+    pruefung = _verify_pending(cmds, pick["name"], acct)
+    fehler = ""
     try:
         _check_one_account(pick["name"], pick["webhook"], pick["user"], pick["pw"],
                            pick["ping"], role_ids, acct, pick.get("owner", ""),
                            auto_tracking, pick.get("ping_env", ""))
     except Exception as e:  # Login/Incapsula/Netzwerk — nie den ganzen Bot reißen
+        fehler = str(e)
         log.error("orders[%s]: fetch fehlgeschlagen: %s", pick["name"], e)
+
+    # Ergebnis der Erstprüfung melden — einmalig, danach steht `login_checked_at`
+    # im eigenen Stand des Bots und `_verify_pending` greift nicht mehr.
+    # Bewusst hier und nicht im Worker: Erst dieser Lauf weiß, ob der Login geht.
+    if pruefung:
+        acct["login_ok"] = not fehler
+        acct["login_checked_at"] = datetime.now(timezone.utc).isoformat()
+        if pick["webhook"]:
+            notify.send_order_update(
+                pick["webhook"],
+                build_account_check_embed(pick.get("owner") or pick["name"], not fehler, fehler),
+                pick["ping"], role_ids,
+            )
+        log.info("orders[%s]: Erstprüfung %s", pick["name"], "ok" if not fehler else "fehlgeschlagen")
     # Immer speichern: last_check_at (in _check_one_account vor dem Login gesetzt)
     # muss persistiert werden — auch bei Fehler → Backoff statt Hämmern.
     orders.save_order_state(token, gist_id, st)

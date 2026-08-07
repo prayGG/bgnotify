@@ -542,6 +542,19 @@ check("BG_PASSWORD_3 entschlüsselt zum Original", entsiegelt(fake.secrets.BG_PA
 check("BG_USERNAME_3 entschlüsselt zum Original", entsiegelt(fake.secrets.BG_USERNAME_3) === "mave@x.de");
 check("DISCORDID_3 enthält die ID des Aufrufers", entsiegelt(fake.secrets.DISCORDID_3) === OTHER);
 
+check("bittet um Login-Prüfung", fake.commands.accounts["3"].verify === true);
+check("stößt dafür sofort einen Lauf an", fake.dispatched === 1, `${fake.dispatched} Dispatches`);
+check("sagt das auch", fake.followUp.includes("wird gerade geprüft"), fake.followUp.split("\n").pop());
+
+// Ohne Actions-Recht muss das Konto trotzdem angelegt sein — nur der Hinweis
+// ändert sich. Alles andere hieße: Passwort eingetippt, nichts passiert.
+resetFake({ ...ready(), dispatchStatus: 404 });
+r = await post(modal({ label: "ohnelauf", user: "u", pass: "p" }), { env: GH_ENV });
+check("Lauf scheitert → Konto trotzdem angelegt", Boolean(fake.commands.accounts?.["3"]), JSON.stringify(fake.commands.accounts));
+check("… und der Hinweis wird abgeschwächt", fake.followUp.includes("nächste Lauf"), fake.followUp.split("\n").pop());
+
+resetFake(ready());
+r = await post(modal({ label: "erster", user: "u1", pass: "p1" }), { env: GH_ENV });
 r = await post(modal({ label: "zweiter", user: "u2", pass: "p2" }), { env: GH_ENV });
 check("nächstes Konto nimmt Platz 4", Boolean(fake.commands.accounts?.["4"]));
 

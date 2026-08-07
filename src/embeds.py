@@ -622,3 +622,40 @@ def build_recovery_embed() -> dict:
         "footer": {"text": "bgnotify"},
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }
+
+
+def build_account_check_embed(label: str, ok: bool, fehler: str = "") -> dict:
+    """Ergebnis der ersten Login-Prüfung eines per `/account add` hinterlegten Kontos.
+
+    Kommt genau einmal, direkt nach dem Anlegen. Ob die Zugangsdaten stimmen,
+    kann erst ein echter Lauf sagen — der Command selbst hat keinen Browser und
+    könnte es deshalb nicht prüfen.
+    """
+    if ok:
+        return {
+            "author": {"name": "✦⠀⠀konto⠀⠀✦"},
+            "title": label,
+            "description": "✅⠀**Login erfolgreich**\n\nDer Bot ist drin. Ab jetzt kommen Bestellungen "
+                           "und Sendungen automatisch — sofern das Konto eingeschaltet ist "
+                           "(`/account enable`).",
+            "color": COLOR_IN_STOCK,
+            "footer": {"text": "bgpharmadrugs.to"},
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        }
+
+    # Den Fehlertext knapp mitgeben: "Login nicht erfolgreich" und "Timeout" sind
+    # zwei völlig verschiedene Aufgaben für den, der es gerade eingetippt hat.
+    grund = re.sub(r"\s+", " ", fehler).strip()
+    if len(grund) > 200:
+        grund = grund[:200].rsplit(" ", 1)[0] + " …"
+    return {
+        "author": {"name": "✦⠀⠀konto⠀⠀✦"},
+        "title": label,
+        "description": "⚠️⠀**Login fehlgeschlagen**\n\nBenutzername oder Passwort stimmen nicht — oder BG hat "
+                       "den Versuch abgewiesen.\n\nMit `/account remove` entfernen und `/account add` neu "
+                       "versuchen."
+                       + (f"\n\n_{grund}_" if grund else ""),
+        "color": COLOR_WARN,
+        "footer": {"text": "bgpharmadrugs.to"},
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }
