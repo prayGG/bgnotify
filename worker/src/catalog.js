@@ -6,19 +6,24 @@
  * mit ihrer eigenen Liste, wäre die Übersicht schon nach dem zweiten neuen
  * Command falsch — und zwar unbemerkt, weil nichts sie widerlegt.
  *
- * `help` ist die Langfassung fürs Panel, `description` die Kurzzeile, die
- * Discord beim Tippen einblendet (max. 100 Zeichen, harte Grenze der API).
+ * `description` ist die Kurzzeile, die Discord beim Tippen einblendet (max. 100
+ * Zeichen, harte Grenze der API). `help` steht im Panel und bleibt bewusst
+ * knapp: EINE Zeile, die sagt was passiert — nicht warum. Das Warum gehört in
+ * die Kommentare im Code, nicht in eine Übersicht, die jeden Tag jemand
+ * überfliegt.
  */
 
 // Discord-Optionstypen, die hier vorkommen.
 export const SUB_COMMAND = 1;
 export const STRING = 3;
 
+const KONTO = { name: "konto", description: "welches Konto", type: STRING, required: true, autocomplete: true };
+
 export const COMMANDS = [
   {
     name: "status",
     description: "Läuft der Bot? Letzter Lauf, Konten, Sendungen",
-    help: "Zeigt, wann der Bot zuletzt lief, wie viele Konten aktiv sind, wie viele Sendungen verfolgt werden — und ob beim letzten Lauf Fehler auftraten.",
+    help: "Läuft der Bot, wie viele Konten aktiv sind, was unterwegs ist.",
   },
   {
     name: "track",
@@ -27,12 +32,12 @@ export const COMMANDS = [
       {
         name: "list",
         description: "Verfolgte Sendungen mit letztem Stand",
-        help: "Alle Sendungen, die der Bot beobachtet — von Hand eingetragene wie automatisch aus Bestellungen übernommene, jeweils mit letztem Stand und letzter Abfrage.",
+        help: "Verfolgte Sendungen mit letztem Stand.",
       },
       {
         name: "add",
         description: "Hermes-Link eintragen",
-        help: "Trägt eine Sendung zur Verfolgung ein. Ab dem nächsten Lauf meldet der Bot jedes neue Ereignis und hört bei Zustellung von selbst auf.",
+        help: "Hermes-Link eintragen. Meldet jedes Ereignis, hört bei Zustellung auf.",
         options: [
           { name: "link", description: "Hermes-Sendungslink", type: STRING, required: true },
           { name: "name", description: "Anzeigename (sonst wird einer aus dem Link abgeleitet)", type: STRING },
@@ -41,15 +46,9 @@ export const COMMANDS = [
       {
         name: "remove",
         description: "Sendung nicht mehr verfolgen",
-        help: "Entfernt einen von Hand eingetragenen Eintrag. Automatisch übernommene Sendungen verschwinden ohnehin nach der Zustellung.",
+        help: "Sendung nicht mehr verfolgen.",
         options: [
-          {
-            name: "name",
-            description: "welche Sendung",
-            type: STRING,
-            required: true,
-            autocomplete: true,
-          },
+          { name: "name", description: "welche Sendung", type: STRING, required: true, autocomplete: true },
         ],
       },
     ],
@@ -61,36 +60,30 @@ export const COMMANDS = [
       {
         name: "list",
         description: "Konten mit An/Aus-Zustand",
-        help: "Welche Konten hinterlegt sind, ob sie an oder aus sind, wann sie zuletzt geprüft wurden und wie viele Bestellungen offen sind.",
+        help: "Konten mit An/Aus, letztem Login und offenen Bestellungen.",
       },
       {
         name: "add",
         description: "Eigenes BG-Konto hinterlegen",
-        help: "Öffnet ein Formular für Zugangsdaten. Die Werte werden sofort verschlüsselt und als GitHub-Secret abgelegt — im Gist stehen nur Anzeigename und Platznummer. Ob der Login stimmt, meldet der Bot beim nächsten Lauf.",
+        help: "Eigenes Konto hinterlegen — verschlüsselt, ohne das Passwort zu verschicken.",
       },
       {
         name: "remove",
         description: "Konto entfernen",
-        help: "Löscht die hinterlegten Zugangsdaten und gibt den Platz frei. Nur für selbst hinterlegte Konten — die fest verdrahteten bleiben.",
-        options: [
-          { name: "konto", description: "welches Konto", type: STRING, required: true, autocomplete: true },
-        ],
+        help: "Eigenes Konto samt Zugangsdaten löschen.",
+        options: [KONTO],
       },
       {
         name: "enable",
         description: "Konto einschalten",
-        help: "Ab dem nächsten Lauf prüft der Bot dieses Konto wieder. Einschalten, wenn du bestellt hast.",
-        options: [
-          { name: "konto", description: "welches Konto", type: STRING, required: true, autocomplete: true },
-        ],
+        help: "Konto einschalten — wird ab dem nächsten Lauf geprüft.",
+        options: [KONTO],
       },
       {
         name: "disable",
         description: "Konto ausschalten",
-        help: "Der Bot loggt sich für dieses Konto nicht mehr ein — null Zugriffe, bis du es wieder einschaltest.",
-        options: [
-          { name: "konto", description: "welches Konto", type: STRING, required: true, autocomplete: true },
-        ],
+        help: "Konto ausschalten — keine Logins mehr.",
+        options: [KONTO],
       },
     ],
   },
@@ -101,12 +94,12 @@ export const COMMANDS = [
       {
         name: "list",
         description: "Was beobachtet wird",
-        help: "Alle beobachteten Produkte — die fest in `config.yml` gepflegten wie die per Command aufgenommenen.",
+        help: "Was beobachtet wird.",
       },
       {
         name: "add",
         description: "Produkt aufnehmen",
-        help: "Beim ersten Aufruf liest der Bot die Seite ein und zeigt, welche Varianten es gibt — das dauert einen Lauf, weil der Command selbst die Seite nicht kennt. Danach nochmal aufrufen und die Variante auswählen.",
+        help: "Produkt aufnehmen. Erster Aufruf liest die Varianten ein, zweiter wählt aus.",
         options: [
           { name: "link", description: "Produktseite bei bgpharmadrugs.to", type: STRING, required: true, autocomplete: true },
           { name: "variante", description: "welche Variante (nach dem Einlesen)", type: STRING, autocomplete: true },
@@ -115,7 +108,7 @@ export const COMMANDS = [
       {
         name: "remove",
         description: "Produkt nicht mehr beobachten",
-        help: "Entfernt ein per Command aufgenommenes Produkt. Die fest in `config.yml` gepflegten bleiben.",
+        help: "Produkt nicht mehr beobachten.",
         options: [
           { name: "produkt", description: "welches Produkt", type: STRING, required: true, autocomplete: true },
         ],
@@ -125,23 +118,23 @@ export const COMMANDS = [
   {
     name: "run",
     description: "Stößt sofort einen Bot-Lauf an",
-    help: "Startet den Bot jetzt, statt auf den nächsten Takt zu warten. Dauert rund eine halbe Minute; die Meldungen kommen wie immer in die Channels.",
+    help: "Startet den Bot sofort, statt auf den Takt zu warten.",
   },
   {
     name: "ping",
     description: "Testet, ob der Bot erreichbar ist",
-    help: "Antwortet „pong“. Nützlich, um zu sehen, ob der Worker läuft und ob du die nötige Rolle hast.",
+    help: "Testet, ob der Bot erreichbar ist.",
   },
   {
     name: "panel",
     description: "Postet oder aktualisiert diese Übersicht",
-    help: "Legt die Übersicht in dem Channel an, in dem du den Command aufrufst. Danach hält sie sich selbst aktuell — kommen Commands dazu, wird die Nachricht bearbeitet statt eine neue gepostet.",
+    help: "Postet diese Übersicht. Sie hält sich danach selbst aktuell.",
     ownerOnly: true,
   },
   {
     name: "setup",
     description: "Richtet die Rolle bgnotify ein (nur der Server-Inhaber)",
-    help: "Legt die Rolle `bgnotify` an und gibt sie dir. Wer die Commands benutzen soll, braucht diese Rolle. Gefahrlos wiederholbar.",
+    help: "Legt die Rolle `bgnotify` an und gibt sie dir.",
     ownerOnly: true,
   },
 ];

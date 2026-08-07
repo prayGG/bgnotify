@@ -14,6 +14,41 @@ import { saveState } from "./gist.js";
 
 const COLOR = 0x5865f2; // Discord-Blurple, wie die Stats-Karte des Bots
 
+// Harte Grenzen von Discord. Wer sie reißt, bekommt keinen gekürzten Text,
+// sondern HTTP 400 — die Nachricht geht gar nicht erst raus.
+const FIELD_MAX = 1024;
+const FIELDS_MAX = 25;
+
+/**
+ * Zeilen als Felder anhängen und dabei bei 1024 Zeichen umbrechen.
+ *
+ * Vorher stand jede Gruppe in EINEM Feld. Das ging so lange gut, bis mit
+ * `/product` der zwölfte Command dazukam und die Übersicht mit HTTP 400
+ * liegenblieb — ohne dass irgendetwas vorher gewarnt hätte. Genau diese Sorte
+ * Fehler wächst still mit: Jeder neue Command bringt sie näher.
+ *
+ * Folgefelder tragen einen leeren Namen, damit die Überschrift nicht bei jedem
+ * Umbruch wiederholt wird.
+ */
+function push(fields, name, lines) {
+  let block = [];
+  let laenge = 0;
+  const abgeben = () => {
+    if (!block.length || fields.length >= FIELDS_MAX) return;
+    fields.push({ name: fields.length && name === "" ? "⠀" : name, value: block.join("\n\n") });
+    name = "⠀";
+    block = [];
+    laenge = 0;
+  };
+
+  for (const line of lines) {
+    if (laenge + line.length + 2 > FIELD_MAX) abgeben();
+    block.push(line);
+    laenge += line.length + 2;
+  }
+  abgeben();
+}
+
 export function buildEmbed() {
   const all = flatten();
   const ansehen = all.filter((c) => !c.ownerOnly);
@@ -21,28 +56,20 @@ export function buildEmbed() {
 
   // Mit Argumenten in der Zeile — `<pflicht>` und `[freiwillig]`. Sonst müsste
   // man raten, ob ein Command noch etwas braucht.
-  const render = (list) =>
-    list.map((c) => `**\`${signature(c)}\`**\n${c.help}`).join("\n\n");
+  const render = (c) => `**\`${signature(c)}\`**\n${c.help}`;
 
   const fields = [];
-  if (ansehen.length) {
-    fields.push({ name: "⠀\n📋⠀⠀A N S E H E N", value: render(ansehen) });
-  }
+  if (ansehen.length) push(fields, "⠀\n📋⠀⠀A N S E H E N", ansehen.map(render));
   if (verwaltung.length) {
-    fields.push({
-      name: "⠀\n🔧⠀⠀V E R W A L T U N G",
-      value: `${render(verwaltung)}\n\n_Nur für den Server-Inhaber._`,
-    });
+    push(fields, "⠀\n🔧⠀⠀V E R W A L T U N G", [
+      ...verwaltung.map(render),
+      "_Nur für den Server-Inhaber._",
+    ]);
   }
 
   return {
     title: "✦⠀⠀b g n o t i f y⠀⠀✦",
-    description: [
-      "Schreib die Befehle einfach hier in den Channel.",
-      "",
-      "**Die Antworten sieht nur du.** Sie stehen niemandem sonst im Verlauf —",
-      "auch dann nicht, wenn Bestell- oder Sendungsdaten darin vorkommen.",
-    ].join("\n"),
+    description: "Befehle einfach hier in den Channel schreiben. **Die Antworten sieht nur du.**",
     color: COLOR,
     fields,
     footer: { text: `hält sich selbst aktuell · Stand ${catalogVersion()}` },

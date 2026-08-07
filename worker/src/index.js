@@ -333,9 +333,16 @@ async function runPanel(interaction, env, state) {
         : "Übersicht aktualisiert."
     );
   } catch (err) {
+    // Die Rechtevermutung nur dort, wo sie zutreffen kann. Sie pauschal
+    // anzuhängen hat schon einmal in die Irre geführt: Bei HTTP 400 (zu langes
+    // Embed-Feld) stand da „fehlt dem Bot das Recht" — und die eigentliche
+    // Ursache stand darüber, ungelesen.
+    const rechte = /HTTP 40[313]/.test(err.message)
+      ? "\n\nDarf der Bot in diesem Channel schreiben?"
+      : "";
     await editOriginalResponse(
       interaction,
-      `\`/panel\` fehlgeschlagen: ${err.message}\n\nFehlt dem Bot vielleicht das Recht, in diesem Channel zu schreiben?`
+      `\`/panel\` fehlgeschlagen: ${err.message}${rechte}`
     ).catch(() => {});
   }
 }

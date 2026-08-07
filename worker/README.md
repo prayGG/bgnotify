@@ -147,7 +147,7 @@ cd worker && node test.mjs
 
 Läuft ohne Deploy: echte Ed25519-Schlüssel und echte Signaturen; Discord, die
 Gist-API und raw.githubusercontent über ein ersetztes `fetch` nachgestellt.
-133 Fälle, darunter „schreibt NUR commands.json" und „Panel wird bearbeitet,
+141 Fälle, darunter „schreibt NUR commands.json" und „Panel wird bearbeitet,
 nicht neu gepostet".
 
 ## Fehlersuche

@@ -22,6 +22,7 @@
  */
 import worker from "./src/index.js";
 import { COMMANDS, catalogVersion, flatten, toDiscordPayload } from "./src/catalog.js";
+import { buildEmbed } from "./src/panel.js";
 import nacl from "tweetnacl";
 import sealedbox from "tweetnacl-sealedbox-js";
 
@@ -692,6 +693,40 @@ r = await post(cmd("product remove", { args: { produkt: "k1" } }));
 check("entfernen klappt", !fake.commands.products.k1, r.content);
 r = await post(cmd("product remove", { args: { produkt: "gibtsnicht" } }));
 check("fest gepflegtes → Absage", r.content?.includes("config.yml"), r.content);
+
+// --------------------------------------------------------------------------
+section("Discord-Grenzen der Übersicht");
+// --------------------------------------------------------------------------
+// Diese Grenzen kürzt Discord nicht, es lehnt die ganze Nachricht mit HTTP 400
+// ab. Der Fehler waechst still mit: Bis /product dazukam, passte alles in EIN
+// Feld — danach lag das Panel liegen, ohne dass vorher irgendetwas warnte.
+{
+  const e = buildEmbed();
+  const felder = e.fields || [];
+  const zuLang = felder.filter((f) => f.value.length > 1024);
+  check(
+    "jedes Feld ≤ 1024 Zeichen",
+    zuLang.length === 0,
+    zuLang.map((f) => `${f.name.trim()}=${f.value.length}`).join(", ") ||
+      `längstes ${Math.max(...felder.map((f) => f.value.length))}`
+  );
+  check("höchstens 25 Felder", felder.length <= 25, `${felder.length}`);
+  check("Feldnamen ≤ 256", felder.every((f) => f.name.length <= 256));
+  check("Titel ≤ 256", (e.title || "").length <= 256);
+  check("Beschreibung ≤ 4096", (e.description || "").length <= 4096);
+
+  const gesamt =
+    (e.title || "").length + (e.description || "").length +
+    (e.footer?.text || "").length +
+    felder.reduce((n, f) => n + f.name.length + f.value.length, 0);
+  check("Gesamtlänge ≤ 6000", gesamt <= 6000, `${gesamt}`);
+
+  // Beim Umbruch darf nichts verlorengehen — das waere der stille Schaden.
+  const text = felder.map((f) => f.value).join("\n");
+  const fehlend = flatten().filter((c) => !text.includes(`/${c.path}`));
+  check("kein Command geht beim Umbruch verloren", fehlend.length === 0, fehlend.map((c) => c.path).join(", "));
+  check("wird tatsächlich auf mehrere Felder verteilt", felder.length > 2, `${felder.length} Felder`);
+}
 
 // --------------------------------------------------------------------------
 section("Katalog");
