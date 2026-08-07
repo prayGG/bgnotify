@@ -6,6 +6,22 @@ on:
 permissions:
   contents: write
 
+# Immer nur EIN Lauf gleichzeitig.
+#
+# Der Bot arbeitet auf state.json nach dem Muster auschecken → ändern →
+# zurückcommitten. Überlappen sich zwei Läufe, liest der zweite den Stand,
+# bevor der erste ihn geschrieben hat — und alles, was daraus abgeleitet wird,
+# passiert doppelt. Am 07.08. genau so passiert: #11397 startete 10 Sekunden
+# bevor #11396 fertig war, beide meldeten denselben Deploy in den Channel.
+#
+# `cancel-in-progress: false` ist wichtig: Der laufende Lauf darf NICHT
+# abgebrochen werden, er steckt womöglich mitten im Schreiben. Der neue wartet
+# stattdessen. GitHub hält dabei genau einen wartenden Lauf vor und verwirft
+# weitere — was hier richtig ist, denn fünfmal dasselbe zu prüfen bringt nichts.
+concurrency:
+  group: bot-run
+  cancel-in-progress: false
+
 jobs:
   run-bot:
     runs-on: ubuntu-latest
