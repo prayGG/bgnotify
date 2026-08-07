@@ -255,3 +255,18 @@ export async function removeProduct(env, state, key) {
   await saveState(env, state);
   return true;
 }
+
+/**
+ * Anzeigenamen der selbst hinterlegten Konten: `{ s3: "kollege" }`.
+ *
+ * Die fest verdrahteten stehen mit ihrem Label in `config.yml`, diese hier im
+ * Gist — wer nur die eine Quelle liest, zeigt `s3` statt „kollege". Genau das
+ * ist passiert.
+ */
+export function slotLabels(state) {
+  const out = {};
+  for (const [slot, a] of Object.entries(state?.accounts || {})) {
+    if (a?.label) out[`s${slot}`] = a.label;
+  }
+  return out;
+}

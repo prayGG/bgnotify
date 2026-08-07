@@ -8,6 +8,7 @@
  */
 
 import { ago, clip, isTerminal, joinLines } from "./format.js";
+import { slotLabels } from "./actions.js";
 import { loadAccountLabels, loadRepoState } from "./repo.js";
 
 const COLOR_OK = 0x57f287;
@@ -154,7 +155,8 @@ export async function trackListView(st, cmd = {}) {
 }
 
 export async function accountListView(st, cmd = {}) {
-  const labels = await loadAccountLabels();
+  // Fest verdrahtete Konten aus config.yml, selbst hinterlegte aus dem Gist.
+  const labels = { ...(await loadAccountLabels()), ...slotLabels(cmd) };
   const names = Object.keys(st.accounts || {});
 
   if (!names.length) {

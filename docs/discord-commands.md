@@ -254,7 +254,7 @@ worker/
 ├── src/repo.js       öffentliche state.json + Kontonamen aus config.yml
 ├── src/format.js     Zeitangaben, Kürzen, Discord-Längengrenzen
 ├── register.js       meldet die Commands aus dem Katalog bei Discord an
-├── test.mjs          141 Fälle ohne Deploy
+├── test.mjs          143 Fälle ohne Deploy
 ├── wrangler.toml     Deploy-Konfiguration
 ├── package.json
 └── README.md         Einrichtungsanleitung
@@ -326,7 +326,7 @@ Vier Entscheidungen im Code, die nicht offensichtlich sind:
    „denkt nach…".
 
 Getestet mit echten Ed25519-Schlüsseln gegen `worker.fetch()`, Discord und
-GitHub über ein ersetztes `fetch` nachgestellt — 141 Fälle, alle grün:
+GitHub über ein ersetztes `fetch` nachgestellt — 143 Fälle, alle grün:
 
 ```bash
 cd worker && node test.mjs

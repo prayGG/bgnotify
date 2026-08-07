@@ -46,6 +46,7 @@ import {
   removeTracking,
   requestScan,
   setAccountEnabled,
+  slotLabels,
   triggerRun,
 } from "./actions.js";
 import { dispatchRun, githubConfigured } from "./github.js";
@@ -408,7 +409,9 @@ async function handleAutocomplete(interaction, env) {
   const passt = (s) => s.toLowerCase().includes(eingabe);
 
   if (path === "account enable" || path === "account disable") {
-    const labels = await loadAccountLabels();
+    // Beide Quellen: config.yml fuer die fest verdrahteten, commands.json fuer
+    // die selbst hinterlegten. Sonst steht dort "s3" statt des Namens.
+    const labels = { ...(await loadAccountLabels()), ...slotLabels(data.commands) };
     const choices = Object.keys(data.orders.accounts || {})
       .map((key) => ({ name: labels[key] ? `${labels[key]} (${key})` : key, value: key }))
       .filter((c) => passt(c.name) || passt(c.value));

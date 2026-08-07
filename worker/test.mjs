@@ -601,6 +601,21 @@ check("liefert aber den Schlüssel", r.body.data.choices[0].value === "a");
 r = await post({ ...cmd("account enable"), type: 4, data: { name: "account", options: [{ type: 1, name: "enable", options: [{ name: "konto", value: "mav", focused: true }] }] } });
 check("filtert nach Eingabe", r.body.data.choices.length === 1 && r.body.data.choices[0].value === "b");
 
+// Selbst hinterlegte Konten tragen ihren Namen in commands.json, nicht in
+// config.yml. Wer nur die eine Quelle liest, zeigt "s3" statt "kollege".
+resetFake({
+  ...ready(),
+  configYml: "accounts:\n    - name: a\n      label: pray\n",
+  orders: { accounts: { a: {}, s3: {} } },
+});
+fake.commands.accounts = { 3: { label: "kollege" } };
+r = await post({ ...cmd("account enable"), type: 4, data: { name: "account", options: [{ type: 1, name: "enable", options: [{ name: "konto", value: "", focused: true }] }] } });
+const namen = r.body.data.choices.map((c) => c.name);
+check("selbst hinterlegtes Konto zeigt seinen Namen", namen.includes("kollege (s3)"), namen.join(", "));
+
+r = await post(cmd("account list"));
+check("/account list ebenso", r.embed.description.includes("kollege"), r.embed.description.split("\n").join(" | "));
+
 const ohneRolle = { ...cmd("account enable", { roles: [] }), type: 4, data: { name: "account", options: [{ type: 1, name: "enable", options: [{ name: "konto", value: "", focused: true }] }] } };
 r = await post(ohneRolle);
 check("ohne Rolle → leere Liste statt Verrat", r.body.data.choices.length === 0);
