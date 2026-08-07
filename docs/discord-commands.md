@@ -250,10 +250,20 @@ worker/
 └── README.md         Einrichtungsanleitung
 ```
 
-**Schritt 1 ist live** — Worker deployt, Endpoint bei Discord eingetragen,
-`/ping` beantwortet. Schritt 2 ist gebaut und getestet, aber erst aktiv, wenn
-die drei neuen Secrets gesetzt sind (`DISCORD_BOT_TOKEN`, `GIST_TOKEN`,
-`GIST_ID`) und einmal `/setup` gelaufen ist.
+**Beide Schritte sind live.** Worker deployt unter
+`bgnotify-commands.praygg.workers.dev`, Endpoint bei Discord eingetragen, alle
+vier Secrets gesetzt, `/setup` einmal gelaufen — die Rolle steht und ist im Gist
+vermerkt.
+
+Zwei Stolpersteine aus der Einrichtung, die beim nächsten Mal Zeit sparen:
+
+- `wrangler secret put NAME` — der **Name** gehört in den Befehl, der **Wert**
+  kommt erst am Prompt danach. Wer den Token in die Befehlszeile schreibt, legt
+  ihn als Secret-*Namen* an. Namen sind nicht geheim, sie stehen im Dashboard.
+- Für Gists braucht es zwingend einen **klassischen** GitHub-Token mit dem Haken
+  `gist`. Fein-granulare Token können die Gist-API überhaupt nicht und liefern
+  stumm `404` — dasselbe, was auch bei falscher `GIST_ID` kommt. Die beiden
+  Fälle sind an der Fehlermeldung nicht unterscheidbar.
 
 Vier Entscheidungen im Code, die nicht offensichtlich sind:
 
