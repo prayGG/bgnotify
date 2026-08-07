@@ -142,8 +142,12 @@ Braucht der Bot in dem Channel Schreibrechte, sonst meldet `/panel` genau das.
 ## Tests
 
 ```bash
-cd worker && node test.mjs
+cd worker && node test.mjs      # Worker
+python test_bot.py            # Bot (aus dem Repo-Wurzelverzeichnis)
 ```
+
+Beide laufen zusaetzlich bei jedem Push (`.github/workflows/tests.yml`) —
+ohne Secrets und ohne Netz, die Suiten stellen ihre Raender selbst nach.
 
 Läuft ohne Deploy: echte Ed25519-Schlüssel und echte Signaturen; Discord, die
 Gist-API und raw.githubusercontent über ein ersetztes `fetch` nachgestellt.

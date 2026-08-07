@@ -1,0 +1,76 @@
+name: tests
+
+# Läuft bei jedem Push und bei jedem PR auf main. Bewusst NICHT nur manuell:
+# Zwei Fehler, die einen halben Abend gekostet haben, hätten hier sofort rot
+# geleuchtet — ein zu langes Embed-Feld (`/panel` blieb mit HTTP 400 liegen)
+# und eine Login-Prüfung, die nie feuern konnte, weil der Filter davor sie
+# rauswarf. Tests, die niemand startet, finden nichts.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+# Bei schnell aufeinanderfolgenden Pushes reicht das Ergebnis des letzten.
+# Hier ist `cancel-in-progress: true` richtig — anders als bei `bot-run`
+# schreibt ein Testlauf nichts, ein Abbruch kann also nichts halb erledigt
+# hinterlassen.
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
+# Nur lesen. Die Suiten stellen ihre Ränder selbst nach und brauchen weder
+# Secrets noch Netz — deshalb dürfen sie hier auch nichts anfassen.
+permissions:
+  contents: read
+
+jobs:
+  worker:
+    name: Worker (JS)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: worker/package-lock.json
+
+      # `npm ci` statt `install`: hält sich strikt an package-lock.json und
+      # schlägt fehl, wenn die beiden auseinanderlaufen. Genau das will man im
+      # Test wissen, statt still eine neuere Version zu bekommen.
+      - run: npm ci
+        working-directory: worker
+
+      - name: Tests
+        run: node test.mjs
+        working-directory: worker
+
+      # Fängt ab, was die Tests nicht sehen: Ein Bundle, das die Workers-Runtime
+      # gar nicht bauen kann (fehlender Import, unbekanntes Modul). Deployt nichts.
+      - name: Bundle baut
+        run: npx wrangler deploy --dry-run
+        working-directory: worker
+
+  bot:
+    name: Bot (Python)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+
+      - run: pip install -r requirements.txt
+
+      - name: Tests
+        run: python test_bot.py
+
+      # Syntaxfehler in einem Modul, das die Tests nicht importieren, würden
+      # sonst erst im echten Lauf auffallen — also im Betrieb.
+      - name: Alle Module kompilieren
+        run: python -m compileall -q src/

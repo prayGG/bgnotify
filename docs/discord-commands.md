@@ -386,7 +386,8 @@ Der Plan ist abgearbeitet. Zwei Dinge sind bewusst offengeblieben:
   eine Karte, danach steht die Auswahl im Autocomplete. Discord-Auswahlmenüs
   wären eleganter, gehen aber nicht: Der Bot postet über Webhooks, und
   eingehende Webhooks dürfen keine interaktiven Komponenten tragen.
-- **Testen:** `node worker/test.mjs` und `python test_bot.py`. Die Python-Seite
+- **Testen:** `node worker/test.mjs` und `python test_bot.py` — beide laufen
+  auch bei jedem Push (`.github/workflows/tests.yml`). Die Python-Seite
   kam spät dazu, nachdem ein Fehler durchgerutscht war, den 111 grüne
   Worker-Tests nicht sehen konnten — er saß in `check_orders`.
 
