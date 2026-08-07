@@ -301,14 +301,28 @@ def check_orders(cfg: dict, default_webhook: str, default_ping_ids: list[str], r
     # An/Aus-Schalter: nur aktivierte Konten (Gist-Feld `enabled`) → in
     # Bestellpausen keine Logins. Standard = aus.
     enabled_names = [a["name"] for a in cfg_accounts if _order_enabled(st, a["name"], cmds)]
-    if not enabled_names:
+
+    # Frisch per `/account add` hinterlegte Konten müssen EINMAL geprüft werden,
+    # auch wenn sie noch aus sind. Sie sind es nämlich immer: Neue Konten starten
+    # ausgeschaltet, damit in Bestellpausen keine Logins passieren. Ohne diese
+    # Ausnahme fiele das Konto hier raus, und wer gerade sein Passwort eingetippt
+    # hat, erführe nie, ob es stimmt.
+    #
+    # Es bleibt bei genau EINEM Login: Danach steht `login_checked_at` im Stand,
+    # `_verify_pending` greift nicht mehr, und das Konto ruht weiter bis zum
+    # ersten `/account enable`.
+    verify_names = [a["name"] for a in cfg_accounts
+                    if _verify_pending(cmds, a["name"], accounts_state.get(a["name"], {}))]
+
+    kandidaten = set(enabled_names) | set(verify_names)
+    if not kandidaten:
         log.info("orders: alle Konten 'off' (Gist `enabled`) — übersprungen.")
         return
 
-    # Nur aktivierte Accounts mit vorhandenen Secrets (Login + Ziel-Webhook).
+    # Nur diese Accounts, sofern Secrets (Login + Ziel-Webhook) vorhanden sind.
     resolved = []
     for a in cfg_accounts:
-        if a["name"] not in enabled_names:
+        if a["name"] not in kandidaten:
             continue
         user = os.environ.get(a.get("username_env", "BG_USERNAME"), "")
         pw = os.environ.get(a.get("password_env", "BG_PASSWORD"), "")
