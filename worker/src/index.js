@@ -482,7 +482,7 @@ async function handleCommand(interaction, env, ctx) {
       const label = (args.name || suggested || "").trim();
       if (!label) {
         return reply(
-          "Aus dem Link lässt sich kein Name ableiten — gib einen mit an, z.B. `name: mave`."
+          "Aus dem Link lässt sich kein Name ableiten — gib mit `name:` selbst einen an."
         );
       }
       return reply(await addTracking(env, state, label, url, userId));

@@ -10,7 +10,7 @@ Abgelegt wird ein **Wunschzustand**, keine Auftragsliste:
 
     {
       "enabled":  {"a": "off"},
-      "tracking": {"mave": {"url": "https://…", "added_by": "…", "added_at": "…"}}
+      "tracking": {"<name>": {"url": "https://…", "added_at": "…"}}
     }
 
 Der Bot legt ihn beim Lesen über seinen eigenen Stand. Ein Wunsch ist

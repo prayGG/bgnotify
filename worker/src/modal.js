@@ -37,7 +37,7 @@ export function accountAddModal() {
     custom_id: ACCOUNT_ADD,
     title: "BG-Konto hinterlegen",
     components: [
-      feld("label", "Anzeigename", "z.B. mave — steht auf deinen Karten", { max_length: 24 }),
+      feld("label", "Anzeigename", "kurzer Name — steht später auf deinen Karten", { max_length: 24 }),
       feld("user", "BG-Benutzername oder E-Mail", "dein Login bei bgpharmadrugs.to", { max_length: 120 }),
       feld("pass", "BG-Passwort", "wird sofort verschlüsselt", { max_length: 120 }),
     ],

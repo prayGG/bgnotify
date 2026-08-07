@@ -35,7 +35,7 @@ export const COMMANDS = [
         help: "Trägt eine Sendung zur Verfolgung ein. Ab dem nächsten Lauf meldet der Bot jedes neue Ereignis und hört bei Zustellung von selbst auf.",
         options: [
           { name: "link", description: "Hermes-Sendungslink", type: STRING, required: true },
-          { name: "name", description: "Anzeigename, z.B. „mave“ (sonst aus dem Link)", type: STRING },
+          { name: "name", description: "Anzeigename (sonst wird einer aus dem Link abgeleitet)", type: STRING },
         ],
       },
       {

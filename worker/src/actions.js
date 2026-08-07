@@ -9,7 +9,7 @@
  * Abgelegt wird ein **Wunschzustand**, keine Auftragsliste:
  *
  *     { "enabled":  { "a": "off" },
- *       "tracking": { "mave": { "url": "…", "added_by": "…", "added_at": "…" } } }
+ *       "tracking": { "<name>": { "url": "…", "added_at": "…" } } }
  *
  * Der Bot legt das beim Lesen über seinen eigenen Stand. Das ist gegenüber
  * einer Warteschlange deutlich robuster: Ein Wunsch ist idempotent, muss nicht
