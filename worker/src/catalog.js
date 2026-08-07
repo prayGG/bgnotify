@@ -64,6 +64,19 @@ export const COMMANDS = [
         help: "Welche Konten hinterlegt sind, ob sie an oder aus sind, wann sie zuletzt geprüft wurden und wie viele Bestellungen offen sind.",
       },
       {
+        name: "add",
+        description: "Eigenes BG-Konto hinterlegen",
+        help: "Öffnet ein Formular für Zugangsdaten. Die Werte werden sofort verschlüsselt und als GitHub-Secret abgelegt — im Gist stehen nur Anzeigename und Platznummer. Ob der Login stimmt, meldet der Bot beim nächsten Lauf.",
+      },
+      {
+        name: "remove",
+        description: "Konto entfernen",
+        help: "Löscht die hinterlegten Zugangsdaten und gibt den Platz frei. Nur für selbst hinterlegte Konten — die fest verdrahteten bleiben.",
+        options: [
+          { name: "konto", description: "welches Konto", type: STRING, required: true, autocomplete: true },
+        ],
+      },
+      {
         name: "enable",
         description: "Konto einschalten",
         help: "Ab dem nächsten Lauf prüft der Bot dieses Konto wieder. Einschalten, wenn du bestellt hast.",

@@ -28,17 +28,34 @@ import {
 } from "./discord.js";
 import { publish, refreshIfStale } from "./panel.js";
 import { accountListView, statusView, trackListView } from "./views.js";
-import { addTracking, parseTrackingLink, removeTracking, setAccountEnabled, triggerRun } from "./actions.js";
+import {
+  SLOTS,
+  addAccount,
+  addTracking,
+  freeSlot,
+  parseTrackingLink,
+  removeAccount,
+  removeTracking,
+  setAccountEnabled,
+  triggerRun,
+} from "./actions.js";
 import { githubConfigured } from "./github.js";
+import { ACCOUNT_ADD, accountAddModal, modalValues } from "./modal.js";
 import { SUB_COMMAND } from "./catalog.js";
 import { loadAccountLabels } from "./repo.js";
 
-const InteractionType = { PING: 1, APPLICATION_COMMAND: 2, AUTOCOMPLETE: 4 };
+const InteractionType = {
+  PING: 1,
+  APPLICATION_COMMAND: 2,
+  AUTOCOMPLETE: 4,
+  MODAL_SUBMIT: 5,
+};
 const InteractionResponseType = {
   PONG: 1,
   CHANNEL_MESSAGE_WITH_SOURCE: 4,
   DEFERRED_CHANNEL_MESSAGE_WITH_SOURCE: 5,
   AUTOCOMPLETE_RESULT: 8,
+  MODAL: 9,
 };
 const EPHEMERAL = 1 << 6; // Antwort sieht nur, wer den Command aufgerufen hat
 
@@ -207,6 +224,67 @@ async function runSetup(interaction, env, state) {
   }
 }
 
+/**
+ * Das abgeschickte Formular verarbeiten: verschlüsseln, Secrets setzen, Platz
+ * vermerken.
+ *
+ * Läuft hinter einer deferrten Antwort, weil bis zu fünf Netzaufrufe anfallen
+ * (Repo-Schlüssel, drei Secrets, Gist). Fehler landen in derselben Antwort —
+ * wer gerade sein Passwort eingetippt hat, soll nicht auf eine Meldung warten,
+ * die nie kommt.
+ */
+async function runAccountAdd(interaction, env, state, werte) {
+  try {
+    const slot = freeSlot(state);
+    if (slot === null) {
+      await editOriginalResponse(interaction, "Inzwischen sind alle Plätze belegt.");
+      return;
+    }
+    await addAccount(
+      env, state, slot, werte.label, werte.user, werte.pass,
+      interaction.member.user.id
+    );
+    await editOriginalResponse(
+      interaction,
+      [
+        `**${werte.label}** ist hinterlegt (Platz ${slot}).`,
+        "",
+        "Die Zugangsdaten sind verschlüsselt als GitHub-Secret abgelegt — im Gist stehen nur",
+        "der Anzeigename und die Platznummer.",
+        "",
+        "Ob der Login stimmt, zeigt sich beim nächsten Lauf. Mit `/account enable` einschalten,",
+        "sobald du bestellt hast, und `/run` stößt sofort einen Lauf an.",
+      ].join("\n")
+    );
+  } catch (err) {
+    await editOriginalResponse(
+      interaction,
+      `Konnte das Konto nicht hinterlegen: ${err.message}`
+    ).catch(() => {});
+  }
+}
+
+/** Konto entfernen: Secrets löschen, Platz freigeben. */
+async function runAccountRemove(interaction, env, state, slot) {
+  try {
+    const eintrag = state.accounts?.[String(slot)];
+    if (!eintrag) {
+      await editOriginalResponse(
+        interaction,
+        "Das ist kein selbst hinterlegtes Konto. Fest verdrahtete Konten stehen in `config.yml` und bleiben."
+      );
+      return;
+    }
+    await removeAccount(env, state, Number(slot));
+    await editOriginalResponse(
+      interaction,
+      `**${eintrag.label}** ist entfernt — Zugangsdaten gelöscht, Platz ${slot} wieder frei.`
+    );
+  } catch (err) {
+    await editOriginalResponse(interaction, `Entfernen fehlgeschlagen: ${err.message}`).catch(() => {});
+  }
+}
+
 /** Bot-Lauf anstoßen und das Ergebnis nachreichen. */
 async function runDispatch(interaction, env, state) {
   try {
@@ -308,6 +386,15 @@ async function handleAutocomplete(interaction, env) {
     return autocompleteResult(choices);
   }
 
+  if (path === "account remove") {
+    // Nur selbst hinterlegte Konten: die fest in config.yml verdrahteten kann
+    // der Worker gar nicht entfernen, sie stünden hier also nur im Weg.
+    const choices = Object.entries(data.commands.accounts || {})
+      .map(([slot, a]) => ({ name: `${a.label} (Platz ${slot})`, value: slot }))
+      .filter((c) => passt(c.name));
+    return autocompleteResult(choices);
+  }
+
   if (path === "track remove") {
     // Nur die selbst eingetragenen: automatisch übernommene Sendungen räumt
     // der Bot nach der Zustellung ohnehin weg, die kann man nicht sinnvoll
@@ -406,6 +493,27 @@ async function handleCommand(interaction, env, ctx) {
       return reply(text);
     }
 
+    case "account add": {
+      if (!githubConfigured(env)) {
+        return reply("Dem Worker fehlt `GITHUB_TOKEN` — ohne das kann er keine Secrets anlegen.");
+      }
+      if (freeSlot(state) === null) {
+        return reply(
+          `Alle ${SLOTS.length} Plätze für selbst hinterlegte Konten sind belegt. Erst eines mit \`/account remove\` freimachen.`
+        );
+      }
+      // Ein Modal MUSS die sofortige Antwort sein — nach einem Defer lässt
+      // Discord keines mehr zu.
+      return json({ type: InteractionResponseType.MODAL, data: accountAddModal() });
+    }
+
+    case "account remove": {
+      if (!githubConfigured(env)) {
+        return reply("Dem Worker fehlt `GITHUB_TOKEN` — ohne das kann er keine Secrets löschen.");
+      }
+      return deferTo(runAccountRemove(interaction, env, state, args.konto), ctx);
+    }
+
     case "run": {
       if (!githubConfigured(env)) {
         return reply(
@@ -420,6 +528,38 @@ async function handleCommand(interaction, env, ctx) {
     default:
       return reply(`Unbekannter Command: \`/${path}\``);
   }
+}
+
+/**
+ * Ein abgeschicktes Formular. Läuft durch dieselbe Rollenprüfung wie ein
+ * Command — ein Modal ist nur eine zweite Runde derselben Interaktion, und wer
+ * die Rolle inzwischen verloren hat, soll auch hier nicht durchkommen.
+ */
+async function handleModal(interaction, env, ctx) {
+  if (interaction.data?.custom_id !== ACCOUNT_ADD) {
+    return reply("Unbekanntes Formular.");
+  }
+  if (!interaction.guild_id || !interaction.member) {
+    return reply("Das geht nur in einem Server.");
+  }
+
+  let data;
+  try {
+    data = await loadAll(env);
+  } catch (err) {
+    return reply(`Stand nicht lesbar: ${err.message}`);
+  }
+  const roleId = roleIdFor(data.commands, interaction.guild_id);
+  if (!roleId || !(interaction.member.roles || []).includes(roleId)) {
+    return reply(`Dafür brauchst du die Rolle <@&${roleId || "bgnotify"}>.`);
+  }
+
+  const werte = modalValues(interaction.data);
+  if (!werte.label || !werte.user || !werte.pass) {
+    return reply("Es fehlt ein Feld — bitte `/account add` nochmal aufrufen.");
+  }
+
+  return deferTo(runAccountAdd(interaction, env, data.commands, werte), ctx);
 }
 
 export default {
@@ -461,6 +601,9 @@ export default {
     }
     if (interaction.type === InteractionType.AUTOCOMPLETE) {
       return handleAutocomplete(interaction, env);
+    }
+    if (interaction.type === InteractionType.MODAL_SUBMIT) {
+      return handleModal(interaction, env, ctx);
     }
     return new Response("unsupported interaction type", { status: 400 });
   },

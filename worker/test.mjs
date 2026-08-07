@@ -22,6 +22,13 @@
  */
 import worker from "./src/index.js";
 import { COMMANDS, catalogVersion, flatten, toDiscordPayload } from "./src/catalog.js";
+import nacl from "tweetnacl";
+import sealedbox from "tweetnacl-sealedbox-js";
+
+// Echtes Schluesselpaar: so beweist der Test, dass die Werte wirklich
+// versiegelt ankommen und nicht nur "irgendwie anders aussehen".
+const SEAL_KP = nacl.box.keyPair();
+const SEAL_PUBLIC_B64 = btoa(String.fromCharCode(...SEAL_KP.publicKey));
 
 const enc = new TextEncoder();
 const hex = (buf) =>
@@ -70,6 +77,8 @@ function resetFake(overrides = {}) {
     editedMessages: [],
     dispatched: 0,
     dispatchStatus: 0,
+    secrets: {},
+    deleted: [],
     ...overrides,
   };
 }
@@ -89,6 +98,19 @@ globalThis.fetch = async (input, init = {}) => {
   }
 
   if (url.host === "api.github.com") {
+    // Secrets-API. Der oeffentliche Schluessel ist ein echtes NaCl-Schluesselpaar,
+    // damit der Test wirklich pruefen kann, dass nichts im Klartext rausgeht.
+    if (method === "GET" && path.endsWith("/actions/secrets/public-key")) {
+      return jsonRes({ key: SEAL_PUBLIC_B64, key_id: "1" });
+    }
+    if (method === "PUT" && path.includes("/actions/secrets/")) {
+      fake.secrets[path.split("/").pop()] = JSON.parse(init.body).encrypted_value;
+      return new Response(null, { status: 201 });
+    }
+    if (method === "DELETE" && path.includes("/actions/secrets/")) {
+      fake.deleted.push(path.split("/").pop());
+      return new Response(null, { status: 204 });
+    }
     if (method === "POST" && path.includes("/actions/workflows/")) {
       if (fake.dispatchStatus) return new Response("", { status: fake.dispatchStatus });
       fake.dispatched++;
@@ -428,7 +450,7 @@ r = await post(cmd("track add", {
   args: { link: "https://www.myhermes.de/x?TrackID=H1023311266211701051", name: "mave" },
 }));
 check("Hermes-Link wird eingetragen", fake.commands.tracking?.mave?.url.includes("H1023311266211701051"));
-check("merkt sich, wer ihn eintrug", fake.commands.tracking?.mave?.added_by === OTHER);
+check("KEINE Discord-ID im Gist", !JSON.stringify(fake.commands.tracking).includes(OTHER), JSON.stringify(fake.commands.tracking.mave));
 check("schreibt NUR commands.json", fake.patchedFiles.join(",") === "commands.json");
 
 r = await post(cmd("track list"));
@@ -467,6 +489,86 @@ resetFake({ ...ready(), dispatchStatus: 404 });
 r = await post(cmd("run"), { env: { ...FULL_ENV, GITHUB_TOKEN: "gh-token" } });
 check("fehlende Rechte werden erklärt", fake.followUp.includes("Actions: read and write"), fake.followUp);
 check("… und sperren nicht", !fake.commands.last_run_at);
+
+// --------------------------------------------------------------------------
+section("/account add");
+// --------------------------------------------------------------------------
+const GH_ENV = { ...FULL_ENV, GITHUB_TOKEN: "gh-token" };
+
+resetFake(ready());
+r = await post(cmd("account add"), { env: GH_ENV });
+check("antwortet mit einem Modal (Typ 9)", r.body.type === 9, `type=${r.body.type}`);
+check("fragt Name, Benutzer, Passwort", JSON.stringify(r.body.data.components).match(/custom_id":"(label|user|pass)"/g)?.length === 3);
+check("Passwort ist KEINE Command-Option", !JSON.stringify(toDiscordPayload()).includes("passwor"));
+
+const modal = (werte, { roles = [ROLE] } = {}) => ({
+  type: 5,
+  application_id: "app-1",
+  token: "interaction-token",
+  guild_id: GUILD,
+  member: { user: { id: OTHER }, roles },
+  data: {
+    custom_id: "account_add",
+    components: Object.entries(werte).map(([k, v]) => ({
+      type: 1, components: [{ type: 4, custom_id: k, value: v }],
+    })),
+  },
+});
+
+resetFake(ready());
+r = await post(modal({ label: "kollege", user: "mave@x.de", pass: "geheim123" }), { env: GH_ENV });
+check("legt drei Secrets an", Object.keys(fake.secrets).length === 3, Object.keys(fake.secrets).join(", "));
+check("belegt Platz 3", Boolean(fake.commands.accounts?.["3"]), JSON.stringify(fake.commands.accounts));
+check("merkt sich nur den Anzeigenamen", JSON.stringify(fake.commands.accounts["3"]).includes("kollege"));
+
+const gespeichert = JSON.stringify(fake.commands);
+check("KEIN Passwort im Gist", !gespeichert.includes("geheim123"), gespeichert.slice(0, 80));
+check("KEIN Benutzername im Gist", !gespeichert.includes("mave@x.de"));
+check("KEINE Discord-ID im Gist", !gespeichert.includes(OTHER));
+check("Discord-ID liegt als Secret", fake.secrets.DISCORDID_3 !== undefined);
+
+const roh = Object.values(fake.secrets).join("|");
+check("Secrets gehen NUR verschlüsselt raus", !roh.includes("geheim123") && !roh.includes("mave@x.de"), roh.slice(0, 60));
+
+// Der eigentliche Beweis: mit dem privaten Schlüssel muss GENAU das Original
+// wieder herauskommen. „Sieht anders aus" wäre auch bei kaputter
+// Verschlüsselung wahr — GitHub könnte den Wert dann aber nie benutzen.
+const entsiegelt = (b64) => {
+  const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+  const auf = sealedbox.open(bytes, SEAL_KP.publicKey, SEAL_KP.secretKey);
+  return auf ? new TextDecoder().decode(auf) : null;
+};
+check("BG_PASSWORD_3 entschlüsselt zum Original", entsiegelt(fake.secrets.BG_PASSWORD_3) === "geheim123", String(entsiegelt(fake.secrets.BG_PASSWORD_3)));
+check("BG_USERNAME_3 entschlüsselt zum Original", entsiegelt(fake.secrets.BG_USERNAME_3) === "mave@x.de");
+check("DISCORDID_3 enthält die ID des Aufrufers", entsiegelt(fake.secrets.DISCORDID_3) === OTHER);
+
+r = await post(modal({ label: "zweiter", user: "u2", pass: "p2" }), { env: GH_ENV });
+check("nächstes Konto nimmt Platz 4", Boolean(fake.commands.accounts?.["4"]));
+
+r = await post(modal({ label: "", user: "u", pass: "p" }), { env: GH_ENV });
+check("leeres Feld → freundlicher Abbruch", r.content?.includes("fehlt ein Feld"), r.content);
+
+r = await post(modal({ label: "x", user: "u", pass: "p" }, { roles: [] }), { env: GH_ENV });
+check("Formular ohne Rolle → abgelehnt", r.content?.includes("Rolle"), r.content);
+
+resetFake(ready());
+fake.commands.accounts = { 3: {}, 4: {}, 5: {}, 6: {} };
+r = await post(cmd("account add"), { env: GH_ENV });
+check("alle Plätze belegt → sagt das statt Modal", r.content?.includes("belegt"), r.content);
+
+// --------------------------------------------------------------------------
+section("/account remove");
+// --------------------------------------------------------------------------
+resetFake(ready());
+fake.commands.accounts = { 3: { label: "kollege" } };
+fake.commands.enabled = { s3: "on" };
+r = await post(cmd("account remove", { args: { konto: "3" } }), { env: GH_ENV });
+check("löscht alle drei Secrets", fake.deleted.length === 3, fake.deleted.join(", "));
+check("gibt den Platz frei", !fake.commands.accounts["3"]);
+check("räumt den An/Aus-Schalter mit weg", !fake.commands.enabled.s3);
+
+r = await post(cmd("account remove", { args: { konto: "9" } }), { env: GH_ENV });
+check("fest verdrahtetes Konto → Absage", fake.followUp.includes("config.yml"), fake.followUp);
 
 // --------------------------------------------------------------------------
 section("Autocomplete");

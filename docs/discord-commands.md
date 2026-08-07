@@ -234,7 +234,7 @@ zusammengeführt.
 
 ---
 
-## 5 · Stand: alles außer `/account add` und `/product`
+## 5 · Stand: alles außer `/product`
 
 Auf `main`, gemergt.
 
@@ -243,6 +243,8 @@ worker/
 ├── src/index.js      Signatur-/Rollenprüfung, Routing, Autocomplete
 ├── src/actions.js    die schreibenden Commands (Wunschzustand)
 ├── src/github.js     Bot-Lauf anstoßen (authentifiziert, eng geschnitten)
+├── src/secrets.js    sealed box + GitHub-Secrets-API
+├── src/modal.js      das Formular fuer /account add
 ├── src/catalog.js    DIE Command-Liste — Quelle für Anmeldung UND Panel
 ├── src/panel.js      Befehlsübersicht bauen, posten, auffrischen
 ├── src/views.js      /status, /track list, /account list (nur lesend)
@@ -251,7 +253,7 @@ worker/
 ├── src/repo.js       öffentliche state.json + Kontonamen aus config.yml
 ├── src/format.js     Zeitangaben, Kürzen, Discord-Längengrenzen
 ├── register.js       meldet die Commands aus dem Katalog bei Discord an
-├── test.mjs          84 Fälle ohne Deploy
+├── test.mjs          106 Fälle ohne Deploy
 ├── wrangler.toml     Deploy-Konfiguration
 ├── package.json
 └── README.md         Einrichtungsanleitung
@@ -323,7 +325,7 @@ Vier Entscheidungen im Code, die nicht offensichtlich sind:
    „denkt nach…".
 
 Getestet mit echten Ed25519-Schlüsseln gegen `worker.fetch()`, Discord und
-GitHub über ein ersetztes `fetch` nachgestellt — 84 Fälle, alle grün:
+GitHub über ein ersetztes `fetch` nachgestellt — 106 Fälle, alle grün:
 
 ```bash
 cd worker && node test.mjs

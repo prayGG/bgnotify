@@ -16,13 +16,14 @@ Requests/Tag, keine Kreditkarte).
 
 ## Stand
 
-Schritt 5 von 7 — alles außer `/account add` und `/product`.
+Schritt 6 von 7 — alles außer `/product`.
 
 | | |
 |---|---|
 | lesen | `/status`, `/track list`, `/account list` |
 | schreiben | `/account enable`, `/account disable`, `/track add`, `/track remove` |
 | auslösen | `/run` |
+| Konten selbst hinterlegen | `/account add`, `/account remove` |
 | Rest | `/ping`, `/setup`, `/panel` |
 
 Was schreibt, schreibt **nur** nach `commands.json` — nie nach
@@ -54,7 +55,7 @@ Worker, weil Discord die Rollen des Aufrufers bei jedem Command mitschickt.
 | `DISCORD_BOT_TOKEN` | Rolle anlegen und zuweisen (`/setup`) | Schritt 2 |
 | `GIST_TOKEN` | PAT mit **ausschließlich** `gist`-Recht | Schritt 2 |
 | `GIST_ID` | ID des privaten Gists | Schritt 2 |
-| `GITHUB_TOKEN` | Bot-Lauf anstoßen (`/run`) — **fein-granular**, nur *Actions: read and write* auf dieses Repo | Schritt 5 |
+| `GITHUB_TOKEN` | Lauf anstoßen und Secrets setzen — **fein-granular**, *Actions: read and write* **und** *Secrets: read and write* auf dieses Repo | Schritt 5 |
 
 Setzen mit `npx wrangler secret put <NAME>`, Wert danach eingeben. Nichts davon
 gehört in `wrangler.toml` — die Datei liegt im öffentlichen Repo.
@@ -145,7 +146,7 @@ cd worker && node test.mjs
 
 Läuft ohne Deploy: echte Ed25519-Schlüssel und echte Signaturen; Discord, die
 Gist-API und raw.githubusercontent über ein ersetztes `fetch` nachgestellt.
-84 Fälle, darunter „schreibt NUR commands.json" und „Panel wird bearbeitet,
+106 Fälle, darunter „schreibt NUR commands.json" und „Panel wird bearbeitet,
 nicht neu gepostet".
 
 ## Fehlersuche

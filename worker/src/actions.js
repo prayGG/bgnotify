@@ -20,6 +20,7 @@
 
 import { saveState } from "./gist.js";
 import { actionsUrl, dispatchRun } from "./github.js";
+import { deleteSecret, putSecrets } from "./secrets.js";
 
 /**
  * Mindestabstand zwischen zwei per Command ausgelösten Läufen.
@@ -86,23 +87,82 @@ export async function setAccountEnabled(env, state, name, on, known) {
 }
 
 /** Sendung eintragen. */
-export async function addTracking(env, state, label, url, userId) {
+export async function addTracking(env, state, label, url) {
   state.tracking ||= {};
   const vorhanden = state.tracking[label];
 
-  state.tracking[label] = {
-    url,
-    added_by: userId,
-    added_at: new Date().toISOString(),
-    // Discord-IDs landen NICHT im Gist — gespeichert wird nur der Name des
-    // Secrets, aufgelöst wird beim Posten. Wer den Command aufruft, bekommt
-    // die Meldungen also über den Standard-Ping.
-  };
+  // Bewusst OHNE die Discord-ID des Aufrufers: Ins Gist kommen keine
+  // Discord-IDs, gespeichert wird höchstens der Name eines Secrets. Wer den
+  // Command aufruft, bekommt die Meldungen über den Standard-Ping.
+  state.tracking[label] = { url, added_at: new Date().toISOString() };
   await saveState(env, state);
 
   return vorhanden
     ? `**${label}** zeigt jetzt auf den neuen Link. Der Stand wurde zurückgesetzt, der Verlauf kommt beim nächsten Lauf frisch.`
     : `**${label}** wird ab dem nächsten Lauf verfolgt. Bei jedem neuen Ereignis kommt eine Meldung — bei Zustellung hört der Bot von selbst auf.`;
+}
+
+// --------------------------------------------------------------------------
+// Konto-Slots
+// --------------------------------------------------------------------------
+
+/**
+ * Vorverdrahtete Plätze für selbst hinterlegte Konten.
+ *
+ * Ein neues Secret nützt nichts, wenn der Workflow es nicht durchreicht — und
+ * Actions kann Secrets nicht dynamisch auflisten. Deshalb stehen die Namen fest
+ * in `main.yml`, und `/account add` belegt den nächsten freien. Harte Grenze bei
+ * vier zusätzlichen Konten; wer mehr will, trägt in `main.yml` weitere Plätze
+ * ein und erweitert diese Liste.
+ *
+ * Die Alternative `toJSON(secrets)` kippt ALLE Secrets in eine Variable,
+ * inklusive Gist- und GitHub-Token — nicht machen.
+ */
+export const SLOTS = [3, 4, 5, 6];
+
+export const slotSecrets = (n) => ({
+  user: `BG_USERNAME_${n}`,
+  pass: `BG_PASSWORD_${n}`,
+  ping: `DISCORDID_${n}`,
+});
+
+/** Nächster freier Platz, oder null wenn alle belegt sind. */
+export function freeSlot(state) {
+  const belegt = new Set(Object.keys(state.accounts || {}).map(Number));
+  return SLOTS.find((n) => !belegt.has(n)) ?? null;
+}
+
+/**
+ * Konto hinterlegen: drei Secrets setzen, Platz im Gist vermerken.
+ *
+ * Ins Gist kommen nur Anzeigename und Platznummer — keine Zugangsdaten, keine
+ * Discord-ID. Die ID des Aufrufers wird als Secret abgelegt, damit ihn der Bot
+ * bei seinen Bestellungen anpingen kann, ohne dass sie irgendwo gespeichert
+ * steht, wo sie nicht hingehört.
+ */
+export async function addAccount(env, state, slot, label, user, pass, discordId) {
+  const s = slotSecrets(slot);
+  await putSecrets(env, { [s.user]: user, [s.pass]: pass, [s.ping]: discordId });
+
+  state.accounts ||= {};
+  state.accounts[String(slot)] = {
+    label,
+    added_at: new Date().toISOString(),
+  };
+  await saveState(env, state);
+}
+
+/** Konto entfernen: Secrets löschen, Platz freigeben. */
+export async function removeAccount(env, state, slot) {
+  const s = slotSecrets(slot);
+  for (const name of [s.user, s.pass, s.ping]) {
+    await deleteSecret(env, name);
+  }
+  delete state.accounts?.[String(slot)];
+  // Auch den An/Aus-Schalter aufräumen, sonst bliebe eine Leiche stehen, die
+  // beim nächsten belegten Platz derselben Nummer plötzlich wieder gälte.
+  if (state.enabled) delete state.enabled[`s${slot}`];
+  await saveState(env, state);
 }
 
 /** Einen Bot-Lauf anstoßen. */

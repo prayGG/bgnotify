@@ -85,6 +85,28 @@ jobs:
           BG_USERNAME_2: ${{ secrets.BG_USERNAME_2 }}
           BG_PASSWORD_2: ${{ secrets.BG_PASSWORD_2 }}
           WEITERE_ID_HIER: ${{ secrets.WEITERE_ID_HIER }}
+          # Plätze für Konten, die sich Leute per `/account add` selbst
+          # hinterlegen. Sie müssen hier VORAB stehen, auch wenn sie leer sind:
+          # Actions kann Secrets nicht dynamisch auflisten, ein per API neu
+          # angelegtes Secret käme also nie im Prozess an. Leere Plätze
+          # überspringt der Bot einfach.
+          #
+          # NICHT durch `toJSON(secrets)` ersetzen — das kippt ALLE Secrets in
+          # eine Variable, inklusive Gist- und GitHub-Token.
+          #
+          # Mehr Plätze? Hier ergänzen UND `SLOTS` in worker/src/actions.js.
+          BG_USERNAME_3: ${{ secrets.BG_USERNAME_3 }}
+          BG_PASSWORD_3: ${{ secrets.BG_PASSWORD_3 }}
+          DISCORDID_3: ${{ secrets.DISCORDID_3 }}
+          BG_USERNAME_4: ${{ secrets.BG_USERNAME_4 }}
+          BG_PASSWORD_4: ${{ secrets.BG_PASSWORD_4 }}
+          DISCORDID_4: ${{ secrets.DISCORDID_4 }}
+          BG_USERNAME_5: ${{ secrets.BG_USERNAME_5 }}
+          BG_PASSWORD_5: ${{ secrets.BG_PASSWORD_5 }}
+          DISCORDID_5: ${{ secrets.DISCORDID_5 }}
+          BG_USERNAME_6: ${{ secrets.BG_USERNAME_6 }}
+          BG_PASSWORD_6: ${{ secrets.BG_PASSWORD_6 }}
+          DISCORDID_6: ${{ secrets.DISCORDID_6 }}
 
       # Läuft auch bei rotem Bot-Run: bei einem Crash schreibt main.py den
       # State (inkl. Fehler-Report-Fingerprint) trotzdem — ohne Commit würde

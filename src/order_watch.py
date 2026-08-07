@@ -253,6 +253,13 @@ def check_orders(cfg: dict, default_webhook: str, default_ping_ids: list[str], r
         {"name": "default", "username_env": "BG_USERNAME", "password_env": "BG_PASSWORD"}
     ]
 
+    # Per `/account add` selbst hinterlegte Konten kommen aus `commands.json`
+    # dazu. Sie sehen aus wie Config-Einträge, verweisen aber auf die
+    # vorverdrahteten Secret-Plätze aus main.yml. Fehlen deren Secrets (Platz
+    # frei), fällt das Konto weiter unten bei der Secret-Prüfung ohnehin raus.
+    cmds = commands.load_commands(token, gist_id)
+    cfg_accounts = list(cfg_accounts) + commands.slot_accounts(cmds)
+
     st = orders.load_order_state(token, gist_id)
     # Migration: alter flacher Stand (Single-Account) → unter erstem Account-Namen.
     if "orders" in st and "accounts" not in st:
@@ -273,7 +280,6 @@ def check_orders(cfg: dict, default_webhook: str, default_ping_ids: list[str], r
 
     # An/Aus-Schalter: nur aktivierte Konten (Gist-Feld `enabled`) → in
     # Bestellpausen keine Logins. Standard = aus.
-    cmds = commands.load_commands(token, gist_id)
     enabled_names = [a["name"] for a in cfg_accounts if _order_enabled(st, a["name"], cmds)]
     if not enabled_names:
         log.info("orders: alle Konten 'off' (Gist `enabled`) — übersprungen.")

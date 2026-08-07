@@ -70,6 +70,31 @@ def enabled_override(cmds: dict, name: str) -> Optional[bool]:
     return str(raw).strip().lower() in _TRUE
 
 
+def slot_accounts(cmds: dict) -> list[dict]:
+    """Selbst hinterlegte Konten als Einträge im Format von `config.yml`.
+
+    Die Zugangsdaten stehen NICHT hier, sondern als GitHub-Secrets — hier stehen
+    nur deren Namen, genau wie bei den fest verdrahteten Konten. Die Platznummer
+    bestimmt die Namen (`BG_USERNAME_3` …); die Plätze sind in `main.yml` vorab
+    verdrahtet, weil Actions Secrets nicht dynamisch auflisten kann.
+
+    Der Kontoname bekommt ein `s` vorangestellt (`s3`), damit er sich nicht mit
+    den Namen aus der Config beißen kann — dort heißen sie `a`, `b`, …
+    """
+    out = []
+    for slot, a in (cmds.get("accounts") or {}).items():
+        if not str(slot).isdigit():
+            continue
+        out.append({
+            "name": f"s{slot}",
+            "label": a.get("label") or f"Konto {slot}",
+            "username_env": f"BG_USERNAME_{slot}",
+            "password_env": f"BG_PASSWORD_{slot}",
+            "ping_env": f"DISCORDID_{slot}",
+        })
+    return out
+
+
 def tracking_entries(cmds: dict) -> dict:
     """Per Discord eingetragene Sendungen, im Format von `manual_tracking`."""
     out = {}
