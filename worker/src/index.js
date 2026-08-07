@@ -3,19 +3,20 @@
  *
  * Discord schickt jeden Slash-Command als HTTPS-POST hierher — es braucht also
  * KEINEN dauerlaufenden Bot-Prozess (und damit keinen gemieteten Server). Der
- * Worker beantwortet den Command und schreibt in das private Gist; gepostet
- * wird weiterhin über die bestehenden Webhooks des Actions-Bots.
+ * Worker beantwortet den Command und schreibt in das private Gist; Meldungen
+ * in die Channels laufen weiterhin über die Webhooks des Actions-Bots.
  *
- * Stand: Schritt 2 — Signaturprüfung, Rollenprüfung, `/setup`, `/ping`.
+ * Stand: Schritt 3 — Signatur- und Rollenprüfung, `/setup`, `/panel`, `/ping`
+ * und die nur-lesenden Ansichten `/status`, `/track list`, `/account list`.
  *
  * Erwartete Secrets (via `wrangler secret put`):
  *   DISCORD_PUBLIC_KEY   Public Key der Discord-App (hex) — Pflicht
- *   DISCORD_BOT_TOKEN    Bot-Token, nur für `/setup` (Rolle anlegen/zuweisen)
- *   GIST_TOKEN           PAT mit ausschließlich `gist`-Recht
+ *   DISCORD_BOT_TOKEN    Bot-Token (Rolle anlegen, Panel posten)
+ *   GIST_TOKEN           klassischer PAT mit ausschließlich `gist`-Recht
  *   GIST_ID              ID des privaten Gists
  */
 
-import { gistConfigured, loadState, roleIdFor, saveState } from "./gist.js";
+import { gistConfigured, loadAll, roleIdFor, saveState } from "./gist.js";
 import {
   ROLE_NAME,
   addRoleToMember,
@@ -25,6 +26,8 @@ import {
   getGuild,
   listRoles,
 } from "./discord.js";
+import { publish, refreshIfStale } from "./panel.js";
+import { accountListView, statusView, trackListView } from "./views.js";
 
 const InteractionType = { PING: 1, APPLICATION_COMMAND: 2 };
 const InteractionResponseType = {
@@ -94,6 +97,13 @@ function reply(content) {
   });
 }
 
+function replyEmbed(embed) {
+  return json({
+    type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+    data: { embeds: [embed], flags: EPHEMERAL },
+  });
+}
+
 /**
  * "Denkt nach…" — Discord verlangt binnen 3 Sekunden eine Antwort. Wer länger
  * braucht, bestätigt sofort und reicht das Ergebnis über
@@ -106,70 +116,49 @@ function deferred() {
   });
 }
 
-// --------------------------------------------------------------------------
-// Rechteprüfung
-// --------------------------------------------------------------------------
-
 /**
- * Darf der Aufrufer diesen Command benutzen? Gibt `null` zurück, wenn ja,
- * sonst den Ablehnungstext.
+ * Arbeit hinter einer deferrten Antwort starten.
  *
- * Geprüft wird ausschließlich die Rolle — Discord liefert die Rollen des
- * Aufrufers bei jedem Command gleich mit, das kostet also keinen zusätzlichen
- * API-Aufruf. `default_member_permissions: "0"` beim Registrieren versteckt die
- * Commands zwar vor normalen Mitgliedern, aber das ist reine Sichtbarkeit und
- * keine Absicherung: Wer die Command-ID kennt, käme sonst durch. Die eigentliche
- * Prüfung ist deshalb genau hier.
+ * `waitUntil` hält den Worker über die Antwort hinaus am Leben. Im Test gibt es
+ * kein ctx — dann läuft der Ablauf direkt, was ihn überhaupt erst prüfbar macht.
  */
-async function denyReason(interaction, env) {
-  if (!gistConfigured(env)) {
-    return "Dem Worker fehlt der Gist-Zugang (`GIST_TOKEN` / `GIST_ID` nicht gesetzt).";
-  }
-
-  let state;
-  try {
-    state = await loadState(env);
-  } catch (err) {
-    return `Stand nicht lesbar: ${err.message}`;
-  }
-
-  const roleId = roleIdFor(state, interaction.guild_id);
-  if (!roleId) {
-    return `Auf diesem Server ist noch nichts eingerichtet — einmalig \`/setup\` ausführen.`;
-  }
-  if (!(interaction.member?.roles || []).includes(roleId)) {
-    return `Dafür brauchst du die Rolle <@&${roleId}>.`;
-  }
-  return null;
+async function deferTo(work, ctx) {
+  if (ctx?.waitUntil) ctx.waitUntil(work);
+  else await work;
+  return deferred();
 }
 
 // --------------------------------------------------------------------------
-// /setup
+// Commands, die dem Server-Inhaber vorbehalten sind
 // --------------------------------------------------------------------------
 
 /**
- * Legt die Rolle an, gibt sie dem Aufrufer und merkt sie sich im Gist.
- *
- * Läuft nach der deferrten Antwort und meldet sein Ergebnis selbst — deshalb
- * wirft die Funktion nichts nach außen, sondern schreibt auch Fehler in die
- * nachgereichte Antwort. Ein stiller Fehlschlag wäre hier besonders ärgerlich:
- * Der Aufrufer sähe eine Antwort, die ewig "denkt nach…" bleibt.
+ * Inhaberschaft echt prüfen statt auf "Administrator" zu vertrauen — Admin kann
+ * jeder werden, dem jemand die Rechte gibt. Kostet einen API-Aufruf, fällt aber
+ * nur bei den beiden Verwaltungs-Commands an.
  */
-async function runSetup(interaction, env) {
+async function isOwner(env, guildId, userId) {
+  const guild = await getGuild(env, guildId);
+  return guild.owner_id === userId;
+}
+
+/**
+ * Legt die Rolle an, gibt sie dem Aufrufer und merkt sie im Gist.
+ *
+ * Meldet sein Ergebnis selbst — auch Fehler. Ein stiller Fehlschlag wäre hier
+ * besonders ärgerlich: Der Aufrufer sähe eine Antwort, die ewig „denkt nach…"
+ * bleibt.
+ */
+async function runSetup(interaction, env, state) {
   try {
     const guildId = interaction.guild_id;
     const userId = interaction.member.user.id;
 
-    // Inhaberschaft echt prüfen statt auf "Administrator" zu vertrauen — Admin
-    // kann jeder werden, dem jemand die Rechte gibt. Der Bootstrap soll aber
-    // wirklich nur dem gehören, dem der Server gehört.
-    const guild = await getGuild(env, guildId);
-    if (guild.owner_id !== userId) {
+    if (!(await isOwner(env, guildId, userId))) {
       await editOriginalResponse(interaction, "Nur der Server-Inhaber darf `/setup` ausführen.");
       return;
     }
 
-    const state = await loadState(env);
     const roles = await listRoles(env, guildId);
 
     // Reihenfolge mit Absicht: gespeicherte ID → gleichnamige Rolle → neu anlegen.
@@ -190,12 +179,11 @@ async function runSetup(interaction, env) {
 
     await addRoleToMember(env, guildId, userId, roleId);
 
-    state.guilds = state.guilds || {};
-    state.guilds[guildId] = {
-      role_id: roleId,
-      configured_at: new Date().toISOString(),
-      configured_by: userId,
-    };
+    state.guilds ||= {};
+    const entry = (state.guilds[guildId] ||= {});
+    entry.role_id = roleId;
+    entry.configured_at = new Date().toISOString();
+    entry.configured_by = userId;
     await saveState(env, state);
 
     await editOriginalResponse(
@@ -205,42 +193,51 @@ async function runSetup(interaction, env) {
         "",
         "Du hast sie bereits. Wer die Commands sonst noch benutzen soll, bekommt sie über",
         "*Servereinstellungen → Mitglieder*.",
+        "",
+        "Als Nächstes: `/panel` in dem Channel aufrufen, in dem die Befehlsübersicht stehen soll.",
       ].join("\n")
     );
   } catch (err) {
-    await editOriginalResponse(interaction, `\`/setup\` fehlgeschlagen: ${err.message}`).catch(
-      () => {}
-    );
+    await editOriginalResponse(interaction, `\`/setup\` fehlgeschlagen: ${err.message}`).catch(() => {});
   }
 }
 
-async function handleSetup(interaction, env, ctx) {
-  const missing = [];
-  if (!botConfigured(env)) missing.push("`DISCORD_BOT_TOKEN`");
-  if (!gistConfigured(env)) missing.push("`GIST_TOKEN` / `GIST_ID`");
-  if (missing.length) {
-    return reply(`Dem Worker fehlen noch Secrets: ${missing.join(", ")}.`);
-  }
+/** Postet die Befehlsübersicht in den Channel, in dem der Command lief. */
+async function runPanel(interaction, env, state) {
+  try {
+    const guildId = interaction.guild_id;
+    if (!(await isOwner(env, guildId, interaction.member.user.id))) {
+      await editOriginalResponse(interaction, "Nur der Server-Inhaber darf `/panel` ausführen.");
+      return;
+    }
 
-  const work = runSetup(interaction, env);
-  if (ctx?.waitUntil) {
-    // Normalfall: `waitUntil` hält den Worker über die Antwort hinaus am Leben,
-    // die Einrichtung läuft also weiter, während Discord schon "denkt nach…" zeigt.
-    ctx.waitUntil(work);
-  } else {
-    // Kein ctx — das ist der Test, der worker.fetch() ohne dritten Parameter
-    // aufruft. Dann direkt abwarten, sonst wäre der Ablauf nicht prüfbar.
-    await work;
+    const { recreated } = await publish(env, state, guildId, interaction.channel_id);
+    await editOriginalResponse(
+      interaction,
+      recreated
+        ? "Übersicht gepostet. Sie hält sich ab jetzt selbst aktuell — kommen Commands dazu, wird diese Nachricht bearbeitet."
+        : "Übersicht aktualisiert."
+    );
+  } catch (err) {
+    await editOriginalResponse(
+      interaction,
+      `\`/panel\` fehlgeschlagen: ${err.message}\n\nFehlt dem Bot vielleicht das Recht, in diesem Channel zu schreiben?`
+    ).catch(() => {});
   }
-  return deferred();
 }
 
 // --------------------------------------------------------------------------
 // Routing
 // --------------------------------------------------------------------------
 
+/** „track list" statt nur „track" — Untercommands stehen als Option vom Typ 1 drin. */
+function commandPath(data) {
+  const sub = (data?.options || []).find((o) => o.type === 1);
+  return sub ? `${data.name} ${sub.name}` : data?.name || "";
+}
+
 async function handleCommand(interaction, env, ctx) {
-  const name = interaction.data?.name;
+  const path = commandPath(interaction.data);
 
   // Ohne Server kein Rollenbegriff — und damit keine Rechteprüfung, auf die
   // sich irgendetwas verlassen könnte.
@@ -248,17 +245,55 @@ async function handleCommand(interaction, env, ctx) {
     return reply("Die Commands funktionieren nur in einem Server, nicht in Direktnachrichten.");
   }
 
-  if (name === "setup") return handleSetup(interaction, env, ctx);
+  const missing = [];
+  if (!botConfigured(env)) missing.push("`DISCORD_BOT_TOKEN`");
+  if (!gistConfigured(env)) missing.push("`GIST_TOKEN` / `GIST_ID`");
+  if (missing.length) return reply(`Dem Worker fehlen noch Secrets: ${missing.join(", ")}.`);
 
-  const denied = await denyReason(interaction, env);
-  if (denied) return reply(denied);
+  // EIN Abruf für beide Dateien — die Rollenprüfung braucht commands.json,
+  // die Ansichten order-state.json.
+  let data;
+  try {
+    data = await loadAll(env);
+  } catch (err) {
+    return reply(`Stand nicht lesbar: ${err.message}`);
+  }
+  const state = data.commands;
 
-  switch (name) {
+  if (path === "setup") return deferTo(runSetup(interaction, env, state), ctx);
+
+  // Ab hier gilt die Rolle. Geprüft wird sie ohne zusätzlichen API-Aufruf:
+  // Discord schickt die Rollen des Aufrufers bei jedem Command mit.
+  const roleId = roleIdFor(state, interaction.guild_id);
+  if (!roleId) {
+    return reply("Auf diesem Server ist noch nichts eingerichtet — einmalig `/setup` ausführen.");
+  }
+  if (!(interaction.member.roles || []).includes(roleId)) {
+    return reply(`Dafür brauchst du die Rolle <@&${roleId}>.`);
+  }
+
+  // Katalog geändert? Dann die Übersicht im Hintergrund nachziehen. Im
+  // Normalfall ist das ein String-Vergleich und sonst nichts.
+  //
+  // Nicht bei `/panel` selbst: das schreibt die Übersicht ohnehin gleich neu.
+  // Beides zusammen liefe auf zwei parallele Veröffentlichungen hinaus, die um
+  // denselben Gist-Eintrag konkurrieren — und im Zweifel zwei Nachrichten im
+  // Channel hinterlassen.
+  if (path !== "panel") refreshIfStale(env, state, interaction.guild_id, ctx);
+
+  switch (path) {
     case "ping":
-      // Bewusst nutzlos: beweist nur, dass Signatur- und Rollenprüfung stehen.
       return reply("pong — Signatur- und Rollenprüfung stehen.");
+    case "status":
+      return replyEmbed(await statusView(data.orders));
+    case "track list":
+      return replyEmbed(await trackListView(data.orders));
+    case "account list":
+      return replyEmbed(await accountListView(data.orders));
+    case "panel":
+      return deferTo(runPanel(interaction, env, state), ctx);
     default:
-      return reply(`Unbekannter Command: \`/${name}\``);
+      return reply(`Unbekannter Command: \`/${path}\``);
   }
 }
 

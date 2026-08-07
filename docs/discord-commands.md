@@ -234,21 +234,34 @@ zusammengeführt.
 
 ---
 
-## 5 · Stand: Schritte 1 und 2 sind gebaut
+## 5 · Stand: Schritte 1 bis 3 sind gebaut
 
 Auf Branch `claude/bgnotify-hermes-tracking-dyao5d`, **noch nicht gemerged**.
 
 ```
 worker/
-├── src/index.js      Signaturprüfung, Rollenprüfung, Routing, /setup, /ping
-├── src/discord.js    Discord-REST: Gilde, Rollen, nachgereichte Antwort
-├── src/gist.js       commands.json im privaten Gist (NIE order-state.json)
-├── register.js       meldet Commands bei Discord an
-├── test.mjs          22 Fälle ohne Deploy
+├── src/index.js      Signatur-/Rollenprüfung, Routing, /setup, /panel, /ping
+├── src/catalog.js    DIE Command-Liste — Quelle für Anmeldung UND Panel
+├── src/panel.js      Befehlsübersicht bauen, posten, auffrischen
+├── src/views.js      /status, /track list, /account list (nur lesend)
+├── src/discord.js    Discord-REST: Gilde, Rollen, Nachrichten, Antwort
+├── src/gist.js       commands.json schreiben, order-state.json NUR lesen
+├── src/repo.js       öffentliche state.json + Kontonamen aus config.yml
+├── src/format.js     Zeitangaben, Kürzen, Discord-Längengrenzen
+├── register.js       meldet die Commands aus dem Katalog bei Discord an
+├── test.mjs          52 Fälle ohne Deploy
 ├── wrangler.toml     Deploy-Konfiguration
 ├── package.json
 └── README.md         Einrichtungsanleitung
 ```
+
+**Die Befehlsübersicht** (`/panel`) steht dauerhaft in einem eigenen Channel und
+entsteht komplett aus `catalog.js`. Ändert sich der Katalog, ändert sich sein
+Fingerabdruck, und der nächste beliebige Command lässt die Nachricht im
+Hintergrund neu zeichnen — bearbeitet, nicht neu gepostet. Das ist der Grund für
+den Katalog: Zwei getrennte Listen (eine für Discord, eine für die Anzeige)
+wären schon nach dem zweiten Command auseinandergelaufen, ohne dass es
+jemandem auffällt.
 
 **Beide Schritte sind live.** Worker deployt unter
 `bgnotify-commands.praygg.workers.dev`, Endpoint bei Discord eingetragen, alle

@@ -64,6 +64,29 @@ export function addRoleToMember(env, guildId, userId, roleId) {
 }
 
 /**
+ * Nachricht in einen Channel schreiben — nur für die Befehlsübersicht.
+ *
+ * Das ist die eine Stelle, an der der Worker von sich aus postet. Alle
+ * Meldungen (Restocks, Bestellungen, Sendungen) laufen weiterhin über die
+ * Webhooks des Actions-Bots, weil die pro Nachricht Absendername und Avatar
+ * setzen dürfen — ein Bot postet immer als er selbst, damit wären
+ * `bgnotify · orders`, `· meso` und `· updates` verloren.
+ */
+export function createMessage(env, channelId, embed) {
+  return call(env, `/channels/${channelId}/messages`, {
+    method: "POST",
+    body: JSON.stringify({ embeds: [embed] }),
+  });
+}
+
+export function editMessage(env, channelId, messageId, embed) {
+  return call(env, `/channels/${channelId}/messages/${messageId}`, {
+    method: "PATCH",
+    body: JSON.stringify({ embeds: [embed] }),
+  });
+}
+
+/**
  * Die vorher deferrte Antwort nachreichen.
  *
  * Läuft über das Interaction-Token, nicht über das Bot-Token — deshalb steht

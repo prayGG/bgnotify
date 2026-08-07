@@ -1,8 +1,14 @@
 # bgnotify · Discord-Commands
 
 Interactions-Endpoint auf Cloudflare Workers. Nimmt Slash-Commands entgegen und
-bearbeitet später das private Gist. **Postet nichts** — Meldungen in die Channels
-laufen weiterhin über die Webhooks des Actions-Bots.
+bearbeitet das private Gist.
+
+**Meldungen postet er nicht** — Restocks, Bestellungen und Sendungen laufen
+weiterhin über die Webhooks des Actions-Bots, weil die pro Nachricht Absender
+und Avatar setzen dürfen (`bgnotify · orders`, `· meso`, `· updates`). Ein Bot
+postet immer als er selbst, die drei Absender wären also verloren. Die einzige
+Ausnahme ist die Befehlsübersicht aus `/panel`: Die ist die eigene Oberfläche
+des Bots, keine Meldung.
 
 Kein dauerlaufender Prozess: Discord schickt jeden Command als HTTPS-POST, der
 Worker antwortet. Deshalb dauerhaft kostenlos (Workers-Free: 100.000
@@ -10,7 +16,15 @@ Requests/Tag, keine Kreditkarte).
 
 ## Stand
 
-Schritt 2 von 7 — Signaturprüfung, Rollenprüfung, `/setup` und `/ping`.
+Schritt 3 von 7 — Signatur- und Rollenprüfung, `/setup`, `/panel`, `/ping`
+sowie die nur-lesenden Ansichten `/status`, `/track list`, `/account list`.
+
+Die Befehlsübersicht im Channel (`/panel`) entsteht vollständig aus
+`src/catalog.js` — derselben Liste, aus der auch `register.js` die Anmeldung
+bei Discord baut. Kommt ein Command dazu, ändert sich der Fingerabdruck des
+Katalogs, und der nächste beliebige Command lässt die Nachricht im Hintergrund
+neu zeichnen. Zwei getrennte Listen wären schon nach dem zweiten Command
+auseinandergelaufen — unbemerkt, weil nichts sie widerlegt.
 
 Ab hier ist jeder Command hinter der Rolle `bgnotify` eingesperrt. Das kam
 bewusst früh: Alles Weitere fasst Bestelldaten und Zugangsdaten an, und
@@ -95,6 +109,16 @@ bekommen soll, kriegt sie über *Servereinstellungen → Mitglieder*.
 übernommen statt ein Duplikat anzulegen. Falls der Gist-Eintrag mal verloren
 geht, holt ein erneuter Aufruf den Stand zurück.
 
+### 6. Befehlsübersicht in den Channel
+
+Einen Channel für den Bot anlegen und dort **`/panel`** aufrufen — auch das nur
+der Server-Inhaber. Die Übersicht bleibt als Nachricht stehen und hält sich
+selbst aktuell; darunter tippt man die Commands, deren Antworten ohnehin nur
+der Aufrufer sieht.
+
+Wird die Nachricht gelöscht, legt der nächste `/panel`-Aufruf eine neue an.
+Braucht der Bot in dem Channel Schreibrechte, sonst meldet `/panel` genau das.
+
 ### Fertig, wenn
 
 `/ping` im Server „pong" antwortet, die Antwort nur du siehst — und jemand
@@ -106,8 +130,10 @@ geht, holt ein erneuter Aufruf den Stand zurück.
 cd worker && node test.mjs
 ```
 
-Läuft ohne Deploy: echte Ed25519-Schlüssel und echte Signaturen, Discord und
-GitHub über ein ersetztes `fetch` nachgestellt. 22 Fälle.
+Läuft ohne Deploy: echte Ed25519-Schlüssel und echte Signaturen; Discord, die
+Gist-API und raw.githubusercontent über ein ersetztes `fetch` nachgestellt.
+52 Fälle, darunter „schreibt NUR commands.json" und „Panel wird bearbeitet,
+nicht neu gepostet".
 
 ## Fehlersuche
 
@@ -120,6 +146,9 @@ GitHub über ein ersetztes `fetch` nachgestellt. 22 Fälle.
 | `/setup` sagt „Missing Permissions" | Dem Bot fehlt `Manage Roles`, **oder** die Rolle `bgnotify` steht in der Serverliste über der Bot-Rolle. Discord lässt einen Bot nur Rollen unterhalb seiner eigenen vergeben — Bot-Rolle nach oben ziehen. |
 | `/setup` sagt „Unknown Guild" | Der Bot ist gar nicht auf diesem Server. Einladungslink erneut öffnen. |
 | Antwort bleibt ewig bei „denkt nach…" | Die nachgereichte Antwort kam nicht an. `npx wrangler tail` zeigt den Fehler aus `runSetup`. |
+| `/panel` sagt „Missing Access" | Dem Bot fehlt in **diesem** Channel das Recht, Nachrichten zu schreiben. Channel-Rechte prüfen oder einen anderen nehmen. |
+| Panel zeigt einen alten Stand | Es zieht erst beim nächsten Command nach. Einmal `/ping` genügt — oder direkt `/panel`. |
+| Neue Commands fehlen in Discord | `node register.js` vergessen. Das Panel allein reicht nicht, Discord muss sie kennen. |
 
 ## Was hier NICHT hingehört
 

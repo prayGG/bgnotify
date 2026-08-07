@@ -1,6 +1,6 @@
 /**
  * Meldet die Slash-Commands bei Discord an. Einmal ausführen, und danach immer
- * dann wieder, wenn sich Namen, Optionen oder Beschreibungen ändern.
+ * dann wieder, wenn Namen, Optionen oder Beschreibungen sich ändern.
  *
  *   DISCORD_APP_ID=... DISCORD_BOT_TOKEN=... [DISCORD_GUILD_ID=...] node register.js
  *
@@ -8,29 +8,18 @@
  * registriert — die sind SOFORT da. Ohne die Variable werden sie global
  * registriert, was bis zu einer Stunde dauern kann. Beim Entwickeln also immer
  * mit Guild-ID arbeiten.
+ *
+ * Die Liste selbst steht in `src/catalog.js` und wird von dort auch fuer die
+ * Uebersicht im Channel benutzt. Zwei getrennte Listen waeren schon nach dem
+ * zweiten neuen Command auseinandergelaufen — unbemerkt, weil nichts sie
+ * widerlegt haette.
  */
+
+import { flatten, toDiscordPayload } from "./src/catalog.js";
 
 const APP_ID = process.env.DISCORD_APP_ID;
 const BOT_TOKEN = process.env.DISCORD_BOT_TOKEN;
 const GUILD_ID = process.env.DISCORD_GUILD_ID || "";
-
-// Schritt 2: /ping und /setup. Die echten Commands kommen Schritt für Schritt dazu.
-//
-// `default_member_permissions: "0"` blendet den Command bei allen aus, die keine
-// Adminrechte haben. Das ist ausdruecklich NUR Sichtbarkeit — die verbindliche
-// Pruefung macht der Worker anhand der Rolle `bgnotify`.
-const commands = [
-  {
-    name: "ping",
-    description: "Testet, ob der Bot erreichbar ist",
-    default_member_permissions: "0",
-  },
-  {
-    name: "setup",
-    description: "Richtet die Rolle bgnotify ein (nur der Server-Inhaber)",
-    default_member_permissions: "0",
-  },
-];
 
 async function main() {
   if (!APP_ID || !BOT_TOKEN) {
@@ -48,7 +37,7 @@ async function main() {
       Authorization: `Bot ${BOT_TOKEN}`,
       "content-type": "application/json",
     },
-    body: JSON.stringify(commands),
+    body: JSON.stringify(toDiscordPayload()),
   });
 
   const text = await res.text();
@@ -61,8 +50,9 @@ async function main() {
   console.log(
     `${registered.length} Command(s) registriert (${GUILD_ID ? `Guild ${GUILD_ID}` : "global"}):`
   );
-  for (const c of registered) console.log(`  /${c.name} — ${c.description}`);
+  for (const c of flatten()) console.log(`  /${c.path} — ${c.description}`);
   if (!GUILD_ID) console.log("\nGlobal registriert — kann bis zu einer Stunde dauern.");
+  console.log("\nDanach /panel aufrufen, damit die Übersicht im Channel den neuen Stand zeigt.");
 }
 
 main().catch((err) => {
