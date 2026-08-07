@@ -95,6 +95,34 @@ export const COMMANDS = [
     ],
   },
   {
+    name: "product",
+    description: "Beobachtete Produkte",
+    subcommands: [
+      {
+        name: "list",
+        description: "Was beobachtet wird",
+        help: "Alle beobachteten Produkte — die fest in `config.yml` gepflegten wie die per Command aufgenommenen.",
+      },
+      {
+        name: "add",
+        description: "Produkt aufnehmen",
+        help: "Beim ersten Aufruf liest der Bot die Seite ein und zeigt, welche Varianten es gibt — das dauert einen Lauf, weil der Command selbst die Seite nicht kennt. Danach nochmal aufrufen und die Variante auswählen.",
+        options: [
+          { name: "link", description: "Produktseite bei bgpharmadrugs.to", type: STRING, required: true, autocomplete: true },
+          { name: "variante", description: "welche Variante (nach dem Einlesen)", type: STRING, autocomplete: true },
+        ],
+      },
+      {
+        name: "remove",
+        description: "Produkt nicht mehr beobachten",
+        help: "Entfernt ein per Command aufgenommenes Produkt. Die fest in `config.yml` gepflegten bleiben.",
+        options: [
+          { name: "produkt", description: "welches Produkt", type: STRING, required: true, autocomplete: true },
+        ],
+      },
+    ],
+  },
+  {
     name: "run",
     description: "Stößt sofort einen Bot-Lauf an",
     help: "Startet den Bot jetzt, statt auf den nächsten Takt zu warten. Dauert rund eine halbe Minute; die Meldungen kommen wie immer in die Channels.",

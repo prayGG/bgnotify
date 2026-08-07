@@ -659,3 +659,41 @@ def build_account_check_embed(label: str, ok: bool, fehler: str = "") -> dict:
         "footer": {"text": "bgpharmadrugs.to"},
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }
+
+
+def build_product_scan_embed(url: str, daten: dict) -> dict:
+    """Was auf einer per `/product add` angemeldeten Seite gefunden wurde.
+
+    Zeigt bewusst ALLE Varianten (bis zur Discord-Grenze): Wer aussucht, will
+    die Auswahl sehen, nicht die ersten fünf und ein "und weitere".
+    """
+    if daten.get("error"):
+        return {
+            "author": {"name": "✦⠀⠀produkt⠀⠀✦"},
+            "title": "Seite nicht lesbar",
+            "description": f"[{url}]({url})\n\n⚠️⠀_{daten['error']}_\n\n"
+                           "Stimmt der Link? Er muss auf eine Produktseite zeigen.",
+            "color": COLOR_WARN,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        }
+
+    titel = daten.get("title") or "Produkt"
+    if daten.get("simple"):
+        beschreibung = (f"**[{titel}]({url})**\n\nEinzelprodukt — keine Varianten zur Auswahl.\n\n"
+                        "Mit `/product add` erneut aufrufen, um es aufzunehmen.")
+    else:
+        varianten = daten.get("variants") or []
+        liste = "\n".join(f"⠀·⠀{v}" for v in varianten)
+        if len(liste) > 3500:
+            liste = liste[:3500].rsplit("\n", 1)[0] + f"\n⠀·⠀… und {len(varianten)} insgesamt"
+        beschreibung = (f"**[{titel}]({url})**\n\n**{len(varianten)}** Varianten gefunden:\n{liste}\n\n"
+                        "Mit `/product add` und der gewünschten Variante aufnehmen — "
+                        "die Auswahl geht jetzt per Autocomplete.")
+
+    return {
+        "author": {"name": "✦⠀⠀produkt⠀⠀✦"},
+        "description": beschreibung,
+        "color": COLOR_BLURPLE,
+        "footer": {"text": "bgpharmadrugs.to"},
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }

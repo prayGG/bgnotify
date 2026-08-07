@@ -470,3 +470,39 @@ if __name__ == "__main__":
     variants = [v.strip() for v in sys.argv[2:]]
     result = check(url, variants)
     print(json.dumps(result, indent=2, ensure_ascii=False))
+
+
+def list_variants(url: str, session: Optional[requests.Session] = None) -> dict:
+    """Was gibt es auf dieser Produktseite? → {"title", "simple", "variants"}.
+
+    Für `/product add`: Der Discord-Worker kann das nicht selbst, er hat keinen
+    Browser und kennt die Seite nicht. Also liest der Bot sie einmal ein und
+    legt das Ergebnis ab, damit die Auswahl danach per Autocomplete geht.
+
+    Bei einem einfachen Produkt (die URL IST das Produkt) bleibt `variants`
+    leer — dort gibt es nichts auszuwählen, der Titel ist die ganze Wahrheit.
+    Bei einem variablen Produkt kommen die Dropdown-Einträge zurück, und zwar
+    im ORIGINALWORTLAUT: `check()` vergleicht später damit, ein geglätteter
+    Text würde ins Leere greifen.
+    """
+    session = session or _session()
+    soup = BeautifulSoup(_fetch(url, session), "html.parser")
+
+    h1 = soup.find("h1")
+    title = (h1.get_text() if h1 else "").strip() or url.rstrip("/").rsplit("/", 1)[-1]
+
+    if _is_simple_product(soup):
+        return {"title": title, "simple": True, "variants": []}
+
+    form = soup.find("form", class_="variations_form")
+    variants: list[str] = []
+    if form:
+        for sel in form.find_all("select"):
+            for o in sel.find_all("option"):
+                if not (o.get("value") or "").strip():
+                    continue          # der "Bitte wählen"-Platzhalter
+                label = (o.get_text() or "").strip()
+                if label and label not in variants:
+                    variants.append(label)
+
+    return {"title": title, "simple": False, "variants": variants}

@@ -201,3 +201,57 @@ export async function removeTracking(env, state, label) {
   await saveState(env, state);
   return { ok: true, text: `**${label}** wird nicht mehr verfolgt.` };
 }
+
+// --------------------------------------------------------------------------
+// Produkte
+// --------------------------------------------------------------------------
+
+/** Nur Produktseiten des Shops — alles andere kann `bgpharma` nicht lesen. */
+export function parseProductLink(raw) {
+  const url = (raw || "").trim();
+  let parsed;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return { error: "Das ist keine gültige URL." };
+  }
+  if (!parsed.hostname.endsWith("bgpharmadrugs.to")) {
+    return { error: "Nur Produktseiten von `bgpharmadrugs.to` — andere Shops kann der Bot nicht lesen." };
+  }
+  if (!parsed.pathname.includes("/product/")) {
+    return { error: "Das sieht nicht nach einer Produktseite aus (der Pfad müsste `/product/…` enthalten)." };
+  }
+  // Ohne Query und Fragment ablegen: Ein Deep-Link auf eine Variante würde sonst
+  // als eigenes Produkt gelten, obwohl es dieselbe Seite ist.
+  return { url: `${parsed.origin}${parsed.pathname}` };
+}
+
+/** Seite zum Einlesen anmelden — das Ergebnis liefert erst der nächste Lauf. */
+export async function requestScan(env, state, url) {
+  state.scans ||= {};
+  state.scans[url] = { requested_at: new Date().toISOString() };
+  await saveState(env, state);
+}
+
+/** Produkt in die Beobachtung aufnehmen. */
+export async function addProduct(env, state, url, name, variante) {
+  state.products ||= {};
+  const key = variante ? `${url}#${variante}` : url;
+  const vorhanden = Boolean(state.products[key]);
+
+  state.products[key] = {
+    url,
+    name: variante || name,
+    variants: variante ? [variante] : [name],
+    added_at: new Date().toISOString(),
+  };
+  await saveState(env, state);
+  return vorhanden;
+}
+
+export async function removeProduct(env, state, key) {
+  if (!state.products?.[key]) return false;
+  delete state.products[key];
+  await saveState(env, state);
+  return true;
+}

@@ -16,7 +16,7 @@ Requests/Tag, keine Kreditkarte).
 
 ## Stand
 
-Schritt 6 von 7 — alles außer `/product`.
+Alle sieben Schritte gebaut.
 
 | | |
 |---|---|
@@ -24,6 +24,7 @@ Schritt 6 von 7 — alles außer `/product`.
 | schreiben | `/account enable`, `/account disable`, `/track add`, `/track remove` |
 | auslösen | `/run` |
 | Konten selbst hinterlegen | `/account add`, `/account remove` |
+| Produkte | `/product list`, `/product add`, `/product remove` |
 | Rest | `/ping`, `/setup`, `/panel` |
 
 Was schreibt, schreibt **nur** nach `commands.json` — nie nach
@@ -146,7 +147,7 @@ cd worker && node test.mjs
 
 Läuft ohne Deploy: echte Ed25519-Schlüssel und echte Signaturen; Discord, die
 Gist-API und raw.githubusercontent über ein ersetztes `fetch` nachgestellt.
-111 Fälle, darunter „schreibt NUR commands.json" und „Panel wird bearbeitet,
+133 Fälle, darunter „schreibt NUR commands.json" und „Panel wird bearbeitet,
 nicht neu gepostet".
 
 ## Fehlersuche

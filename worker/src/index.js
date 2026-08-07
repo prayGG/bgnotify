@@ -6,9 +6,10 @@
  * Worker beantwortet den Command und schreibt in das private Gist; Meldungen
  * in die Channels laufen weiterhin über die Webhooks des Actions-Bots.
  *
- * Stand: alles außer `/product`.
- *   lesen      /status, /track list, /account list
- *   schreiben  /account enable|disable, /track add|remove, /account add|remove
+ * Stand: vollständig (Schritte 1–7).
+ *   lesen      /status, /track list, /account list, /product list
+ *   schreiben  /account enable|disable|add|remove, /track add|remove,
+ *              /product add|remove
  *   auslösen   /run
  *   Rest       /ping, /setup, /panel
  *
@@ -31,15 +32,19 @@ import {
   listRoles,
 } from "./discord.js";
 import { publish, refreshIfStale } from "./panel.js";
-import { accountListView, statusView, trackListView } from "./views.js";
+import { accountListView, productListView, statusView, trackListView } from "./views.js";
 import {
   SLOTS,
   addAccount,
+  addProduct,
   addTracking,
   freeSlot,
+  parseProductLink,
   parseTrackingLink,
   removeAccount,
+  removeProduct,
   removeTracking,
+  requestScan,
   setAccountEnabled,
   triggerRun,
 } from "./actions.js";
@@ -47,6 +52,7 @@ import { dispatchRun, githubConfigured } from "./github.js";
 import { ACCOUNT_ADD, accountAddModal, modalValues } from "./modal.js";
 import { SUB_COMMAND } from "./catalog.js";
 import { loadAccountLabels } from "./repo.js";
+import { clip } from "./format.js";
 
 const InteractionType = {
   PING: 1,
@@ -411,6 +417,35 @@ async function handleAutocomplete(interaction, env) {
     return autocompleteResult(choices);
   }
 
+  if (path === "product add") {
+    const eingelesen = data.orders.product_scans || {};
+    if (focused?.name === "link") {
+      // Schon eingelesene Seiten vorschlagen — der zweite Aufruf ist der
+      // haeufigere, und niemand tippt eine Produkt-URL gern zweimal.
+      return autocompleteResult(
+        Object.entries(eingelesen)
+          .filter(([u, s]) => !s.error && (passt(u) || passt(s.title || "")))
+          .map(([u, s]) => ({ name: clip(s.title || u, 90), value: u }))
+      );
+    }
+    if (focused?.name === "variante") {
+      const url = parseProductLink(optionValues(interaction.data).link || "").url || "";
+      const scan = eingelesen[url];
+      return autocompleteResult(
+        (scan?.variants || []).filter(passt).map((v) => ({ name: clip(v, 90), value: v }))
+      );
+    }
+    return autocompleteResult([]);
+  }
+
+  if (path === "product remove") {
+    return autocompleteResult(
+      Object.entries(data.commands.products || {})
+        .filter(([, p]) => passt(p.name || ""))
+        .map(([key, p]) => ({ name: clip(p.name, 90), value: key }))
+    );
+  }
+
   if (path === "track remove") {
     // Nur die selbst eingetragenen: automatisch übernommene Sendungen räumt
     // der Bot nach der Zustellung ohnehin weg, die kann man nicht sinnvoll
@@ -528,6 +563,62 @@ async function handleCommand(interaction, env, ctx) {
         return reply("Dem Worker fehlt `GITHUB_TOKEN` — ohne das kann er keine Secrets löschen.");
       }
       return deferTo(runAccountRemove(interaction, env, state, args.konto), ctx);
+    }
+
+    case "product list":
+      return replyEmbed(await productListView(data.orders, state));
+
+    case "product add": {
+      const { url, error } = parseProductLink(args.link);
+      if (error) return reply(error);
+
+      const scan = data.orders.product_scans?.[url];
+      if (!scan) {
+        await requestScan(env, state, url);
+        let nachsatz = "Das dauert einen Lauf — ich melde mich hier, sobald ich weiß, was es dort gibt.";
+        if (githubConfigured(env)) {
+          try {
+            await dispatchRun(env);
+            state.last_run_at = new Date().toISOString();
+            await saveState(env, state);
+          } catch {
+            nachsatz = "Beim nächsten Lauf lese ich die Seite ein — mit `/run` geht es sofort.";
+          }
+        }
+        return reply(`Angemeldet. Die Seite kenne ich noch nicht.\n\n${nachsatz}`);
+      }
+      if (scan.error) {
+        return reply(`Die Seite war nicht lesbar: _${scan.error}_\n\nStimmt der Link?`);
+      }
+
+      // Einzelprodukt: Es gibt nichts auszuwählen, der Titel ist die Bezeichnung.
+      if (scan.simple) {
+        const schon = await addProduct(env, state, url, scan.title, "");
+        return reply(`**${scan.title}** wird ${schon ? "weiterhin" : "ab jetzt"} beobachtet.`);
+      }
+      if (!args.variante) {
+        return reply(
+          `**${scan.title}** hat ${scan.variants.length} Varianten. Ruf \`/product add\` nochmal auf und wähl bei \`variante\` aus — die Liste steht jetzt im Autocomplete.`
+        );
+      }
+      if (!scan.variants.includes(args.variante)) {
+        return reply(
+          `**${args.variante}** gibt es auf der Seite nicht. Wähl bitte aus dem Autocomplete — der Wortlaut muss exakt stimmen, sonst greift der Abgleich ins Leere.`
+        );
+      }
+      const schon = await addProduct(env, state, url, scan.title, args.variante);
+      return reply(
+        `**${args.variante}** wird ${schon ? "weiterhin" : "ab jetzt"} beobachtet.\n\nAb dem nächsten Lauf steht es im Dashboard, und ein Restock pingt wie gewohnt.`
+      );
+    }
+
+    case "product remove": {
+      const weg = await removeProduct(env, state, args.produkt);
+      return reply(
+        weg
+          ? "Wird nicht mehr beobachtet."
+          : "Das ist kein per Command aufgenommenes Produkt. Die fest gepflegten stehen in `config.yml` und bleiben."
+      );
     }
 
     case "run": {

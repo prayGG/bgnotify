@@ -610,6 +610,90 @@ r = await post({ ...cmd("track remove"), type: 4, data: { name: "track", options
 check("schlägt eingetragene Sendungen vor", r.body.data.choices.length === 2, JSON.stringify(r.body.data.choices.map((c) => c.value)));
 
 // --------------------------------------------------------------------------
+section("/product");
+// --------------------------------------------------------------------------
+const PROD = "https://bgpharmadrugs.to/product/peptides/";
+
+resetFake(ready());
+r = await post(cmd("product add", { args: { link: "https://example.com/product/x" } }));
+check("fremder Shop → abgelehnt", r.content?.includes("bgpharmadrugs.to"), r.content);
+
+r = await post(cmd("product add", { args: { link: "https://bgpharmadrugs.to/shop/" } }));
+check("keine Produktseite → abgelehnt", r.content?.includes("/product/"), r.content);
+
+// Erster Aufruf: Seite unbekannt → Auftrag anlegen und Lauf anstoßen.
+resetFake(ready());
+r = await post(cmd("product add", { args: { link: PROD + "?attr=x#frag" } }), { env: GH_ENV });
+check("unbekannte Seite → zum Einlesen angemeldet", Boolean(fake.commands.scans?.[PROD]), JSON.stringify(fake.commands.scans));
+check("Link wird normalisiert (ohne Query/Fragment)", Object.keys(fake.commands.scans)[0] === PROD);
+check("stößt dafür einen Lauf an", fake.dispatched === 1);
+check("nimmt NOCH NICHTS in Beobachtung", !fake.commands.products);
+
+// Zweiter Aufruf, nachdem der Bot eingelesen hat.
+resetFake({
+  ...ready(),
+  orders: { product_scans: { [PROD]: { title: "Peptides and HGH", simple: false, variants: ["BPC157 10mg", "TB500 10mg"] } } },
+});
+r = await post(cmd("product add", { args: { link: PROD } }));
+check("eingelesen, aber ohne Variante → bittet um Auswahl", r.content?.includes("2 Varianten"), r.content);
+
+r = await post(cmd("product add", { args: { link: PROD, variante: "Gibtsnicht 5mg" } }));
+check("erfundene Variante → abgelehnt", r.content?.includes("gibt es auf der Seite nicht"), r.content);
+check("… und nichts aufgenommen", !fake.commands.products);
+
+r = await post(cmd("product add", { args: { link: PROD, variante: "BPC157 10mg" } }));
+check("echte Variante → aufgenommen", Boolean(fake.commands.products), JSON.stringify(fake.commands.products));
+check("merkt den Wortlaut EXAKT", Object.values(fake.commands.products)[0].variants[0] === "BPC157 10mg");
+check("schreibt NUR commands.json", fake.patchedFiles.join(",") === "commands.json");
+
+// Einzelprodukt: keine Auswahl nötig.
+resetFake({
+  ...ready(),
+  orders: { product_scans: { [PROD]: { title: "Roaccutane 20 mg", simple: true, variants: [] } } },
+});
+r = await post(cmd("product add", { args: { link: PROD } }));
+check("Einzelprodukt → direkt aufgenommen", r.content?.includes("wird ab jetzt beobachtet"), r.content);
+
+// Nicht lesbare Seite.
+resetFake({ ...ready(), orders: { product_scans: { [PROD]: { error: "HTTP 404" } } } });
+r = await post(cmd("product add", { args: { link: PROD } }));
+check("Seite war nicht lesbar → sagt warum", r.content?.includes("404"), r.content);
+
+// Autocomplete
+resetFake({
+  ...ready(),
+  orders: { product_scans: { [PROD]: { title: "Peptides and HGH", simple: false, variants: ["BPC157 10mg", "TB500 10mg"] } } },
+});
+const ac = (sub, opts) => ({
+  ...cmd(`product ${sub}`),
+  type: 4,
+  data: { name: "product", options: [{ type: 1, name: sub, options: opts }] },
+});
+r = await post(ac("add", [{ name: "link", value: "", focused: true }]));
+check("Autocomplete schlägt eingelesene Seiten vor", r.body.data.choices[0]?.value === PROD, JSON.stringify(r.body.data.choices));
+check("… mit dem Produkttitel", r.body.data.choices[0]?.name === "Peptides and HGH");
+
+r = await post(ac("add", [{ name: "link", value: PROD }, { name: "variante", value: "bpc", focused: true }]));
+check("Varianten-Autocomplete filtert", r.body.data.choices.length === 1 && r.body.data.choices[0].value === "BPC157 10mg", JSON.stringify(r.body.data.choices));
+
+// /product list
+resetFake(ready());
+r = await post(cmd("product list"));
+check("leere Liste erklärt config.yml", r.embed.description.includes("config.yml"));
+
+resetFake({ ...ready(), orders: { product_scans: {} } });
+fake.commands.products = { k1: { url: PROD, name: "BPC157 10mg" } };
+fake.commands.scans = { "https://bgpharmadrugs.to/product/neu/": {} };
+r = await post(cmd("product list"));
+check("zeigt Aufgenommenes", r.embed.description.includes("BPC157 10mg"));
+check("zeigt auch Wartendes", r.embed.description.includes("wird beim nächsten Lauf eingelesen"), r.embed.description);
+
+r = await post(cmd("product remove", { args: { produkt: "k1" } }));
+check("entfernen klappt", !fake.commands.products.k1, r.content);
+r = await post(cmd("product remove", { args: { produkt: "gibtsnicht" } }));
+check("fest gepflegtes → Absage", r.content?.includes("config.yml"), r.content);
+
+// --------------------------------------------------------------------------
 section("Katalog");
 // --------------------------------------------------------------------------
 const payload = toDiscordPayload();

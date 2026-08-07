@@ -234,7 +234,7 @@ zusammengeführt.
 
 ---
 
-## 5 · Stand: alles außer `/product`
+## 5 · Stand: alle sieben Schritte gebaut
 
 Auf `main`, gemergt.
 
@@ -245,6 +245,7 @@ worker/
 ├── src/github.js     Bot-Lauf anstoßen (authentifiziert, eng geschnitten)
 ├── src/secrets.js    sealed box + GitHub-Secrets-API
 ├── src/modal.js      das Formular fuer /account add
+└── (Bot-Seite) src/product_watch.py — Auftraege abarbeiten, Produkte mergen
 ├── src/catalog.js    DIE Command-Liste — Quelle für Anmeldung UND Panel
 ├── src/panel.js      Befehlsübersicht bauen, posten, auffrischen
 ├── src/views.js      /status, /track list, /account list (nur lesend)
@@ -253,7 +254,7 @@ worker/
 ├── src/repo.js       öffentliche state.json + Kontonamen aus config.yml
 ├── src/format.js     Zeitangaben, Kürzen, Discord-Längengrenzen
 ├── register.js       meldet die Commands aus dem Katalog bei Discord an
-├── test.mjs          111 Fälle ohne Deploy
+├── test.mjs          133 Fälle ohne Deploy
 ├── wrangler.toml     Deploy-Konfiguration
 ├── package.json
 └── README.md         Einrichtungsanleitung
@@ -325,7 +326,7 @@ Vier Entscheidungen im Code, die nicht offensichtlich sind:
    „denkt nach…".
 
 Getestet mit echten Ed25519-Schlüsseln gegen `worker.fetch()`, Discord und
-GitHub über ein ersetztes `fetch` nachgestellt — 111 Fälle, alle grün:
+GitHub über ein ersetztes `fetch` nachgestellt — 133 Fälle, alle grün:
 
 ```bash
 cd worker && node test.mjs
@@ -375,10 +376,19 @@ nicht das des Actions-Bots wiederverwenden: Der Worker ist über eine öffentlic
 URL erreichbar, der Actions-Bot nicht. Was hier lecken kann, soll so wenig
 können wie möglich.
 
-### Dann Schritt 3
+### Alles gebaut — was bleibt
 
-Nur-lesende Commands: `/status`, `/track list`, `/account list`. Ab dann fassen
-die Antworten echte Bestelldaten an — deshalb war die Rolle vorher dran.
+Der Plan ist abgearbeitet. Zwei Dinge sind bewusst offengeblieben:
+
+- **`/product add` braucht zwei Aufrufe.** Beim ersten kennt der Worker die
+  Seite nicht; welche Varianten es gibt, weiß erst, wer sie geladen hat. Der
+  Auftrag wandert in `commands.json`, der nächste Lauf liest ein und postet
+  eine Karte, danach steht die Auswahl im Autocomplete. Discord-Auswahlmenüs
+  wären eleganter, gehen aber nicht: Der Bot postet über Webhooks, und
+  eingehende Webhooks dürfen keine interaktiven Komponenten tragen.
+- **Testen:** `node worker/test.mjs` und `python test_bot.py`. Die Python-Seite
+  kam spät dazu, nachdem ein Fehler durchgerutscht war, den 111 grüne
+  Worker-Tests nicht sehen konnten — er saß in `check_orders`.
 
 ---
 

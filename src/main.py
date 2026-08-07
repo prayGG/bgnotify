@@ -26,7 +26,7 @@ import logging
 import os
 import sys
 
-from . import health, notify
+from . import commands, health, notify
 from .config import (
     load_config,
     load_ping_role_ids,
@@ -48,6 +48,7 @@ from .forum_watch import check_forum
 from .hermes_watch import check_shipments
 from .order_watch import check_orders
 from .pricing import fetch_usd_eur_rate
+from .product_watch import merge_products, run_scans
 from .ps_watch import check_playstation
 from .stock_watch import check_products
 
@@ -80,6 +81,15 @@ def main() -> int:
     labels = variant_labels(cfg)
 
     try:
+        # 0 — Per Command aufgenommene Produkte dazunehmen. Muss VOR dem
+        # Stock-Check passieren, sonst wird das frisch aufgenommene Produkt
+        # einen ganzen Lauf lang übersehen. Fällt der Gist aus, bleibt es bei
+        # dem, was in config.yml steht — der Lauf läuft trotzdem.
+        gist_cmds = commands.load_commands(
+            os.environ.get("GIST_TOKEN", ""), os.environ.get("GIST_ID", "")
+        )
+        cfg["products"] = merge_products(cfg, gist_cmds)
+
         # 1 — Shop-Produkte. Den (unabhängigen) USD/EUR-Kurs holen wir parallel
         # in einem Thread: er trifft einen anderen Host als der Shop, also
         # überlappt seine Latenz mit dem Scrapen statt sie davorzuhängen.
@@ -110,6 +120,11 @@ def main() -> int:
         # `auto_tracking` und wird noch im selben Run mitgenommen. Dazu die von
         # Hand eingetragenen (`manual_tracking`) ohne hinterlegtes Kundenkonto.
         check_shipments(cfg, order_webhook, user_ids, role_ids)
+
+        # 4c — Offene Produkt-Auftraege aus Discord (`/product add`). Nach den
+        # Bestellungen, weil ein Einlesen nur ein Seitenabruf ist und nichts
+        # blockiert; das Ergebnis kommt als eigene Karte in den Channel.
+        run_scans(cfg, order_webhook, user_ids, role_ids)
 
         # 5 — PlayStation-Preise. Preissenkungen pingen wie ein Restock und laufen
         # über den BG-notify-Channel (stock_webhook). Die PS-Statuses landen mit

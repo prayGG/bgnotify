@@ -140,5 +140,81 @@ check("Platz wird zu einem Konto-Eintrag", [a["name"] for a in sa] == ["s3"], st
 check("verweist auf die Secret-Namen", sa[0]["username_env"] == "BG_USERNAME_3" and sa[0]["ping_env"] == "DISCORDID_3")
 check("unbrauchbarer Schlüssel fliegt raus", all(a["name"] != "snope" for a in sa))
 
+# --------------------------------------------------------------------------
+section("Produkte aus Discord")
+# --------------------------------------------------------------------------
+from src import bgpharma, product_watch  # noqa: E402
+
+PROD = "https://bgpharmadrugs.to/product/peptides/"
+
+cfg_mit_produkt = {"products": [{"name": "Fest", "url": PROD, "watch_variants": ["X"]}]}
+zusammen = product_watch.merge_products(cfg_mit_produkt, {})
+check("ohne Gist bleibt es bei config.yml", len(zusammen) == 1)
+
+zusammen = product_watch.merge_products(
+    {"products": []}, {"products": {"k": {"url": PROD, "name": "BPC157 10mg", "variants": ["BPC157 10mg"]}}})
+check("Command-Produkt kommt dazu", len(zusammen) == 1 and zusammen[0]["name"] == "BPC157 10mg", str(zusammen))
+check("Wortlaut der Variante bleibt roh", zusammen[0]["watch_variants"] == ["BPC157 10mg"])
+
+# Gleiche URL in beiden: die von Hand gepflegte Config gewinnt, sonst
+# ueberschriebe ein Command die Aliase und Kommentare aus der YAML.
+zusammen = product_watch.merge_products(
+    cfg_mit_produkt, {"products": {"k": {"url": PROD, "name": "Doppelt"}}})
+check("dieselbe URL → config.yml gewinnt", len(zusammen) == 1 and zusammen[0]["name"] == "Fest", str(zusammen))
+
+
+class ScanLauf(Lauf):
+    """Wie Lauf, aber mit ausgetauschtem Seiten-Leser."""
+
+    def __init__(self, *, cmds, state, daten=None, kaputt=False):
+        super().__init__(cmds=cmds, state=state)
+        self.daten, self.kaputt, self.gelesen = daten, kaputt, []
+
+    def __enter__(self):
+        super().__enter__()
+        self._lv = bgpharma.list_variants
+        bgpharma.list_variants = self._list
+        return self
+
+    def __exit__(self, *exc):
+        bgpharma.list_variants = self._lv
+        return super().__exit__(*exc)
+
+    def _list(self, url, session=None):
+        self.gelesen.append(url)
+        if self.kaputt:
+            raise RuntimeError("HTTP 404")
+        return dict(self.daten)
+
+    def scans(self):
+        product_watch.run_scans({}, "https://discord/hook", ["1"], [])
+        return self
+
+
+auftrag = {"scans": {PROD: {"requested_at": "x"}}}
+gefunden = {"title": "Peptides and HGH", "simple": False, "variants": ["BPC157 10mg"]}
+
+with ScanLauf(cmds=auftrag, state={}, daten=gefunden) as l:
+    l.scans()
+    check("offener Auftrag → Seite wird gelesen", l.gelesen == [PROD], str(l.gelesen))
+    check("Ergebnis landet im Stand des Bots", PROD in l.gespeichert.get("product_scans", {}))
+    check("Varianten gemerkt", l.gespeichert["product_scans"][PROD]["variants"] == ["BPC157 10mg"])
+    check("meldet den Fund", any("Varianten gefunden" in (k.get("description") or "") for k in l.karten))
+
+# Schon eingelesen → nicht nochmal. Sonst laege bei jedem Lauf dieselbe Seite an.
+fertig = {"product_scans": {PROD: {"title": "x", "simple": True, "variants": []}}}
+with ScanLauf(cmds=auftrag, state=fertig, daten=gefunden) as l:
+    l.scans()
+    check("schon eingelesen → kein zweiter Abruf", l.gelesen == [], str(l.gelesen))
+    check("… und keine zweite Karte", l.karten == [])
+
+with ScanLauf(cmds=auftrag, state={}, kaputt=True) as l:
+    l.scans()
+    check("Seite kaputt → Fehler wird festgehalten",
+          l.gespeichert["product_scans"][PROD].get("error", "").startswith("HTTP 404"))
+    check("… und gemeldet statt verschluckt",
+          any("nicht lesbar" in (k.get("title") or "") for k in l.karten),
+          str([k.get("title") for k in l.karten]))
+
 print(f"\n{failed} FEHLER" if failed else "\nALLES GRÜN")
 sys.exit(1 if failed else 0)

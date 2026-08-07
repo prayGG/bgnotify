@@ -111,3 +111,28 @@ def tracking_entries(cmds: dict) -> dict:
                     entry[key] = val[key]
             out[label] = entry
     return out
+
+
+def scan_urls(cmds: dict) -> list[str]:
+    """URLs, die per `/product add` zum Einlesen angemeldet wurden."""
+    return [u for u in (cmds.get("scans") or {}) if str(u).startswith("http")]
+
+
+def command_products(cmds: dict) -> list[dict]:
+    """Per Command aufgenommene Produkte im Format von `config.yml`.
+
+    `watch_variants` bleibt im ORIGINALWORTLAUT der Seite — `bgpharma.check()`
+    vergleicht damit gegen die Dropdown-Einträge, ein geglätteter Text griffe
+    ins Leere. Für die Anzeige gibt es `variant_labels`, genau wie in der Config.
+    """
+    out = []
+    for eintrag in (cmds.get("products") or {}).values():
+        url = (eintrag or {}).get("url") or ""
+        if not url.startswith("http"):
+            continue
+        name = eintrag.get("name") or url.rstrip("/").rsplit("/", 1)[-1]
+        p = {"name": name, "url": url, "watch_variants": list(eintrag.get("variants") or [name])}
+        if eintrag.get("emoji"):
+            p["emoji"] = eintrag["emoji"]
+        out.append(p)
+    return out

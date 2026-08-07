@@ -189,3 +189,36 @@ export async function accountListView(st, cmd = {}) {
     timestamp: new Date().toISOString(),
   };
 }
+
+export async function productListView(st, cmd = {}) {
+  const ausCommands = Object.entries(cmd.products || {});
+  const eingelesen = st.product_scans || {};
+  const offen = Object.keys(cmd.scans || {}).filter((u) => !eingelesen[u]);
+
+  const lines = ausCommands.map(([, p]) => `🔎⠀**[${p.name}](${p.url})**\n⠀⠀⠀_per Command aufgenommen_`);
+
+  // Was noch aufs Einlesen wartet, gehört sichtbar dazu — sonst wirkt ein
+  // gerade angemeldetes Produkt, als wäre es verschluckt worden.
+  for (const url of offen) {
+    lines.push(`⏳⠀**${url.replace(/^https?:\/\/[^/]+/, "")}**\n⠀⠀⠀_wird beim nächsten Lauf eingelesen_`);
+  }
+
+  if (!lines.length) {
+    return {
+      author: { name: "✦⠀⠀produkte⠀⠀✦" },
+      description:
+        "Hier stehen nur die per `/product add` aufgenommenen.\n\n" +
+        "Die fest gepflegten liegen in `config.yml` — dort stehen Erklärkommentare zu jedem " +
+        "Eintrag, die ein Programm beim Neuschreiben wegwerfen würde. Deshalb bleiben sie von Hand.",
+      color: COLOR_IDLE,
+    };
+  }
+
+  return {
+    author: { name: "✦⠀⠀produkte⠀⠀✦" },
+    description: joinLines(lines),
+    color: COLOR_OK,
+    footer: { text: "die fest gepflegten stehen in config.yml" },
+    timestamp: new Date().toISOString(),
+  };
+}
