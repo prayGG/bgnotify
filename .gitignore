@@ -8,3 +8,7 @@ prompt.txt
 order-sample.html
 order-*.html
 *.eml
+
+# Worker-Abhängigkeiten (Cloudflare)
+node_modules/
+.wrangler/

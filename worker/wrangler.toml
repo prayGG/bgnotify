@@ -1,0 +1,13 @@
+name = "bgnotify-commands"
+main = "src/index.js"
+compatibility_date = "2026-05-01"
+
+# Keine Bindings, keine Datenbank, kein Speicher: Der Worker hält nichts vor,
+# der Stand liegt weiterhin ausschließlich im privaten Gist.
+#
+# Secrets werden NICHT hier eingetragen (die Datei liegt im öffentlichen Repo),
+# sondern gesetzt mit:
+#
+#   wrangler secret put DISCORD_PUBLIC_KEY
+#
+# Später kommen dazu: DISCORD_BOT_TOKEN, GIST_TOKEN, GIST_ID, GITHUB_TOKEN.
