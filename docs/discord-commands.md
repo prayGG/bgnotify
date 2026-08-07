@@ -236,7 +236,7 @@ zusammengeführt.
 
 ## 5 · Stand: Schritte 1 bis 3 sind gebaut
 
-Auf Branch `claude/bgnotify-hermes-tracking-dyao5d`, **noch nicht gemerged**.
+Auf `main`, gemergt.
 
 ```
 worker/
@@ -367,8 +367,15 @@ die Antworten echte Bestelldaten an — deshalb war die Rolle vorher dran.
 - **Discord verlangt Antwort binnen 3 Sekunden.** Alles Langsamere sofort
   bestätigen und das Ergebnis später über den bestehenden Webhook melden.
 - **Antworten ephemeral**, sobald Bestell- oder Sendungsdaten drinstehen.
-- **Entwickeln auf** `claude/bgnotify-hermes-tracking-dyao5d`, pushen mit
-  `git push -u origin <branch>`. PRs nur auf ausdrücklichen Wunsch.
+- **Direkt auf `main` entwickeln**, kein Feature-Branch. Grund: Der
+  Updates-Channel kündigt an, was auf `main` landet — auf einem Branch bleibt
+  der Fortschritt unsichtbar, bis jemand mergt. Und riskant ist es hier nicht:
+  Weder der Bot noch der Worker deployen aus GitHub. Der Bot läuft als Action
+  aus dem Repo, der Worker wird von Hand mit `wrangler deploy` hochgeladen —
+  ein halbfertiger Commit auf `main` kann also nichts umwerfen.
+  (Bis Schritt 3 lief es auf `claude/bgnotify-hermes-tracking-dyao5d`; der
+  Branch ist gemergt und gelöscht.)
+- **PRs nur auf ausdrücklichen Wunsch.**
 - Token so eng wie möglich schneiden: Gist-Token nur für Gists, der Token für
   `/run` nur mit Actions-Recht auf dieses eine Repo, der für `/account add` nur
   mit Secrets-Recht.
