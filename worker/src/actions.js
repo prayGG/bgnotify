@@ -19,6 +19,17 @@
  */
 
 import { saveState } from "./gist.js";
+import { actionsUrl, dispatchRun } from "./github.js";
+
+/**
+ * Mindestabstand zwischen zwei per Command ausgelösten Läufen.
+ *
+ * Nicht als Schutz vor Missbrauch gedacht — wer die Rolle hat, darf das ja.
+ * Es fängt den Reflex ab, bei ausbleibender Reaktion noch dreimal zu drücken:
+ * Ein Lauf braucht ~30 Sekunden, und fünf gleichzeitige Läufe würden sich beim
+ * Zurückschreiben von `state.json` gegenseitig überholen.
+ */
+const RUN_COOLDOWN_SECONDS = 90;
 
 /** Hosts, deren Sendungsseiten `src/hermes.py` lesen kann. */
 const HERMES_HOSTS = ["hermesworld.com", "myhermes.de"];
@@ -92,6 +103,24 @@ export async function addTracking(env, state, label, url, userId) {
   return vorhanden
     ? `**${label}** zeigt jetzt auf den neuen Link. Der Stand wurde zurückgesetzt, der Verlauf kommt beim nächsten Lauf frisch.`
     : `**${label}** wird ab dem nächsten Lauf verfolgt. Bei jedem neuen Ereignis kommt eine Meldung — bei Zustellung hört der Bot von selbst auf.`;
+}
+
+/** Einen Bot-Lauf anstoßen. */
+export async function triggerRun(env, state) {
+  const last = Date.parse(state.last_run_at || "");
+  const wartet = Number.isNaN(last) ? 0 : RUN_COOLDOWN_SECONDS - Math.floor((Date.now() - last) / 1000);
+  if (wartet > 0) {
+    return `Gerade eben schon angestoßen — noch **${wartet} s** warten.\n\nEin Lauf braucht rund eine halbe Minute. Die Meldungen kommen wie immer in die Channels.`;
+  }
+
+  await dispatchRun(env);
+
+  // Erst nach dem erfolgreichen Anstoßen merken: Sonst würde ein fehl-
+  // geschlagener Versuch die Sperre auslösen und man käme 90 s nicht wieder ran.
+  state.last_run_at = new Date().toISOString();
+  await saveState(env, state);
+
+  return `Lauf angestoßen. Dauert rund eine halbe Minute, die Meldungen kommen in die Channels.\n\n[→⠀⠀bei GitHub zusehen](${actionsUrl()})`;
 }
 
 /** Sendung austragen. */

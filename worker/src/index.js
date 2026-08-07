@@ -28,7 +28,8 @@ import {
 } from "./discord.js";
 import { publish, refreshIfStale } from "./panel.js";
 import { accountListView, statusView, trackListView } from "./views.js";
-import { addTracking, parseTrackingLink, removeTracking, setAccountEnabled } from "./actions.js";
+import { addTracking, parseTrackingLink, removeTracking, setAccountEnabled, triggerRun } from "./actions.js";
+import { githubConfigured } from "./github.js";
 import { SUB_COMMAND } from "./catalog.js";
 import { loadAccountLabels } from "./repo.js";
 
@@ -203,6 +204,15 @@ async function runSetup(interaction, env, state) {
     );
   } catch (err) {
     await editOriginalResponse(interaction, `\`/setup\` fehlgeschlagen: ${err.message}`).catch(() => {});
+  }
+}
+
+/** Bot-Lauf anstoßen und das Ergebnis nachreichen. */
+async function runDispatch(interaction, env, state) {
+  try {
+    await editOriginalResponse(interaction, await triggerRun(env, state));
+  } catch (err) {
+    await editOriginalResponse(interaction, `\`/run\` fehlgeschlagen: ${err.message}`).catch(() => {});
   }
 }
 
@@ -394,6 +404,17 @@ async function handleCommand(interaction, env, ctx) {
     case "track remove": {
       const { text } = await removeTracking(env, state, args.name);
       return reply(text);
+    }
+
+    case "run": {
+      if (!githubConfigured(env)) {
+        return reply(
+          "Dem Worker fehlt `GITHUB_TOKEN` — ohne das kann er keinen Lauf anstoßen."
+        );
+      }
+      // Deferred: Der Weg geht über die GitHub-API und danach ins Gist. Einzeln
+      // schnell, zusammen aber zu nah an Discords 3-Sekunden-Grenze.
+      return deferTo(runDispatch(interaction, env, state), ctx);
     }
 
     default:

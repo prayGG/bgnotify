@@ -68,6 +68,8 @@ function resetFake(overrides = {}) {
     patchedFiles: [],
     posted: [],
     editedMessages: [],
+    dispatched: 0,
+    dispatchStatus: 0,
     ...overrides,
   };
 }
@@ -87,6 +89,11 @@ globalThis.fetch = async (input, init = {}) => {
   }
 
   if (url.host === "api.github.com") {
+    if (method === "POST" && path.includes("/actions/workflows/")) {
+      if (fake.dispatchStatus) return new Response("", { status: fake.dispatchStatus });
+      fake.dispatched++;
+      return new Response(null, { status: 204 });
+    }
     if (method === "GET") {
       return jsonRes({
         files: {
@@ -436,6 +443,30 @@ check("entfernen klappt", !fake.commands.tracking.mave, r.content);
 
 r = await post(cmd("track remove", { args: { name: "gibtsnicht" } }));
 check("unbekannter Name → ehrliche Absage", r.content?.includes("steht nicht in der Liste"), r.content);
+
+// --------------------------------------------------------------------------
+section("/run");
+// --------------------------------------------------------------------------
+resetFake(ready());
+r = await post(cmd("run"), { env: { ...FULL_ENV, GITHUB_TOKEN: "gh-token" } });
+check("stößt den Lauf an", fake.dispatched === 1, `${fake.dispatched} Dispatches`);
+check("antwortet deferred", r.body.type === 5);
+check("meldet es mit Link", fake.followUp.includes("angestoßen") && fake.followUp.includes("github.com"), fake.followUp.split("\n")[0]);
+check("merkt sich den Zeitpunkt", Boolean(fake.commands.last_run_at));
+
+r = await post(cmd("run"), { env: { ...FULL_ENV, GITHUB_TOKEN: "gh-token" } });
+check("zweiter Aufruf sofort danach → Sperre", fake.followUp.includes("warten"), fake.followUp.split("\n")[0]);
+check("… und stößt NICHT nochmal an", fake.dispatched === 1, `${fake.dispatched} Dispatches`);
+
+resetFake(ready());
+r = await post(cmd("run"));
+check("ohne GITHUB_TOKEN → sagt das klar", r.content?.includes("GITHUB_TOKEN"), r.content);
+
+// Fehlende Rechte dürfen die Sperre NICHT auslösen, sonst kommt man 90 s nicht wieder ran.
+resetFake({ ...ready(), dispatchStatus: 404 });
+r = await post(cmd("run"), { env: { ...FULL_ENV, GITHUB_TOKEN: "gh-token" } });
+check("fehlende Rechte werden erklärt", fake.followUp.includes("Actions: read and write"), fake.followUp);
+check("… und sperren nicht", !fake.commands.last_run_at);
 
 // --------------------------------------------------------------------------
 section("Autocomplete");

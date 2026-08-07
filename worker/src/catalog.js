@@ -82,6 +82,11 @@ export const COMMANDS = [
     ],
   },
   {
+    name: "run",
+    description: "Stößt sofort einen Bot-Lauf an",
+    help: "Startet den Bot jetzt, statt auf den nächsten Takt zu warten. Dauert rund eine halbe Minute; die Meldungen kommen wie immer in die Channels.",
+  },
+  {
     name: "ping",
     description: "Testet, ob der Bot erreichbar ist",
     help: "Antwortet „pong“. Nützlich, um zu sehen, ob der Worker läuft und ob du die nötige Rolle hast.",
