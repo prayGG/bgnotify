@@ -10,9 +10,31 @@ Requests/Tag, keine Kreditkarte).
 
 ## Stand
 
-Schritt 1 von 7 — Signaturprüfung und `/ping`. Mehr kann der Worker noch nicht,
-und das ist Absicht: Discord akzeptiert die Endpoint-URL nur, wenn die
-Ed25519-Prüfung korrekt ist. Steht die, ist der Rest geradeaus.
+Schritt 2 von 7 — Signaturprüfung, Rollenprüfung, `/setup` und `/ping`.
+
+Ab hier ist jeder Command hinter der Rolle `bgnotify` eingesperrt. Das kam
+bewusst früh: Alles Weitere fasst Bestelldaten und Zugangsdaten an, und
+nachträglich abzusichern ist die Reihenfolge, in der man Lücken übersieht.
+
+`default_member_permissions: "0"` blendet die Commands bei normalen Mitgliedern
+nur **aus** — das ist Sichtbarkeit, keine Absicherung. Verbindlich prüft der
+Worker, weil Discord die Rollen des Aufrufers bei jedem Command mitschickt.
+
+## Secrets
+
+| Secret | Wofür | Nötig ab |
+|---|---|---|
+| `DISCORD_PUBLIC_KEY` | Signaturprüfung eingehender Anfragen | Schritt 1 |
+| `DISCORD_BOT_TOKEN` | Rolle anlegen und zuweisen (`/setup`) | Schritt 2 |
+| `GIST_TOKEN` | PAT mit **ausschließlich** `gist`-Recht | Schritt 2 |
+| `GIST_ID` | ID des privaten Gists | Schritt 2 |
+
+Setzen mit `npx wrangler secret put <NAME>`, Wert danach eingeben. Nichts davon
+gehört in `wrangler.toml` — die Datei liegt im öffentlichen Repo.
+
+Der Worker schreibt **nur** `commands.json` im Gist. `order-state.json` gehört
+dem Actions-Bot, der darauf laden → ändern → speichern macht; ein Fremdschreiben
+dazwischen würde dessen Änderungen verlieren. Ein Test wacht darüber.
 
 ## Einrichten
 
@@ -60,9 +82,32 @@ Die Guild-ID (Rechtsklick auf den Server → *Server-ID kopieren*, dafür muss d
 Entwicklermodus in den Discord-Einstellungen an sein) sorgt dafür, dass die
 Commands sofort da sind. Ohne sie dauert es bis zu einer Stunde.
 
+### 5. Einrichten
+
+Im Server einmalig **`/setup`** aufrufen — nur der Server-Inhaber darf das.
+Der Command legt die Rolle `bgnotify` an, gibt sie dir und merkt sie im Gist.
+
+Die Rolle trägt bewusst **keine** Discord-Berechtigungen: Sie ist reines
+Kennzeichen für den Worker, kein Recht auf dem Server. Wer sie sonst noch
+bekommen soll, kriegt sie über *Servereinstellungen → Mitglieder*.
+
+`/setup` ist gefahrlos wiederholbar — eine schon vorhandene Rolle wird
+übernommen statt ein Duplikat anzulegen. Falls der Gist-Eintrag mal verloren
+geht, holt ein erneuter Aufruf den Stand zurück.
+
 ### Fertig, wenn
 
-`/ping` im Server „pong" antwortet — und die Antwort nur du siehst.
+`/ping` im Server „pong" antwortet, die Antwort nur du siehst — und jemand
+**ohne** die Rolle stattdessen eine Absage bekommt.
+
+## Tests
+
+```bash
+cd worker && node test.mjs
+```
+
+Läuft ohne Deploy: echte Ed25519-Schlüssel und echte Signaturen, Discord und
+GitHub über ein ersetztes `fetch` nachgestellt. 22 Fälle.
 
 ## Fehlersuche
 
@@ -71,6 +116,10 @@ Commands sofort da sind. Ohne sie dauert es bis zu einer Stunde.
 | Discord nimmt die URL nicht an | Public Key falsch oder Worker nicht deployt. `npx wrangler tail` zeigt die Requests live. |
 | `/ping` taucht nicht auf | Command nicht registriert, oder global statt für die Guild (dauert bis zu 1 h). |
 | „Die Anwendung reagiert nicht" | Worker antwortet nicht binnen 3 s — bei `/ping` praktisch nur möglich, wenn er gar nicht läuft. |
+| „Auf diesem Server ist noch nichts eingerichtet" | `/setup` wurde noch nie aufgerufen. |
+| `/setup` sagt „Missing Permissions" | Dem Bot fehlt `Manage Roles`, **oder** die Rolle `bgnotify` steht in der Serverliste über der Bot-Rolle. Discord lässt einen Bot nur Rollen unterhalb seiner eigenen vergeben — Bot-Rolle nach oben ziehen. |
+| `/setup` sagt „Unknown Guild" | Der Bot ist gar nicht auf diesem Server. Einladungslink erneut öffnen. |
+| Antwort bleibt ewig bei „denkt nach…" | Die nachgereichte Antwort kam nicht an. `npx wrangler tail` zeigt den Fehler aus `runSetup`. |
 
 ## Was hier NICHT hingehört
 

@@ -234,21 +234,28 @@ zusammengeführt.
 
 ---
 
-## 5 · Stand: Schritt 1 ist gebaut
+## 5 · Stand: Schritte 1 und 2 sind gebaut
 
 Auf Branch `claude/bgnotify-hermes-tracking-dyao5d`, **noch nicht gemerged**.
 
 ```
 worker/
-├── src/index.js      Signaturprüfung, Routing, /ping
+├── src/index.js      Signaturprüfung, Rollenprüfung, Routing, /setup, /ping
+├── src/discord.js    Discord-REST: Gilde, Rollen, nachgereichte Antwort
+├── src/gist.js       commands.json im privaten Gist (NIE order-state.json)
 ├── register.js       meldet Commands bei Discord an
-├── test.mjs          Signaturtest ohne Deploy
+├── test.mjs          22 Fälle ohne Deploy
 ├── wrangler.toml     Deploy-Konfiguration
 ├── package.json
 └── README.md         Einrichtungsanleitung
 ```
 
-Zwei Entscheidungen im Code, die nicht offensichtlich sind:
+**Schritt 1 ist live** — Worker deployt, Endpoint bei Discord eingetragen,
+`/ping` beantwortet. Schritt 2 ist gebaut und getestet, aber erst aktiv, wenn
+die drei neuen Secrets gesetzt sind (`DISCORD_BOT_TOKEN`, `GIST_TOKEN`,
+`GIST_ID`) und einmal `/setup` gelaufen ist.
+
+Vier Entscheidungen im Code, die nicht offensichtlich sind:
 
 1. Geprüft wird über die **rohen Body-Bytes**, nicht über neu serialisiertes
    JSON — `JSON.stringify` liefert nicht zwingend dieselbe Byte-Folge zurück,
@@ -256,17 +263,29 @@ Zwei Entscheidungen im Code, die nicht offensichtlich sind:
 2. Es werden **zwei Algorithmus-Schreibweisen** probiert (`Ed25519` und das
    ältere `NODE-ED25519`), weil die Workers-Runtime historisch den Altnamen
    verlangte. So überlebt der Code ein Plattform-Update.
+3. Die Rollenprüfung kostet **keinen** API-Aufruf: Discord schickt
+   `member.roles` bei jedem Command mit. `/setup` dagegen holt die Gilde
+   wirklich (`GET /guilds/{id}`), um die Inhaberschaft zu prüfen — „Administrator"
+   wäre etwas anderes, das kann jeder bekommen, dem es jemand gibt. Der teure
+   Weg nur dort, wo er einmalig anfällt.
+4. `/setup` antwortet **deferred** (Typ 5). Es macht bis zu vier Netzaufrufe
+   (Gilde, Rollen, Zuweisung, Gist) — zusammen zu nah an Discords
+   3-Sekunden-Grenze. Der Ablauf läuft in `ctx.waitUntil()` weiter und schreibt
+   sein Ergebnis über das Interaction-Token nach; ein Bot-Token braucht es dafür
+   nicht. Fehler landen ebenfalls dort, sonst bliebe die Antwort ewig bei
+   „denkt nach…".
 
-Getestet mit echten Ed25519-Schlüsseln gegen `worker.fetch()` — sieben Fälle,
-alle grün:
+Getestet mit echten Ed25519-Schlüsseln gegen `worker.fetch()`, Discord und
+GitHub über ein ersetztes `fetch` nachgestellt — 22 Fälle, alle grün:
 
 ```bash
 cd worker && node test.mjs
 ```
 
-Der wichtigste Fall ist „kaputte Signatur → 401": Discord testet die
-Endpoint-URL beim Eintragen genau damit und akzeptiert sie nur, wenn abgelehnt
-wird. Läuft der Test durch, wird Discord die URL annehmen.
+Zwei Fälle tragen mehr als der Rest. „Kaputte Signatur → 401": Discord testet
+die Endpoint-URL beim Eintragen genau damit und akzeptiert sie nur, wenn
+abgelehnt wird. Und „`/setup` schreibt NUR commands.json": Das ist die eine
+Regel, deren Bruch niemandem auffiele, bis Bestellungen still verschwinden.
 
 ---
 
@@ -286,10 +305,31 @@ Ablauf steht ausführlich in `worker/README.md`. Kurzfassung, Reihenfolge zählt
    `Manage Roles`)
 6. `node register.js` mit App-ID, Bot-Token und Guild-ID
 
-### Dann Schritt 2
+Schritt 1 ist damit erledigt und live.
 
-`/setup` und der Rollencheck. Früh, damit alles Weitere von Anfang an geschützt
-ist statt nachträglich.
+### Für Schritt 2 (Code liegt, Secrets fehlen)
+
+```bash
+cd worker
+npx wrangler secret put DISCORD_BOT_TOKEN   # Developer Portal → Bot
+npx wrangler secret put GIST_TOKEN          # PAT, NUR gist-Recht
+npx wrangler secret put GIST_ID             # aus der Gist-URL
+npx wrangler deploy
+node register.js                            # meldet /setup mit an
+```
+
+Danach im Server einmalig `/setup` — nur der Inhaber darf. Fertig, wenn jemand
+ohne die Rolle bei `/ping` eine Absage bekommt.
+
+Das `GIST_TOKEN` bewusst als eigenes, auf `gist` beschränktes PAT anlegen und
+nicht das des Actions-Bots wiederverwenden: Der Worker ist über eine öffentliche
+URL erreichbar, der Actions-Bot nicht. Was hier lecken kann, soll so wenig
+können wie möglich.
+
+### Dann Schritt 3
+
+Nur-lesende Commands: `/status`, `/track list`, `/account list`. Ab dann fassen
+die Antworten echte Bestelldaten an — deshalb war die Rolle vorher dran.
 
 ---
 

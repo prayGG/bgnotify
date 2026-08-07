@@ -14,14 +14,20 @@ const APP_ID = process.env.DISCORD_APP_ID;
 const BOT_TOKEN = process.env.DISCORD_BOT_TOKEN;
 const GUILD_ID = process.env.DISCORD_GUILD_ID || "";
 
-// Schritt 1: nur /ping. Die echten Commands kommen Schritt für Schritt dazu.
+// Schritt 2: /ping und /setup. Die echten Commands kommen Schritt für Schritt dazu.
+//
+// `default_member_permissions: "0"` blendet den Command bei allen aus, die keine
+// Adminrechte haben. Das ist ausdruecklich NUR Sichtbarkeit — die verbindliche
+// Pruefung macht der Worker anhand der Rolle `bgnotify`.
 const commands = [
   {
     name: "ping",
     description: "Testet, ob der Bot erreichbar ist",
-    // Ohne diese Zeile taucht der Command bei jedem Mitglied auf. 0 = niemand
-    // ausser Admins sieht ihn; die eigentliche Rechtepruefung macht spaeter der
-    // Worker anhand der Rolle.
+    default_member_permissions: "0",
+  },
+  {
+    name: "setup",
+    description: "Richtet die Rolle bgnotify ein (nur der Server-Inhaber)",
     default_member_permissions: "0",
   },
 ];
