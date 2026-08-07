@@ -1,0 +1,16 @@
+{
+  "name": "bgnotify-commands",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Discord-Interactions-Endpoint fuer bgnotify (Cloudflare Worker)",
+  "type": "module",
+  "scripts": {
+    "deploy": "wrangler deploy",
+    "dev": "wrangler dev",
+    "tail": "wrangler tail",
+    "register": "node register.js"
+  },
+  "devDependencies": {
+    "wrangler": "^4.0.0"
+  }
+}
