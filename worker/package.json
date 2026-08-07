@@ -8,7 +8,8 @@
     "deploy": "wrangler deploy",
     "dev": "wrangler dev",
     "tail": "wrangler tail",
-    "register": "node register.js"
+    "register": "node register.js",
+    "test": "node test.mjs"
   },
   "devDependencies": {
     "wrangler": "^4.0.0"
