@@ -97,6 +97,36 @@ def _backfill_pending(acct: dict) -> bool:
                for o in (acct.get("orders") or {}).values())
 
 
+def _remember_enabled(accounts_state: dict, cfg_accounts: list,
+                      enabled_names: list) -> tuple[list[str], bool]:
+    """An/Aus-Zustand jedes Kontos merken.
+
+    Gibt (frisch eingeschaltete Konten, hat sich der Merker geändert) zurück.
+    Das zweite Stück entscheidet, ob der Stand gespeichert werden muss.
+
+    Der Merker wird für ALLE Konten gepflegt, auch die ausgeschalteten — sonst
+    bliebe nach dem Ausschalten `True` stehen und das nächste Einschalten sähe
+    aus wie „war doch schon an".
+
+    Bewusst `is False` statt `not was_on`: Beim allerersten Lauf nach dieser
+    Änderung fehlt der Merker überall. Ohne die Unterscheidung würde jedes
+    bereits eingeschaltete Konto als „gerade eingeschaltet" gelten und einen
+    überflüssigen Login auslösen. So wird beim ersten Lauf nur aufgeschrieben.
+    """
+    switched_on, changed = [], False
+    for a in cfg_accounts:
+        name = a["name"]
+        acct = accounts_state.setdefault(name, {})
+        now_on = name in enabled_names
+        was_on = acct.get("_was_enabled")
+        if now_on and was_on is False:
+            switched_on.append(name)
+        if was_on is not now_on:
+            changed = True
+        acct["_was_enabled"] = now_on
+    return switched_on, changed
+
+
 def _orders_due(acct: dict, interval_minutes: int, idle_interval_minutes: int) -> bool:
     """Ist dieser Account fällig? Zwei-Gang-Takt (offen→schnell, sonst Ruhe) mit
     ±10% Jitter. Kein last_check_at = noch nie geprüft = fällig."""
@@ -181,7 +211,9 @@ def _check_one_account(name: str, webhook: str, user: str, pw: str,
 
     def want_detail(o: dict) -> bool:
         if not initialized:
-            return False  # Baseline-Lauf: keine History nachladen
+            # Baseline: die Historie wird still übernommen, OFFENE Bestellungen
+            # dagegen gemeldet — für deren Karte brauchen wir die Artikel.
+            return o["status"] not in _TERMINAL_STATUS
         prev = order_map.get(o["order_id"])
         if prev is None:
             return True  # neue Bestellung → Detailseite für die Artikel (+ ggf. Tracking)
@@ -197,12 +229,34 @@ def _check_one_account(name: str, webhook: str, user: str, pw: str,
     acct["cookies"] = cookies  # Session für nächsten Lauf merken (privates Gist)
 
     if not initialized:
+        # Erstkontakt mit einem Konto. Die Bestellhistorie bleibt still — sonst
+        # knallt bei jedem neu hinterlegten Konto die komplette Vergangenheit in
+        # den Channel. Was noch LÄUFT wird dagegen gemeldet: Genau dafür trägt
+        # man das Konto ja gerade ein, und es sind nie viele.
+        #
+        # `stale` prüft gegen _TERMINAL_STATUS statt nur gegen "completed" —
+        # sonst bekäme eine stornierte Altbestellung später noch eine
+        # Tracking-Karte hinterhergeworfen.
+        offen = 0
         for o in olist:
-            done = o["status"] == "completed"
-            order_map[o["order_id"]] = {"status": o["status"], "tracking_posted": done,
-                                        "tracking_registered": done}
+            oid, slug = o["order_id"], o["status"]
+            stale = slug in _TERMINAL_STATUS
+            entry = {"status": slug, "tracking_posted": stale, "tracking_registered": stale}
+            detail = orders.parse_order_detail(details[oid]) if oid in details else None
+            items = (detail or {}).get("items") or None
+            if items:
+                entry["items"] = items
+            order_map[oid] = entry
+            if not stale:
+                notify.send_order_update(
+                    webhook,
+                    build_order_status_embed(o, fresh=True, items=items, owner=owner),
+                    ping_ids, role_ids,
+                )
+                offen += 1
         acct["_initialized"] = True
-        log.info("orders[%s]: Baseline gesetzt (%d Bestellungen), nichts gepostet", name, len(olist))
+        log.info("orders[%s]: Erstkontakt — %d Bestellung(en) übernommen, %d offene gemeldet",
+                 name, len(olist), offen)
         return
 
     for o in olist:
@@ -301,6 +355,23 @@ def check_orders(cfg: dict, default_webhook: str, default_ping_ids: list[str], r
     # An/Aus-Schalter: nur aktivierte Konten (Gist-Feld `enabled`) → in
     # Bestellpausen keine Logins. Standard = aus.
     enabled_names = [a["name"] for a in cfg_accounts if _order_enabled(st, a["name"], cmds)]
+
+    # Gerade eingeschaltet? Dann sofort prüfen statt bis zu 24 h Ruhe-Takt
+    # abzuwarten — man legt den Schalter genau dann um, wenn man bestellt hat.
+    # `last_check_at` leeren genügt: `_orders_due` wertet "noch nie geprüft"
+    # bereits als fällig, und beim Sortieren rutscht das Konto nach vorn.
+    #
+    # Erkannt wird über den gemerkten Zustand, nicht über den Command — so
+    # greift es auch, wenn der Schalter von Hand im Gist umgelegt wurde. Der
+    # Merker wird SOFORT gespeichert: Weiter unten gibt es mehrere Abbruchwege,
+    # auf denen er sonst verlorenginge und das Einschalten nie erkannt würde.
+    switched_on, flags_changed = _remember_enabled(accounts_state, cfg_accounts, enabled_names)
+    for name in switched_on:
+        accounts_state[name]["last_check_at"] = ""
+    if switched_on:
+        log.info("orders: gerade eingeschaltet, wird sofort geprüft: %s", ", ".join(switched_on))
+    if flags_changed:
+        orders.save_order_state(token, gist_id, st)
 
     # Frisch per `/account add` hinterlegte Konten müssen EINMAL geprüft werden,
     # auch wenn sie noch aus sind. Sie sind es nämlich immer: Neue Konten starten
