@@ -100,7 +100,7 @@ export const COMMANDS = [
       {
         name: "add",
         description: "Produkt aufnehmen",
-        help: "Produkt aufnehmen. Erster Aufruf liest die Varianten ein, zweiter wählt aus.",
+        help: "Produkt aufnehmen. Varianten kommen als Auswahlmenü in die Antwort.",
         options: [
           { name: "link", description: "Produktseite bei bgpharmadrugs.to", type: STRING, required: true, autocomplete: true },
           { name: "variante", description: "welche Variante (nach dem Einlesen)", type: STRING, autocomplete: true },

@@ -107,8 +107,16 @@ Verbrauch hier: eine Handvoll pro Tag.
 ### 3.2 Trennung nach Richtung, nicht nach Technik
 
 Nicht alles auf Bot umstellen. Webhooks dürfen pro Nachricht Name und Avatar
-setzen — davon lebt das Setup mit `bgnotify · orders`, `· meso`, `· updates`.
-Ein echter Bot postet immer als er selbst; die drei Absender wären weg.
+setzen — davon lebt das Setup mit `bgnotify · orders` und `· meso`. Ein echter
+Bot postet immer als er selbst; diese Absender wären weg.
+
+Eine Ausnahme gibt es inzwischen: Deploy-Karten und Fehler-Reports. Die
+gehören zu keinem Channel im Voraus, und ihr fest eingetragener Webhook zeigte
+monatelang auf einen Channel, den niemand sah — unbemerkt, weil Discord einen
+Webhook-POST auch dann mit 204 quittiert, wenn dort keiner mitliest. Dafür
+merkt sich der Worker bei jedem Command seinen Channel, und der Bot schreibt
+mit seinem eigenen Token dorthin. Der Absendername ist dieser Sorte Meldung
+egal; dass sie ankommt, nicht.
 
 ```
 Discord ──Command──▶ Worker ──schreibt──▶ Gist: commands.json
@@ -170,7 +178,7 @@ Namen auf Englisch. **sofort** = Worker allein, Antwort unter einer Sekunde.
 | `/track add` | Hermes-Link eintragen, optional Name und Ping-Ziel | sofort |
 | `/track list` | was verfolgt wird, mit letztem Stand und letzter Abfrage | sofort |
 | `/track remove` | Eintrag löschen, Namen per Autocomplete | sofort |
-| `/product add` | URL rein, Bot liest Varianten und lässt auswählen | nächster Lauf |
+| `/product add` | URL rein, Bot liest Varianten, Auswahl per Dropdown | nächster Lauf |
 | `/product list` / `remove` | Beobachtungsliste zeigen, Einträge entfernen | sofort |
 | `/run` | stößt sofort einen Bot-Lauf an (`workflow_dispatch`) | sofort |
 | `/status` | läuft der Bot, letzter Lauf, Konten, Webhooks | sofort |
@@ -386,12 +394,20 @@ können wie möglich.
 
 Der Plan ist abgearbeitet. Zwei Dinge sind bewusst offengeblieben:
 
-- **`/product add` braucht zwei Aufrufe.** Beim ersten kennt der Worker die
-  Seite nicht; welche Varianten es gibt, weiß erst, wer sie geladen hat. Der
-  Auftrag wandert in `commands.json`, der nächste Lauf liest ein und postet
-  eine Karte, danach steht die Auswahl im Autocomplete. Discord-Auswahlmenüs
-  wären eleganter, gehen aber nicht: Der Bot postet über Webhooks, und
-  eingehende Webhooks dürfen keine interaktiven Komponenten tragen.
+- **`/product add` braucht den ersten Aufruf zum Einlesen.** Beim ersten kennt
+  der Worker die Seite nicht; welche Varianten es gibt, weiß erst, wer sie
+  geladen hat. Der Auftrag wandert in `commands.json`, der nächste Lauf liest
+  ein und reicht das Ergebnis über den Interaction-Token nach.
+
+  Der zweite Aufruf ist inzwischen ein **Auswahlmenü** in der Antwort. Hier
+  stand vorher, das ginge nicht, weil eingehende Webhooks keine interaktiven
+  Komponenten tragen dürfen — das stimmt, geht aber am Fall vorbei: Das Menü
+  hängt nicht an einer Webhook-Nachricht, sondern an der Antwort des Workers
+  auf den Command, und die darf Komponenten führen. Den Klick nimmt derselbe
+  Endpoint als `MESSAGE_COMPONENT` entgegen (`worker/src/select.js`).
+  Der Weg über `variante:` bleibt als Rückfallebene für die Fälle, in denen
+  Discords Grenzen greifen: `custom_id` endet bei 100 Zeichen, ein Menü bei
+  25 Einträgen.
 - **Testen:** `node worker/test.mjs` und `python test_bot.py` — beide laufen
   auch bei jedem Push (`.github/workflows/tests.yml`). Die Python-Seite
   kam spät dazu, nachdem ein Fehler durchgerutscht war, den 111 grüne

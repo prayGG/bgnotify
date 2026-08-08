@@ -3,8 +3,11 @@
  *
  * Discord schickt jeden Slash-Command als HTTPS-POST hierher — es braucht also
  * KEINEN dauerlaufenden Bot-Prozess (und damit keinen gemieteten Server). Der
- * Worker beantwortet den Command und schreibt in das private Gist; Meldungen
- * in die Channels laufen weiterhin über die Webhooks des Actions-Bots.
+ * Worker beantwortet den Command und schreibt in das private Gist; die
+ * Meldungen selbst (Restocks, Bestellungen, Sendungen) verschickt der
+ * Actions-Bot über seine Webhooks. Eine Ausnahme: Deploy-Karten und
+ * Fehler-Reports gehören zu keinem Channel im Voraus — für die merkt sich der
+ * Worker hier, wo zuletzt ein Command lief.
  *
  * Stand: vollständig (Schritte 1–7).
  *   lesen      /status, /track list, /account list, /product list
@@ -45,12 +48,14 @@ import {
   removeProduct,
   renameProduct,
   moveProduct,
+  rememberChannel,
   removeTracking,
   requestScan,
   setAccountEnabled,
   slotLabels,
   triggerRun,
 } from "./actions.js";
+import { parsePick, productSelect } from "./select.js";
 import { dispatchRun, githubConfigured } from "./github.js";
 import { ACCOUNT_ADD, accountAddModal, modalValues } from "./modal.js";
 import { SUB_COMMAND } from "./catalog.js";
@@ -60,6 +65,7 @@ import { clip } from "./format.js";
 const InteractionType = {
   PING: 1,
   APPLICATION_COMMAND: 2,
+  MESSAGE_COMPONENT: 3,
   AUTOCOMPLETE: 4,
   MODAL_SUBMIT: 5,
 };
@@ -67,6 +73,7 @@ const InteractionResponseType = {
   PONG: 1,
   CHANNEL_MESSAGE_WITH_SOURCE: 4,
   DEFERRED_CHANNEL_MESSAGE_WITH_SOURCE: 5,
+  UPDATE_MESSAGE: 7,
   AUTOCOMPLETE_RESULT: 8,
   MODAL: 9,
 };
@@ -129,6 +136,20 @@ function reply(content) {
   return json({
     type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
     data: { content, flags: EPHEMERAL },
+  });
+}
+
+/**
+ * Die Nachricht ersetzen, an der geklickt wurde.
+ *
+ * Bewusst mit leerem `components`: Das Menü verschwindet, sobald etwas gewählt
+ * ist. Bliebe es stehen, sähe die Antwort aus wie eine Frage, die noch offen
+ * ist — und ein zweiter Klick würde dasselbe nochmal aufnehmen.
+ */
+function updateMessage(content) {
+  return json({
+    type: InteractionResponseType.UPDATE_MESSAGE,
+    data: { content, components: [], flags: EPHEMERAL },
   });
 }
 
@@ -539,6 +560,19 @@ async function handleCommand(interaction, env, ctx) {
   // Channel hinterlassen.
   if (path !== "panel") refreshIfStale(env, state, interaction.guild_id, ctx);
 
+  // Wo gerade jemand tippt, ist auch der Ort, an dem er die Meldungen des Bots
+  // sehen will. Bis hierher haben Deploy-Karten und Fehler-Reports einen fest
+  // eingetragenen Webhook benutzt — der zeigte auf einen Channel, den niemand
+  // sah, und das konnte niemand merken: Discord quittiert einen Webhook-POST
+  // auch dann mit 204, wenn dort keiner mitliest. Läuft im Hintergrund, damit
+  // die Antwort darauf nicht wartet; scheitert es, ist nur der alte Channel
+  // einen Command länger gültig.
+  const gemerkt = rememberChannel(env, state, interaction.guild_id, interaction.channel_id).catch(
+    () => {}
+  );
+  if (ctx?.waitUntil) ctx.waitUntil(gemerkt);
+  else await gemerkt;
+
   const args = optionValues(interaction.data);
   const userId = interaction.member.user.id;
 
@@ -632,6 +666,29 @@ async function handleCommand(interaction, env, ctx) {
         return reply(`**${scan.title}** wird ${schon ? "weiterhin" : "ab jetzt"} beobachtet.`);
       }
       if (!args.variante) {
+        // Die Varianten als Dropdown in die Antwort. Ein Klick statt eines
+        // zweiten Command-Aufrufs mit demselben Link — und der Wortlaut kann
+        // nicht mehr danebenliegen, weil Discord genau das zurückmeldet, was
+        // hier hineingeschrieben wurde.
+        const auswahl = productSelect(url, scan.variants);
+        if (auswahl) {
+          const fehlen = auswahl.total - auswahl.shown;
+          return json({
+            type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+            data: {
+              content:
+                `**${scan.title}** hat ${auswahl.total} Varianten — welche soll beobachtet werden?` +
+                (fehlen
+                  ? `\n\n_${fehlen} passen nicht in die Liste; die gehen über \`variante:\`._`
+                  : ""),
+              components: [auswahl.row],
+              flags: EPHEMERAL,
+            },
+          });
+        }
+        // Passt das Menü nicht in Discords Grenzen, bleibt der alte Weg. Lieber
+        // ein Command, den man zweimal tippt, als eine Antwort, die als HTTP 400
+        // gar nicht erst ankommt.
         return reply(
           `**${scan.title}** hat ${scan.variants.length} Varianten. Ruf \`/product add\` nochmal auf und wähl bei \`variante\` aus — die Liste steht jetzt im Autocomplete.`
         );
@@ -693,6 +750,51 @@ async function handleCommand(interaction, env, ctx) {
     default:
       return reply(`Unbekannter Command: \`/${path}\``);
   }
+}
+
+/**
+ * Ein Klick im Auswahlmenü.
+ *
+ * Läuft durch dieselbe Rollenprüfung wie ein Command. Das ist kein Formalismus:
+ * Eine Nachricht mit Menü liegt im Channel, und eine Component-Interaktion
+ * lässt sich auslösen, ohne den Command je aufgerufen zu haben. Wer die Rolle
+ * inzwischen verloren hat, soll hier nicht durchkommen.
+ *
+ * Gegengeprüft wird außerdem gegen den Stand des Bots, nicht gegen die
+ * Nachricht: Zwischen Aufruf und Klick können Minuten liegen, und was auf der
+ * Seite nicht mehr steht, hilft in der Beobachtung niemandem.
+ */
+async function handleComponent(interaction, env) {
+  const url = parsePick(interaction.data?.custom_id);
+  if (!url) return reply("Unbekannte Auswahl.");
+  if (!interaction.guild_id || !interaction.member) {
+    return reply("Das geht nur in einem Server.");
+  }
+
+  let data;
+  try {
+    data = await loadAll(env);
+  } catch (err) {
+    return reply(`Stand nicht lesbar: ${err.message}`);
+  }
+  const roleId = roleIdFor(data.commands, interaction.guild_id);
+  if (!roleId || !(interaction.member.roles || []).includes(roleId)) {
+    return reply(`Dafür brauchst du die Rolle <@&${roleId || "bgnotify"}>.`);
+  }
+
+  const variante = (interaction.data?.values || [])[0] || "";
+  const scan = data.orders.product_scans?.[url];
+  if (!scan || scan.error || !(scan.variants || []).includes(variante)) {
+    return updateMessage(
+      "Diese Auswahl gibt es so nicht mehr — ruf `/product add` nochmal auf."
+    );
+  }
+
+  const schon = await addProduct(env, data.commands, url, scan.title, variante);
+  return updateMessage(
+    `**${variante}** wird ${schon ? "weiterhin" : "ab jetzt"} beobachtet.\n\n` +
+      "Ab dem nächsten Lauf steht es im Dashboard, und ein Restock pingt wie gewohnt."
+  );
 }
 
 /**
@@ -763,6 +865,9 @@ export default {
     }
     if (interaction.type === InteractionType.APPLICATION_COMMAND) {
       return handleCommand(interaction, env, ctx);
+    }
+    if (interaction.type === InteractionType.MESSAGE_COMPONENT) {
+      return handleComponent(interaction, env);
     }
     if (interaction.type === InteractionType.AUTOCOMPLETE) {
       return handleAutocomplete(interaction, env);
