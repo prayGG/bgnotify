@@ -695,6 +695,17 @@ check("Varianten-Autocomplete filtert", r.body.data.choices.length === 1 && r.bo
 // /product rename hatte gar keinen Autocomplete-Zweig und fiel auf die leere
 // Liste durch — im Client sah das aus wie "keine Produkte", nicht wie ein
 // fehlender Fall. Deshalb steht das hier fuer BEIDE Commands.
+// /product move zieht seine Vorschlaege aus state.json — das schreibt der Bot
+// beim Zeichnen des Dashboards. Als einziger Autocomplete-Zweig war der bisher
+// ungeprueft.
+fake.repoState = { dashboard_names: ["Roaccutane 20 mg (Roche)", "Azelaic Acid 20% 30g"] };
+r = await post(ac("move", [{ name: "produkt", value: "", focused: true }]));
+check("Autocomplete fuer /product move schlaegt etwas vor",
+  r.body.data.choices?.length === 2, JSON.stringify(r.body.data.choices));
+r = await post(ac("move", [{ name: "produkt", value: "azelaic", focused: true }]));
+check("… und filtert nach der Eingabe",
+  r.body.data.choices?.[0]?.value === "Azelaic Acid 20% 30g", JSON.stringify(r.body.data.choices));
+
 fake.commands.products = { k1: { url: PROD, name: "Azelaic Acid 20% 30 gr cream" } };
 for (const sub of ["remove", "rename"]) {
   r = await post(ac(sub, [{ name: "produkt", value: "", focused: true }]));
