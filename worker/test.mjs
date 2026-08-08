@@ -718,6 +718,16 @@ check("leerer Name setzt zurueck", !("label" in fake.commands.products.k1), r.co
 r = await post(cmd("product rename", { args: { produkt: "gibtsnicht", name: "X" } }));
 check("fest gepflegtes → Absage beim Umbenennen", r.content?.includes("config.yml"), r.content);
 
+// Sortierung: Die Position ist ZWEITschluessel. Verfuegbarkeit sortiert weiter
+// zuerst — sonst muesste man beim Draufschauen die ganze Liste absuchen, ob
+// ueberhaupt etwas gruen ist.
+r = await post(cmd("product move", { args: { produkt: "Roaccutane 20 mg", position: 10 } }));
+check("Position wird gemerkt", fake.commands.order?.["Roaccutane 20 mg"] === 10, r.content);
+check("… geschluesselt nach der Ueberschrift, nicht nach einem Produktschluessel",
+  Object.keys(fake.commands.order)[0] === "Roaccutane 20 mg");
+r = await post(cmd("product move", { args: { produkt: "  ", position: 5 } }));
+check("leerer Name → Absage", r.content?.includes("Autocomplete"), r.content);
+
 r = await post(cmd("product remove", { args: { produkt: "k1" } }));
 check("entfernen klappt", !fake.commands.products.k1, r.content);
 r = await post(cmd("product remove", { args: { produkt: "gibtsnicht" } }));

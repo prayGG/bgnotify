@@ -44,6 +44,7 @@ import {
   removeAccount,
   removeProduct,
   renameProduct,
+  moveProduct,
   removeTracking,
   requestScan,
   setAccountEnabled,
@@ -53,7 +54,7 @@ import {
 import { dispatchRun, githubConfigured } from "./github.js";
 import { ACCOUNT_ADD, accountAddModal, modalValues } from "./modal.js";
 import { SUB_COMMAND } from "./catalog.js";
-import { loadAccountLabels } from "./repo.js";
+import { loadAccountLabels, loadRepoState } from "./repo.js";
 import { clip } from "./format.js";
 
 const InteractionType = {
@@ -449,6 +450,15 @@ async function handleAutocomplete(interaction, env) {
     return autocompleteResult([]);
   }
 
+  if (path === "product move") {
+    // Genau die Ueberschriften, die im Dashboard stehen — der Bot legt sie
+    // dort ab. Die aus config.yml nachzubauen hiesse, sie doppelt zu pflegen.
+    const namen = (await loadRepoState()).dashboard_names || [];
+    return autocompleteResult(
+      namen.filter(passt).map((n) => ({ name: clip(n, 90), value: clip(n, 90) }))
+    );
+  }
+
   if (path === "product remove") {
     return autocompleteResult(
       Object.entries(data.commands.products || {})
@@ -633,6 +643,17 @@ async function handleCommand(interaction, env, ctx) {
       return reply(
         `Heißt im Dashboard jetzt **${heisst}**.\n\n` +
           "Überwacht wird weiter derselbe Eintrag auf der Seite — umbenannt ist nur die Anzeige."
+      );
+    }
+
+    case "product move": {
+      const wohin = await moveProduct(env, state, args.produkt, args.position);
+      return reply(
+        wohin === null
+          ? `**${args.produkt}** steht so nicht im Dashboard. Waehl bitte aus dem Autocomplete.`
+          : `**${args.produkt}** steht jetzt auf Position ${wohin}.\n\n` +
+              "Verfuegbares bleibt oben — die Position entscheidet nur innerhalb einer Stufe. " +
+              "Sichtbar ab dem naechsten Lauf."
       );
     }
 

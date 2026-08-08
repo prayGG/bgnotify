@@ -146,3 +146,20 @@ def command_products(cmds: dict) -> list[dict]:
             p["variant_labels"] = {v: label for v in varianten}
         out.append(p)
     return out
+
+
+def product_order(cmds: dict) -> dict:
+    """Von Hand gesetzte Reihenfolge fürs Dashboard: `{Überschrift: Position}`.
+
+    Bewusst nach dem ANGEZEIGTEN Namen geschlüsselt, nicht nach einem
+    Produkteintrag: So lassen sich auch die fest in `config.yml` gepflegten
+    Produkte verschieben, ohne die Datei anzufassen — sonst wären ausgerechnet
+    die ältesten Einträge die einzigen, die man nicht sortieren kann.
+    """
+    out: dict = {}
+    for name, pos in (cmds.get("order") or {}).items():
+        try:
+            out[str(name)] = int(pos)
+        except (TypeError, ValueError):
+            continue
+    return out

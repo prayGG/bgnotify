@@ -38,6 +38,7 @@ from .config import (
 from .deploy import announce_deploy
 from .embeds import (
     build_dashboard_embed,
+    dashboard_group_names,
     build_forum_embed,
     build_oos_embed,
     build_ps_drop_embed,
@@ -142,10 +143,18 @@ def main() -> int:
         # Alerts gehen unabhängig davon in den Stock-Channel — deshalb NICHT an
         # `webhook` gekoppelt (sonst feuern sie nicht, wenn nur der Stock-Webhook
         # gesetzt ist). send_* sind no-ops bei leerer URL.
+        # Von Hand gesetzte Reihenfolge (`/product move`). Zweitschlüssel: Die
+        # Verfügbarkeit sortiert weiterhin zuerst, das hier entscheidet nur
+        # innerhalb einer Stufe.
+        order = commands.product_order(gist_cmds)
+        # Die Überschriften veröffentlichen, damit `/product move` im
+        # Autocomplete genau das anbietet, was im Dashboard steht.
+        state["dashboard_names"] = dashboard_group_names(statuses)
+
         if webhook:
             new_stats_id = notify.edit_in_place(
                 webhook,
-                build_stats_embed(cfg, state, usd_eur=usd_eur),
+                build_stats_embed(cfg, state, usd_eur=usd_eur, order=order),
                 message_id=state.get("stats_message_id", ""),
             )
             if new_stats_id:
@@ -153,7 +162,7 @@ def main() -> int:
 
             new_id = notify.edit_in_place(
                 webhook,
-                build_dashboard_embed(statuses, usd_eur=usd_eur, labels=labels),
+                build_dashboard_embed(statuses, usd_eur=usd_eur, labels=labels, order=order),
                 message_id=state.get("dashboard_message_id", ""),
             )
             if new_id:

@@ -314,3 +314,24 @@ export function slotLabels(state) {
   }
   return out;
 }
+
+/**
+ * Position im Dashboard setzen. Geschluesselt nach der ANGEZEIGTEN Ueberschrift,
+ * nicht nach einem Produkteintrag — nur so lassen sich auch die fest in
+ * `config.yml` gepflegten Produkte verschieben, ohne die Datei anzufassen.
+ * Sonst waeren ausgerechnet die aeltesten Eintraege die einzigen, die man nicht
+ * sortieren kann.
+ *
+ * Kleiner heisst weiter oben. Ohne Angabe gilt 100, damit in beide Richtungen
+ * Platz bleibt, ohne alles umzunummerieren. `null` bei leerem Namen.
+ */
+export async function moveProduct(env, state, name, position) {
+  const sauber = (name || "").trim();
+  if (!sauber) return null;
+  const pos = Number.parseInt(position, 10);
+  state.order ||= {};
+  if (Number.isFinite(pos)) state.order[sauber] = pos;
+  else delete state.order[sauber];
+  await saveState(env, state);
+  return Number.isFinite(pos) ? pos : 100;
+}

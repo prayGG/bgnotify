@@ -250,5 +250,36 @@ with ScanLauf(cmds=auftrag, state={}, kaputt=True) as l:
           any("nicht lesbar" in (q["embed"].get("title") or "") for q in l.quittungen),
           str([q["embed"].get("title") for q in l.quittungen]))
 
+# --------------------------------------------------------------------------
+section("Sortierung im Dashboard")
+# --------------------------------------------------------------------------
+from src.embeds import build_dashboard_embed, dashboard_group_names  # noqa: E402
+
+
+def st(name, in_stock):
+    return {"variant": name, "product_name": name, "in_stock": in_stock, "found": True,
+            "price": "10", "product_url": "https://x"}
+
+
+lage = [st("Zebra", True), st("Alpha", True), st("Beta", False)]
+check("Überschriften wie angezeigt", dashboard_group_names(lage) == ["Zebra", "Alpha", "Beta"])
+
+def reihenfolge(order):
+    text = build_dashboard_embed(lage, order=order)["description"]
+    return [n for n in ("Zebra", "Alpha", "Beta") if n in text] and sorted(
+        ("Zebra", "Alpha", "Beta"), key=lambda n: text.index(n))
+
+check("ohne Positionen: verfügbar oben, dann alphabetisch",
+      reihenfolge({}) == ["Alpha", "Zebra", "Beta"], str(reihenfolge({})))
+check("Position hebt Zebra über Alpha",
+      reihenfolge({"Zebra": 1}) == ["Zebra", "Alpha", "Beta"], str(reihenfolge({"Zebra": 1})))
+# Der entscheidende Fall: Eine Position darf ein ausverkauftes Produkt NICHT
+# nach oben holen. Sonst müsste man beim Draufschauen jedes Mal die ganze Liste
+# absuchen, ob überhaupt etwas grün ist — genau das soll das Dashboard abnehmen.
+check("… aber niemals über die Verfügbarkeit hinweg",
+      reihenfolge({"Beta": 1}) == ["Alpha", "Zebra", "Beta"], str(reihenfolge({"Beta": 1})))
+check("kaputte Position wird ignoriert statt zu krachen",
+      reihenfolge({"Zebra": "oben"}) == ["Alpha", "Zebra", "Beta"])
+
 print(f"\n{failed} FEHLER" if failed else "\nALLES GRÜN")
 sys.exit(1 if failed else 0)

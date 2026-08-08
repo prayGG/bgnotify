@@ -16,6 +16,7 @@
 // Discord-Optionstypen, die hier vorkommen.
 export const SUB_COMMAND = 1;
 export const STRING = 3;
+export const INTEGER = 4;
 
 const KONTO = { name: "konto", description: "welches Konto", type: STRING, required: true, autocomplete: true };
 
@@ -103,6 +104,15 @@ export const COMMANDS = [
         options: [
           { name: "link", description: "Produktseite bei bgpharmadrugs.to", type: STRING, required: true, autocomplete: true },
           { name: "variante", description: "welche Variante (nach dem Einlesen)", type: STRING, autocomplete: true },
+        ],
+      },
+      {
+        name: "move",
+        description: "Position im Dashboard setzen",
+        help: "Reihenfolge im Dashboard — kleiner heißt weiter oben.",
+        options: [
+          { name: "produkt", description: "welches Produkt", type: STRING, required: true, autocomplete: true },
+          { name: "position", description: "kleiner = weiter oben (Standard 100)", type: INTEGER, required: true },
         ],
       },
       {
