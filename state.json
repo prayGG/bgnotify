@@ -1,8 +1,8 @@
 {
   "bot_stats": {
     "first_check_at": "2026-05-20T18:50:44.075159+00:00",
-    "last_check_at": "2026-08-08T21:10:32.745957+00:00",
-    "total_checks": 11479,
+    "last_check_at": "2026-08-08T21:20:39.478308+00:00",
+    "total_checks": 11480,
     "total_restocks": 3
   },
   "dashboard_message_id": "1510095616322175107",
@@ -17,6 +17,52 @@
     "Tretinoin",
     "Azelaic Acid 20% 30g",
     "Tazarotene 0.1% 60g"
+  ],
+  "dashboard_variants": [
+    {
+      "key": "GHK CU 50 mg",
+      "label": "GHK CU 50 mg"
+    },
+    {
+      "key": "Tirzepatide 30 mg",
+      "label": "Tirzepatide 30 mg"
+    },
+    {
+      "key": "Retatrutide 30 mg",
+      "label": "Retatrutide 30 mg"
+    },
+    {
+      "key": "BPC157/TB500 mix 5mg each",
+      "label": "BPC/TB500 5 mg"
+    },
+    {
+      "key": "ASPENDOS tablets 100 mg * 30 Medochemie",
+      "label": "Modafinil 100 mg 30x"
+    },
+    {
+      "key": "Roaccutane 20 mg 30 Roche",
+      "label": "Roaccutane 20 mg 30x"
+    },
+    {
+      "key": "Minoxidil 5 mg",
+      "label": "Minoxidil 5 mg"
+    },
+    {
+      "key": "0.025% 20 grams",
+      "label": "Tretinoin 0.025% 20g"
+    },
+    {
+      "key": "0.05% 30 grams",
+      "label": "Tretinoin 0.05% 30g"
+    },
+    {
+      "key": "Azelaic Acid 20% 30 gr cream",
+      "label": "Azelaic Acid 20% 30g"
+    },
+    {
+      "key": "Tazarotene cream/gel 0.1% (60 G/ box)",
+      "label": "Tazarotene 0.1% 60g"
+    }
   ],
   "error_report": {
     "active": false
@@ -96,7 +142,7 @@
       "3888239"
     ]
   },
-  "last_deploy_sha": "1f4a45362f97f1b0bbcfcfcedb981d021bf084d7",
+  "last_deploy_sha": "4c5585fa687f91fc305bcbeabc521bd910426d6d",
   "playstation": {},
   "products": {
     "https://bgpharmadrugs.to/product/minoxytop-5-mg-minoxidil-tablets-ip/": {
