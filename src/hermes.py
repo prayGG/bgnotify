@@ -101,6 +101,11 @@ def _fetch_text(url: str, timeout_ms: int = 45000) -> str:
         try:
             ctx = browser.new_context(
                 user_agent=UA, locale="de-DE",
+                # Ohne timezone_id nimmt Playwright die Systemzeitzone — auf dem
+                # GitHub-Runner ist das UTC. Hermes formatiert seine Zeitstempel
+                # im Browser, dadurch stand 02:48 als 00:48 auf der Karte. Die
+                # Seite muss so gelesen werden, wie sie ein Empfänger hier sieht.
+                timezone_id="Europe/Berlin",
                 viewport={"width": 1280, "height": 900},
             )
             ctx.add_init_script(
