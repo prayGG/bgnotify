@@ -772,6 +772,97 @@ r = await post(cmd("product remove", { args: { produkt: "gibtsnicht" } }));
 check("fest gepflegtes → Absage", r.content?.includes("config.yml"), r.content);
 
 // --------------------------------------------------------------------------
+section("/product add · Auswahlmenü");
+// --------------------------------------------------------------------------
+// Der zweite Aufruf mit `variante:` bleibt moeglich, ist aber nicht mehr der
+// Normalweg: Die Varianten kommen als Dropdown in die Antwort.
+const komponente = (customId, wert, { roles = [ROLE] } = {}) => ({
+  type: 3,
+  application_id: "app-1",
+  token: "interaction-token",
+  channel_id: CHANNEL,
+  guild_id: GUILD,
+  member: { user: { id: OTHER }, roles },
+  data: { custom_id: customId, component_type: 3, values: wert === null ? [] : [wert] },
+});
+
+resetFake({
+  ...ready(),
+  orders: { product_scans: { [PROD]: { title: "Peptides and HGH", simple: false, variants: ["BPC157 10mg", "TB500 10mg"] } } },
+});
+r = await post(cmd("product add", { args: { link: PROD } }));
+const menue = r.body.data.components?.[0]?.components?.[0];
+check("ohne Variante → Dropdown statt zweitem Aufruf", menue?.type === 3, JSON.stringify(r.body.data.components));
+check("… mit beiden Varianten zur Auswahl", menue?.options?.length === 2, JSON.stringify(menue?.options));
+check("… und dem Wortlaut EXAKT als Wert", menue?.options?.[0]?.value === "BPC157 10mg");
+check("… nur fuer den Aufrufer sichtbar", r.body.data.flags === 64);
+check("… und noch nichts aufgenommen", !fake.commands.products);
+
+// Der Klick. Antwort-Typ 7 ersetzt die Nachricht, an der geklickt wurde — das
+// Menue verschwindet dabei, sonst sieht die Frage aus wie noch offen.
+r = await post(komponente(menue.custom_id, "TB500 10mg"));
+check("Klick nimmt die Variante auf", Object.values(fake.commands.products || {})[0]?.variants?.[0] === "TB500 10mg", JSON.stringify(fake.commands.products));
+check("… ersetzt die Nachricht (Typ 7)", r.body.type === 7, `type=${r.body.type}`);
+check("… und raeumt das Menue weg", r.body.data.components?.length === 0, JSON.stringify(r.body.data.components));
+check("… schreibt NUR commands.json", fake.patchedFiles.join(",") === "commands.json");
+
+// Eine Nachricht mit Menue liegt im Channel. Eine Component-Interaktion laesst
+// sich ausloesen, ohne den Command je aufgerufen zu haben — die Rollenpruefung
+// muss hier also genauso greifen wie beim Command selbst.
+resetFake({
+  ...ready(),
+  orders: { product_scans: { [PROD]: { title: "Peptides and HGH", simple: false, variants: ["BPC157 10mg"] } } },
+});
+r = await post(komponente(`pv:${PROD}`, "BPC157 10mg", { roles: [] }));
+check("Klick ohne Rolle → abgelehnt", r.content?.includes("Rolle"), r.content);
+check("… und nichts aufgenommen", !fake.commands.products, JSON.stringify(fake.commands.products));
+
+// Zwischen Aufruf und Klick koennen Minuten liegen. Geprueft wird deshalb gegen
+// den Stand des Bots, nicht gegen die Nachricht.
+r = await post(komponente(`pv:${PROD}`, "Gibtsnicht 5mg"));
+check("Variante inzwischen weg → Absage statt stiller Aufnahme", r.content?.includes("nicht mehr"), r.content);
+check("… und nichts aufgenommen", !fake.commands.products);
+
+r = await post(komponente("irgendwas:sonst", "x"));
+check("fremde Kennung → Absage", r.content?.includes("Unbekannte Auswahl"), r.content);
+
+// Discords custom_id endet bei 100 Zeichen. Passt die URL nicht hinein, muss der
+// alte Weg ueber `variante:` uebrig bleiben — eine Antwort, die Discord mit
+// HTTP 400 verwirft, waere schlimmer als ein Command, den man zweimal tippt.
+const LANG = `https://bgpharmadrugs.to/product/${"x".repeat(80)}/`;
+resetFake({
+  ...ready(),
+  orders: { product_scans: { [LANG]: { title: "Langer Link", simple: false, variants: ["A", "B"] } } },
+});
+r = await post(cmd("product add", { args: { link: LANG } }));
+check("zu lange URL → faellt auf den Textweg zurueck", !r.body.data.components && r.content?.includes("Autocomplete"), r.content);
+
+// --------------------------------------------------------------------------
+section("Channel merken");
+// --------------------------------------------------------------------------
+// Deploy-Karten und Fehler-Reports des Actions-Bots gehoeren zu keinem Command
+// und hatten deshalb bisher einen fest eingetragenen Webhook — der zeigte auf
+// einen Channel, den niemand sah. Jetzt merkt der Worker, wo zuletzt jemand
+// SICHTBAR etwas getan hat.
+resetFake(ready());
+r = await post(cmd("ping"));
+check("Command hinterlaesst den Channel", fake.commands.guilds[GUILD]?.channel_id === CHANNEL, JSON.stringify(fake.commands.guilds));
+check("… mit Zeitstempel", Boolean(fake.commands.guilds[GUILD]?.channel_at));
+check("… und ohne order-state.json anzufassen", fake.patchedFiles.join(",") === "commands.json");
+
+// Zweiter Command im selben Channel: nichts Neues zu schreiben. Sonst waere
+// jeder Command ein Gist-PATCH ohne neuen Inhalt.
+fake.patchedFiles = [];
+r = await post(cmd("ping"));
+check("gleicher Channel → kein erneutes Schreiben", fake.patchedFiles.length === 0, fake.patchedFiles.join(","));
+
+// Ohne Rolle wird nichts gemerkt: Wer nicht darf, soll auch nicht bestimmen,
+// wohin die Meldungen gehen.
+resetFake(ready());
+r = await post(cmd("ping", { roles: [] }));
+check("ohne Rolle → Channel bleibt ungesetzt", !fake.commands.guilds[GUILD]?.channel_id, JSON.stringify(fake.commands.guilds));
+
+// --------------------------------------------------------------------------
 section("Discord-Grenzen der Übersicht");
 // --------------------------------------------------------------------------
 // Diese Grenzen kürzt Discord nicht, es lehnt die ganze Nachricht mit HTTP 400

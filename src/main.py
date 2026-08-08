@@ -70,7 +70,15 @@ def main() -> int:
     webhook = _webhook_from_cfg(cfg, "discord_webhook_env", "DISCORD_WEBHOOK_URL")
     if not webhook:
         log.warning("env var %s is empty — Discord disabled", cfg.get("discord_webhook_env", "DISCORD_WEBHOOK_URL"))
-    updates_webhook = _webhook_from_cfg(cfg, "discord_updates_webhook_env", "DISCORD_UPDATES_WEBHOOK_URL")
+    # Deploy-Karten und Fehler-Reports gehören zu keinem Command — es gibt also
+    # keinen Channel, der sich aus dem Anlass ergäbe. Erste Wahl ist deshalb der,
+    # in dem zuletzt ein Command lief; den trägt der Worker ins Gist ein, und
+    # gelesen wird er weiter unten (er steht erst nach dem Gist-Abruf fest).
+    # Der Webhook bleibt Rückfallebene.
+    updates = notify.UpdateTarget(
+        webhook=_webhook_from_cfg(cfg, "discord_updates_webhook_env", "DISCORD_UPDATES_WEBHOOK_URL"),
+        bot_token=os.environ.get("DISCORD_BOT_TOKEN", ""),
+    )
     forum_webhook = _webhook_from_cfg(cfg, "discord_forum_webhook_env", "DISCORD_FORUM_WEBHOOK_URL")
     order_webhook = _webhook_from_cfg(cfg, "discord_order_webhook_env", "DISCORD_ORDER_WEBHOOK_URL")
     # Stock-alerts (restock + OOS) ideally go to the dedicated bg-notify
@@ -90,6 +98,7 @@ def main() -> int:
             os.environ.get("GIST_TOKEN", ""), os.environ.get("GIST_ID", "")
         )
         cfg["products"] = merge_products(cfg, gist_cmds)
+        updates.channel_id = commands.updates_channel(gist_cmds)
 
         # ERST JETZT die Anzeige-Aliase einsammeln. Vor dem Merge kannte diese
         # Liste nur die aus `config.yml` — die per `/product rename` gesetzten
@@ -116,7 +125,7 @@ def main() -> int:
         log.info("USD->EUR rate: %s", usd_eur)
 
         # 2 — Deploy-Announcement
-        announce_deploy(state, updates_webhook)
+        announce_deploy(state, updates)
 
         # 3 — Forum-Posts
         new_forum_posts = check_forum(cfg, state)
@@ -194,12 +203,12 @@ def main() -> int:
         # Harter Crash: erst melden + State sichern, dann den Run trotzdem
         # fehlschlagen lassen, damit der Workflow rot wird.
         log.exception("run crashed: %s: %s", type(e).__name__, e)
-        health.report(state, updates_webhook, errors)
+        health.report(state, updates, errors)
         save_state(state)
         raise
 
     # 7 — Fehler-Report (nur wenn sich das Fehlerbild geändert hat)
-    health.report(state, updates_webhook, errors)
+    health.report(state, updates, errors)
 
     # 8 — State persistieren
     save_state(state)

@@ -5,10 +5,18 @@ bearbeitet das private Gist.
 
 **Meldungen postet er nicht** — Restocks, Bestellungen und Sendungen laufen
 weiterhin über die Webhooks des Actions-Bots, weil die pro Nachricht Absender
-und Avatar setzen dürfen (`bgnotify · orders`, `· meso`, `· updates`). Ein Bot
-postet immer als er selbst, die drei Absender wären also verloren. Die einzige
-Ausnahme ist die Befehlsübersicht aus `/panel`: Die ist die eigene Oberfläche
-des Bots, keine Meldung.
+und Avatar setzen dürfen (`bgnotify · orders`, `· meso`). Ein Bot postet immer
+als er selbst, die Absender wären also verloren. Ausnahme ist die
+Befehlsübersicht aus `/panel`: Die ist die eigene Oberfläche des Bots, keine
+Meldung.
+
+Eine Sorte Meldung hat aber gar keinen Channel im Voraus: Deploy-Karten und
+Fehler-Reports entstehen im Actions-Lauf, nicht aus einer Interaktion. Dafür
+merkt sich der Worker bei jedem Command, in welchem Channel er lief
+(`guilds[].channel_id`), und der Bot schreibt mit `DISCORD_BOT_TOKEN` dorthin.
+Vorher stand da ein fest eingetragener Webhook, der auf einen Channel zeigte,
+den niemand sah — und das fiel nicht auf, weil Discord einen Webhook-POST auch
+dann mit 204 quittiert, wenn dort keiner mitliest.
 
 Kein dauerlaufender Prozess: Discord schickt jeden Command als HTTPS-POST, der
 Worker antwortet. Deshalb dauerhaft kostenlos (Workers-Free: 100.000

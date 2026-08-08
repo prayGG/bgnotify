@@ -59,7 +59,8 @@ src/
 |---|---|
 | `DISCORD_WEBHOOK_URL` | Status-Channel (Dashboard + Stats) |
 | `DISCORD_STOCK_WEBHOOK_URL` | Restock-/OOS-/PS-Alerts (Fallback: Haupt-Webhook) |
-| `DISCORD_UPDATES_WEBHOOK_URL` | Deploy-Announcements |
+| `DISCORD_UPDATES_WEBHOOK_URL` | Deploy-Karten + Fehler-Reports — nur noch Rückfallebene |
+| `DISCORD_BOT_TOKEN` | dasselbe, aber in den Channel, in dem zuletzt ein Command lief |
 | `DISCORD_FORUM_WEBHOOK_URL` | Forum-Posts (leer = Feature aus) |
 | `DISCORD_ORDER_WEBHOOK_URL` | Bestellstatus (leer = Feature aus) |
 | `GIST_TOKEN` / `GIST_ID` | privates Gist für den Order-State |

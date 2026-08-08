@@ -339,5 +339,59 @@ check("Zeilenliste: sichtbar + Schluessel",
 check("leerer Name wird ignoriert statt gespeichert",
       commands.product_labels({"labels": {FEST: "   "}}) == {})
 
+# --------------------------------------------------------------------------
+section("Wohin Deploy-Karten und Fehler-Reports gehen")
+# --------------------------------------------------------------------------
+# Der Webhook dafuer zeigte monatelang auf einen Channel, den niemand sah — und
+# das konnte niemand merken: Discord quittiert einen Webhook-POST auch dann mit
+# 204, wenn dort keiner mitliest. Jetzt gilt zuerst der Channel, in dem zuletzt
+# ein Command lief; den traegt der Worker ins Gist ein.
+check("kein Eintrag → kein Channel", commands.updates_channel({}) == "")
+check("Channel aus dem Gist",
+      commands.updates_channel({"guilds": {"g1": {"channel_id": "1535236560906100797"}}})
+      == "1535236560906100797")
+check("etwas anderes als eine ID wird nicht geglaubt",
+      commands.updates_channel({"guilds": {"g1": {"channel_id": "bg-oat"}}}) == "")
+
+# Bei mehreren Servern gewinnt der juengste Eintrag — "wo zuletzt jemand war"
+# ist die einzige Angabe, die hier ohne Rueckfrage stimmen kann.
+viele = {"guilds": {
+    "alt": {"channel_id": "111", "channel_at": "2026-01-01T00:00:00Z"},
+    "neu": {"channel_id": "222", "channel_at": "2026-08-08T00:00:00Z"},
+}}
+check("juengster Eintrag gewinnt", commands.updates_channel(viele) == "222")
+
+
+class FakeZiel(notify.UpdateTarget):
+    """Zaehlt, welchen Weg `send` genommen haette."""
+
+    def __init__(self, *a, bot_ok=True, **k):
+        super().__init__(*a, **k)
+        self.bot_ok, self.wege = bot_ok, []
+
+
+_orig_bot, _orig_wh = notify.send_bot_message, notify.send_update_announcement
+try:
+    notify.send_bot_message = lambda t, c, e: (ziel.wege.append("bot"), ziel.bot_ok)[1]
+    notify.send_update_announcement = lambda w, e: (ziel.wege.append("webhook"), bool(w))[1]
+
+    ziel = FakeZiel(webhook="https://wh", bot_token="tok", channel_id="123")
+    check("mit Channel: der Bot schreibt, der Webhook bleibt aussen vor",
+          ziel.send({}) and ziel.wege == ["bot"], str(ziel.wege))
+
+    ziel = FakeZiel(webhook="https://wh", bot_token="tok", channel_id="123", bot_ok=False)
+    check("darf der Bot dort nicht schreiben → Webhook als Rueckfallebene",
+          ziel.send({}) and ziel.wege == ["bot", "webhook"], str(ziel.wege))
+
+    ziel = FakeZiel(webhook="https://wh")
+    check("ohne Bot-Token bleibt alles wie vorher",
+          ziel.send({}) and ziel.wege == ["webhook"], str(ziel.wege))
+
+    ziel = FakeZiel(bot_token="tok")  # Token da, aber noch nie ein Command
+    check("kein Ziel → der Aufrufer merkt es, statt ins Leere zu senden", not bool(ziel))
+    check("… und mit Channel ist es eines", bool(FakeZiel(bot_token="tok", channel_id="1")))
+finally:
+    notify.send_bot_message, notify.send_update_announcement = _orig_bot, _orig_wh
+
 print(f"\n{failed} FEHLER" if failed else "\nALLES GRÜN")
 sys.exit(1 if failed else 0)
