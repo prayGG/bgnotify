@@ -174,7 +174,7 @@ def _register_tracking(auto: dict, order_id: str, links: list[str],
     endete die Kette bei der "Tracking ist da"-Karte — verfolgt wurden nur die
     von Hand ins Gist getippten Sendungen (`manual_tracking`).
 
-    Label wie auf der Karte ("pray #37143"), damit Bestell- und Sendungskarten
+    Label wie auf der Karte ("pray #10042"), damit Bestell- und Sendungskarten
     optisch zusammengehören. Discord-IDs landen NICHT im Gist — gespeichert wird
     nur der Name des Secrets, aufgelöst wird beim Posten.
     """

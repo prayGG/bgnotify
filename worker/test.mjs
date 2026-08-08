@@ -311,8 +311,8 @@ resetFake({
   orders: {
     enabled: { a: "on", b: "off" },
     accounts: { a: { last_check_at: frisch, orders: { 1: { status: "processing" } } }, b: {} },
-    auto_tracking: { "pray #37143": { url: "https://t/1" } },
-    manual_tracking_state: { "pray #37143": { status: "unterwegs", last_check_at: frisch } },
+    auto_tracking: { "pray #10042": { url: "https://t/1" } },
+    manual_tracking_state: { "pray #10042": { status: "unterwegs", last_check_at: frisch } },
   },
 });
 r = await post(cmd("status"));
@@ -343,17 +343,17 @@ check("ohne Sendungen → freundlicher Hinweis", r.embed.description.includes("N
 resetFake({
   ...ready(),
   orders: {
-    auto_tracking: { "pray #37143": { url: "https://t/1" } },
+    auto_tracking: { "pray #10042": { url: "https://t/1" } },
     manual_tracking: { mave: { url: "https://t/2" } },
     manual_tracking_state: {
-      "pray #37143": { status: "Sendung ist unterwegs", last_check_at: frisch },
+      "pray #10042": { status: "Sendung ist unterwegs", last_check_at: frisch },
       mave: { status: "Sendung wurde zugestellt.", last_check_at: frisch },
     },
   },
 });
 r = await post(cmd("track list"));
 t = r.embed.description;
-check("listet beide Quellen", t.includes("pray #37143") && t.includes("mave"));
+check("listet beide Quellen", t.includes("pray #10042") && t.includes("mave"));
 check("kennzeichnet Herkunft", t.includes("automatisch") && t.includes("von Hand"));
 check("erkennt Zustellung", t.includes("✅"), t.split("\n")[2]);
 check("unterwegs steht oben", t.indexOf("🚚") < t.indexOf("✅"));
@@ -448,9 +448,9 @@ r = await post(cmd("track add", { args: { link: "nicht mal eine url" } }));
 check("Unsinn → abgelehnt", r.content?.includes("keine gültige URL"), r.content);
 
 r = await post(cmd("track add", {
-  args: { link: "https://www.myhermes.de/x?TrackID=H1023311266211701051", name: "mave" },
+  args: { link: "https://www.myhermes.de/x?TrackID=H1000000000000000002", name: "mave" },
 }));
-check("Hermes-Link wird eingetragen", fake.commands.tracking?.mave?.url.includes("H1023311266211701051"));
+check("Hermes-Link wird eingetragen", fake.commands.tracking?.mave?.url.includes("H1000000000000000002"));
 check("KEINE Discord-ID im Gist", !JSON.stringify(fake.commands.tracking).includes(OTHER), JSON.stringify(fake.commands.tracking.mave));
 check("schreibt NUR commands.json", fake.patchedFiles.join(",") === "commands.json");
 

@@ -8,7 +8,7 @@ Seitenaufbau (Stand 2026-06):
 
     Deine Sendungsdetails
     Deine Sendung
-    H1023311179870001047                     <- Sendungsnummer
+    H1000000000000000001                     <- Sendungsnummer
     Sendung wurde an der Empfangsadresse zugestellt.   <- Kurzstatus
     Zugestellt am:Freitag, 12.06.2026        <- Detailfelder "Label:Wert"
     Uhrzeit:14:28 Uhr
