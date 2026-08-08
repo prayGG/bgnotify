@@ -79,7 +79,6 @@ def main() -> int:
 
     user_ids = load_ping_user_ids(cfg)
     role_ids = load_ping_role_ids(cfg)
-    labels = variant_labels(cfg)
 
     try:
         # 0 — Per Command aufgenommene Produkte dazunehmen. Muss VOR dem
@@ -90,6 +89,14 @@ def main() -> int:
             os.environ.get("GIST_TOKEN", ""), os.environ.get("GIST_ID", "")
         )
         cfg["products"] = merge_products(cfg, gist_cmds)
+
+        # ERST JETZT die Anzeige-Aliase einsammeln. Vor dem Merge kannte diese
+        # Liste nur die aus `config.yml` — die per `/product rename` gesetzten
+        # fehlten, und das Dashboard zeigte weiter den langen Originalwortlaut.
+        # Nicht aufgefallen ist es, weil die Stats-Karte sich ihre Aliase selbst
+        # aus `cfg` zieht (embeds.py) und deshalb immer richtig lag: zwei Karten
+        # nebeneinander, eine mit dem neuen Namen, eine mit dem alten.
+        labels = variant_labels(cfg)
 
         # 1 — Shop-Produkte. Den (unabhängigen) USD/EUR-Kurs holen wir parallel
         # in einem Thread: er trifft einen anderen Host als der Shop, also
