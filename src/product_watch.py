@@ -53,8 +53,13 @@ def merge_products(cfg: dict, cmds: dict) -> list:
     return aus_config
 
 
-def run_scans(cfg: dict, webhook: str, ping_ids: list[str], role_ids: list[str]) -> None:
-    """Offene Einlese-Aufträge abarbeiten. Fehler brechen nie den Lauf ab."""
+def run_scans(cfg: dict, webhook: str) -> None:
+    """Offene Einlese-Aufträge abarbeiten. Fehler brechen nie den Lauf ab.
+
+    `webhook` zeigt auf den Bot-Channel: Das Ergebnis ist die Antwort auf einen
+    selbst getippten Command, keine Meldung. Deshalb ohne Ping und nicht im
+    Bestell-Channel.
+    """
     import os
 
     token = os.environ.get("GIST_TOKEN", "")
@@ -87,9 +92,7 @@ def run_scans(cfg: dict, webhook: str, ping_ids: list[str], role_ids: list[str])
         ergebnisse[url] = daten
 
         if webhook:
-            notify.send_order_update(
-                webhook, build_product_scan_embed(url, daten), ping_ids, role_ids
-            )
+            notify.send_command_result(webhook, build_product_scan_embed(url, daten))
         log.info("products: '%s' eingelesen (%d Variante(n))", url, len(daten.get("variants") or []))
 
     orders.save_order_state(token, gist_id, st)

@@ -174,6 +174,24 @@ def send_forum_post(webhook_url: str, embed: dict) -> bool:
     return _request("POST", webhook_url, payload) is not None
 
 
+def send_command_result(webhook_url: str, embed: dict) -> bool:
+    """Antwort auf einen Discord-Command (z.B. `/product add`) — ohne Ping.
+
+    Kommt in den Bot-Channel, nicht zu den Meldungen: Was jemand selbst
+    angestoßen hat, muss niemanden anpingen und hat im Bestell-Channel nichts
+    verloren. Bewusst eigener Absender, damit es sich auch optisch von den
+    Restock-/Bestellmeldungen abhebt.
+    """
+    if not webhook_url:
+        return False
+    payload = {
+        "username": "bgnotify · bot",
+        "embeds": [embed],
+        "allowed_mentions": {"parse": []},
+    }
+    return _request("POST", webhook_url, payload) is not None
+
+
 def send_order_update(
     webhook_url: str,
     embed: dict,
