@@ -38,17 +38,23 @@ forum:
 # Takt = Abstand zwischen zwei Abfragen DERSELBEN Sendung.
 #
 # ACHTUNG, das Raster: Der Bot läuft alle 10 Minuten, öfter als das kann keine
-# Sendung abgefragt werden. Mit ±10% Jitter heißt 15 deshalb in der Praxis
-# GENAU 20 Minuten (Schwelle 13,5–16,5 min → beim 10-min-Lauf noch nicht fällig,
-# beim 20-min-Lauf schon). Jeder Wert zwischen 10 und 20 ergibt dasselbe. Wer
-# wirklich jeden Lauf will, muss auf 9 runter (Schwelle bleibt dann unter 10).
+# Sendung abgefragt werden. Der ±10%-Jitter entscheidet also nur, BEI WELCHEM
+# Lauf sie drankommt — gemessen über 2000 Durchläufe:
 #
-# Warum nicht aggressiver: Jede Abfrage startet einen eigenen Browser (~10 s).
-# Ein Rate-Limit droht dabei kaum — die Sendungsseite ist öffentlich, und jeder
-# Lauf kommt von einem frischen Runner mit neuer IP, aus Hermes' Sicht macht
-# also jede IP genau einen Aufruf.
+#     60 → 60 oder 70 min     15 → immer 20 min
+#     30 → 30 oder 40 min      9 → immer 10 min, also jeder Lauf
+#
+# Jeder Wert zwischen 10 und 20 ergibt dieselben 20 Minuten, das Raster
+# schluckt den Unterschied. 9 ist der schnellstmögliche Wert: Die Schwelle
+# bleibt mit 8,1–9,9 min immer unter 10, damit ist jede Sendung bei jedem Lauf
+# fällig. Kleiner als 9 ändert nichts mehr.
+#
+# Preis dafür: Jede Abfrage startet einen eigenen Browser (~10 s), bei zwei
+# Paketen also ~20 s Laufzeit zusätzlich pro Lauf. Ein Rate-Limit droht kaum —
+# die Sendungsseite ist öffentlich, und jeder Lauf kommt von einem frischen
+# Runner mit neuer IP, aus Hermes' Sicht macht also jede IP genau einen Aufruf.
 tracking:
-  check_interval_minutes: 15
+  check_interval_minutes: 9
   # Sendungen pro Lauf. Bei zwei Paketen gleichzeitig würde sonst jedes nur
   # jeden zweiten Lauf drankommen und der Takt sich still verdoppeln.
   max_per_run: 2
