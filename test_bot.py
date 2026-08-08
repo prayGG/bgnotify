@@ -281,5 +281,28 @@ check("… aber niemals über die Verfügbarkeit hinweg",
 check("kaputte Position wird ignoriert statt zu krachen",
       reihenfolge({"Zebra": "oben"}) == ["Alpha", "Zebra", "Beta"])
 
+# Das Dashboard bekommt seine Aliase von aussen (main.py) uebergeben, die
+# Stats-Karte holt sie sich selbst aus cfg. Wurden sie VOR dem Merge der
+# Command-Produkte eingesammelt, kannte die Liste nur config.yml — und das
+# Dashboard zeigte weiter den langen Originalwortlaut, waehrend die Stats-Karte
+# direkt daneben schon den kurzen zeigte. Genau so ist es passiert.
+merged = product_watch.merge_products({"products": []}, {"products": {"k": {
+    "url": PROD, "name": LANG, "variants": [LANG], "label": "Azelaic 20% 30g"}}})
+nach_merge = variant_labels({"products": merged})
+check("Aliase erst NACH dem Merge einsammeln", nach_merge == {LANG: "Azelaic 20% 30g"},
+      str(nach_merge))
+
+karte = build_dashboard_embed([{
+    "variant": LANG, "product_name": "Azelaic 20% 30g", "in_stock": True, "found": True,
+    "price": "10", "product_url": "https://x"}], labels=nach_merge)["description"]
+check("… dann zeigt das Dashboard den kurzen Namen",
+      "Azelaic 20% 30g" in karte and LANG not in karte, karte)
+
+vorher = variant_labels({"products": []})   # so sah es vor dem Fix aus
+karte_alt = build_dashboard_embed([{
+    "variant": LANG, "product_name": "Azelaic 20% 30g", "in_stock": True, "found": True,
+    "price": "10", "product_url": "https://x"}], labels=vorher)["description"]
+check("… und ohne die Aliase eben nicht (der alte Fehler)", LANG in karte_alt)
+
 print(f"\n{failed} FEHLER" if failed else "\nALLES GRÜN")
 sys.exit(1 if failed else 0)
