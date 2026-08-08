@@ -1,8 +1,8 @@
 {
   "bot_stats": {
     "first_check_at": "2026-05-20T18:50:44.075159+00:00",
-    "last_check_at": "2026-08-08T16:10:40.502802+00:00",
-    "total_checks": 11449,
+    "last_check_at": "2026-08-08T16:17:48.412589+00:00",
+    "total_checks": 11450,
     "total_restocks": 3
   },
   "dashboard_message_id": "1510095616322175107",
@@ -15,8 +15,8 @@
     "Roaccutane 20 mg (Roche)",
     "Minoxidil 5 mg",
     "Tretinoin",
-    "Azelaic Acid 20% 30 gr cream",
-    "Tazarotene cream/gel 0.1% (60 G/ box)"
+    "Azelaic Acid 20% 30g",
+    "Tazarotene 0.1% 60g"
   ],
   "error_report": {
     "active": false
@@ -96,7 +96,7 @@
       "3888239"
     ]
   },
-  "last_deploy_sha": "01d5e8afc24f13b19b6bee5b564c33d027125fae",
+  "last_deploy_sha": "3b1e9e238d65f43559cb5b9bc4fda283949e7e94",
   "playstation": {},
   "products": {
     "https://bgpharmadrugs.to/product/minoxytop-5-mg-minoxidil-tablets-ip/": {
