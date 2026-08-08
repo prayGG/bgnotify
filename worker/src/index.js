@@ -459,11 +459,16 @@ async function handleAutocomplete(interaction, env) {
     );
   }
 
-  if (path === "product remove") {
+  // Beide arbeiten auf demselben Schluessel: das per Command aufgenommene
+  // Produkt. Angezeigt wird der aktuelle Anzeige-Name — nach einem `rename`
+  // stuende sonst weiter der lange Originalwortlaut im Vorschlag, also genau
+  // das, was man gerade losgeworden ist.
+  if (path === "product remove" || path === "product rename") {
     return autocompleteResult(
       Object.entries(data.commands.products || {})
-        .filter(([, p]) => passt(p.name || ""))
-        .map(([key, p]) => ({ name: clip(p.name, 90), value: key }))
+        .map(([key, p]) => [key, p.label || p.name || key])
+        .filter(([, anzeige]) => passt(anzeige))
+        .map(([key, anzeige]) => ({ name: clip(anzeige, 90), value: key }))
     );
   }
 
