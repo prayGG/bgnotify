@@ -70,7 +70,7 @@ orders:
   # eingeloggt (Staggering), nie zwei gleichzeitig von derselben IP.
   # Ein Konto wird übersprungen, solange seine Secrets nicht existieren.
   # `label` ist reine Anzeige: steht als Titel auf den Bestell-/Tracking-Karten
-  # ("pray · #37143" statt nur "#37143"), damit im gemeinsamen Channel sofort
+  # ("pray · #10042" statt nur "#10042"), damit im gemeinsamen Channel sofort
   # klar ist, wessen Bestellung das ist. Weglassen = wie vorher nur die Nummer.
   accounts:
     - name: a

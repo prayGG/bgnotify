@@ -12,7 +12,7 @@ Zwei Quellen, ein Ablauf:
 Gist-Format (`manual_tracking`), Label frei wählbar — zwei Schreibweisen:
 
     "manual_tracking": {
-      "Ich #37143":   "https://tracking.hermesworld.com/?TrackID=...",
+      "Ich #10042":   "https://tracking.hermesworld.com/?TrackID=...",
       "Kollege #123": {
         "url":  "https://tracking.hermesworld.com/?TrackID=...",
         "ping": "123456789012345678"

@@ -348,8 +348,8 @@ section("Wohin Deploy-Karten und Fehler-Reports gehen")
 # ein Command lief; den traegt der Worker ins Gist ein.
 check("kein Eintrag → kein Channel", commands.updates_channel({}) == "")
 check("Channel aus dem Gist",
-      commands.updates_channel({"guilds": {"g1": {"channel_id": "1535236560906100797"}}})
-      == "1535236560906100797")
+      commands.updates_channel({"guilds": {"g1": {"channel_id": "1234567890123456789"}}})
+      == "1234567890123456789")
 check("etwas anderes als eine ID wird nicht geglaubt",
       commands.updates_channel({"guilds": {"g1": {"channel_id": "bg-oat"}}}) == "")
 
