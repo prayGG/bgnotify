@@ -706,18 +706,26 @@ r = await post(ac("move", [{ name: "produkt", value: "azelaic", focused: true }]
 check("… und filtert nach der Eingabe",
   r.body.data.choices?.[0]?.value === "Azelaic Acid 20% 30g", JSON.stringify(r.body.data.choices));
 
+// /product remove kennt nur die per Command aufgenommenen Produkte — die fest
+// in config.yml gepflegten kann der Worker gar nicht entfernen.
 fake.commands.products = { k1: { url: PROD, name: "Azelaic Acid 20% 30 gr cream" } };
-for (const sub of ["remove", "rename"]) {
-  r = await post(ac(sub, [{ name: "produkt", value: "", focused: true }]));
-  check(`Autocomplete fuer /product ${sub} schlaegt etwas vor`,
-    r.body.data.choices?.[0]?.value === "k1", JSON.stringify(r.body.data.choices));
-}
-// Nach dem Umbenennen muss der NEUE Name im Vorschlag stehen, sonst waere man
-// den langen Wortlaut genau dort nicht los, wo man ihn wieder auswaehlen muss.
-fake.commands.products.k1.label = "Azelaic 20% 30g";
-r = await post(ac("rename", [{ name: "produkt", value: "azelaic 20", focused: true }]));
-check("… und zeigt den aktuellen Anzeige-Namen",
-  r.body.data.choices?.[0]?.name === "Azelaic 20% 30g", JSON.stringify(r.body.data.choices));
+r = await post(ac("remove", [{ name: "produkt", value: "", focused: true }]));
+check("Autocomplete fuer /product remove schlaegt etwas vor",
+  r.body.data.choices?.[0]?.value === "k1", JSON.stringify(r.body.data.choices));
+
+// /product rename arbeitet dagegen auf den ZEILEN des Dashboards: angeboten
+// wird der sichtbare Name, gespeichert der Varianten-String. Nur so erreicht es
+// auch das, was ausschliesslich in config.yml steht.
+fake.repoState = { dashboard_variants: [
+  { key: "Roaccutane 20 mg 30 Roche", label: "Roaccutane 20 mg 30x" },
+  { key: "Azelaic Acid 20% 30 gr cream", label: "Azelaic Acid 20% 30 gr cream" },
+] };
+r = await post(ac("rename", [{ name: "produkt", value: "roaccutane", focused: true }]));
+check("Autocomplete fuer /product rename bietet Dashboard-Zeilen",
+  r.body.data.choices?.[0]?.value === "Roaccutane 20 mg 30 Roche",
+  JSON.stringify(r.body.data.choices));
+check("… zeigt dabei den sichtbaren Namen",
+  r.body.data.choices?.[0]?.name === "Roaccutane 20 mg 30x", JSON.stringify(r.body.data.choices));
 
 // /product list
 resetFake(ready());
@@ -731,19 +739,22 @@ r = await post(cmd("product list"));
 check("zeigt Aufgenommenes", r.embed.description.includes("BPC157 10mg"));
 check("zeigt auch Wartendes", r.embed.description.includes("wird beim nächsten Lauf eingelesen"), r.embed.description);
 
-// Umbenennen darf NUR die Anzeige treffen. Wanderte der Wortlaut mit, liefe der
-// Abgleich gegen das Dropdown der Seite ins Leere — das Produkt stuende weiter
-// im Dashboard und waere nie wieder auf Lager, ohne dass etwas nach Fehler aussieht.
-fake.commands.products.k1.variants = ["Azelaic Acid 20% 30 gr cream"];
-r = await post(cmd("product rename", { args: { produkt: "k1", name: "Azelaic 20% 30g" } }));
-check("umbenennen klappt", fake.commands.products.k1.label === "Azelaic 20% 30g", r.content);
-check("… Match-String unangetastet",
-  fake.commands.products.k1.variants[0] === "Azelaic Acid 20% 30 gr cream",
-  String(fake.commands.products.k1.variants));
-r = await post(cmd("product rename", { args: { produkt: "k1", name: "   " } }));
-check("leerer Name setzt zurueck", !("label" in fake.commands.products.k1), r.content);
-r = await post(cmd("product rename", { args: { produkt: "gibtsnicht", name: "X" } }));
-check("fest gepflegtes → Absage beim Umbenennen", r.content?.includes("config.yml"), r.content);
+// Der springende Punkt: Ein Produkt, das NUR in config.yml steht (also nicht in
+// commands.products), muss sich umbenennen lassen. Sonst waeren ausgerechnet
+// Roaccutane und Tretinoin die einzigen, an die man nicht drankommt.
+const FEST = "Roaccutane 20 mg 30 Roche";
+r = await post(cmd("product rename", { args: { produkt: FEST, name: "Roaccutane 30x" } }));
+check("config.yml-Produkt laesst sich umbenennen",
+  fake.commands.labels?.[FEST] === "Roaccutane 30x", JSON.stringify(fake.commands.labels));
+check("… geschluesselt nach dem Match-String, nicht nach einem Produkteintrag",
+  Object.keys(fake.commands.labels)[0] === FEST);
+check("… und commands.products bleibt unberuehrt",
+  !("label" in (fake.commands.products?.k1 || {})), JSON.stringify(fake.commands.products));
+
+r = await post(cmd("product rename", { args: { produkt: FEST, name: "   " } }));
+check("leerer Name setzt zurueck", !(FEST in (fake.commands.labels || {})), r.content);
+r = await post(cmd("product rename", { args: { produkt: "  ", name: "X" } }));
+check("ohne Auswahl → Absage", r.content?.includes("Autocomplete"), r.content);
 
 // Sortierung: Die Position ist ZWEITschluessel. Verfuegbarkeit sortiert weiter
 // zuerst — sonst muesste man beim Draufschauen die ganze Liste absuchen, ob

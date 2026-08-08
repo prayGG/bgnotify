@@ -282,22 +282,29 @@ export async function removeProduct(env, state, key) {
 }
 
 /**
- * Anzeige-Namen aendern. Nur die Anzeige — der Wortlaut, mit dem der Bot gegen
- * die Seite abgleicht (`variants`), bleibt unangetastet. Wuerde man den
- * mitumbenennen, liefe der Abgleich gegen das Dropdown ins Leere und das
- * Produkt waere still nicht mehr ueberwacht: Es stuende weiter im Dashboard,
- * nur nie wieder auf Lager.
+ * Anzeige-Namen einer Dashboard-Zeile setzen.
+ *
+ * Geschluesselt nach dem Varianten-String, mit dem der Bot gegen die Seite
+ * abgleicht — der aendert sich beim Umbenennen NIE. Zwei Dinge folgen daraus:
+ *
+ *   1. Es greift auch bei den fest in `config.yml` gepflegten Produkten, ohne
+ *      die Datei anzufassen. Sonst waeren ausgerechnet Roaccutane und Tretinoin
+ *      die einzigen, die man nicht umbenennen kann.
+ *   2. Der Abgleich bleibt heil. Wanderte der Wortlaut mit, griffe er ins Leere:
+ *      Das Produkt stuende weiter im Dashboard und waere nur nie wieder auf
+ *      Lager — ein Fehler, der nach gar keinem Fehler aussieht.
  *
  * Leerer Name setzt zurueck auf den Originalwortlaut.
  */
 export async function renameProduct(env, state, key, label) {
-  const eintrag = state.products?.[key];
-  if (!eintrag) return null;
+  const schluessel = (key || "").trim();
+  if (!schluessel) return null;
   const sauber = (label || "").trim().slice(0, 80);
-  if (sauber) eintrag.label = sauber;
-  else delete eintrag.label;
+  state.labels ||= {};
+  if (sauber) state.labels[schluessel] = sauber;
+  else delete state.labels[schluessel];
   await saveState(env, state);
-  return sauber || eintrag.name || key;
+  return sauber || schluessel;
 }
 
 /**

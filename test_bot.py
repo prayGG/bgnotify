@@ -304,5 +304,40 @@ karte_alt = build_dashboard_embed([{
     "price": "10", "product_url": "https://x"}], labels=vorher)["description"]
 check("… und ohne die Aliase eben nicht (der alte Fehler)", LANG in karte_alt)
 
+# --------------------------------------------------------------------------
+section("/product rename für ALLE Produkte")
+# --------------------------------------------------------------------------
+from src.embeds import dashboard_variants  # noqa: E402
+
+# Der springende Punkt: Roaccutane steht nur in config.yml. Haenge das
+# Umbenennen an einem Produkteintrag im Gist, waere genau das unerreichbar.
+FEST = "Roaccutane 20 mg 30 Roche"
+cfg_fest = {"products": [{"name": "Roaccutane 20 mg (Roche)", "url": "https://x/product/r/",
+                          "watch_variants": [FEST],
+                          "variant_labels": {FEST: "Roaccutane 20 mg 30x"}}]}
+
+aus_config = variant_labels(cfg_fest)
+check("config.yml liefert seinen eigenen Alias", aus_config == {FEST: "Roaccutane 20 mg 30x"})
+
+# So legt main() die beiden uebereinander.
+zusammen = dict(aus_config)
+zusammen.update(commands.product_labels({"labels": {FEST: "Roaccutane 30x"}}))
+check("Discord schlaegt config.yml", zusammen == {FEST: "Roaccutane 30x"}, str(zusammen))
+
+lage = [{"variant": FEST, "product_name": "Roaccutane 20 mg (Roche)", "in_stock": True,
+         "found": True, "price": "39", "product_url": "https://x"}]
+karte = build_dashboard_embed(lage, labels=zusammen)["description"]
+check("… und das Dashboard zeigt den neuen Namen",
+      "Roaccutane 30x" in karte and FEST not in karte, karte)
+
+# Das Autocomplete des Workers speist sich hieraus: sichtbarer Name als
+# Vorschlag, Match-String als gespeicherter Wert.
+zeilen = dashboard_variants(lage, zusammen)
+check("Zeilenliste: sichtbar + Schluessel",
+      zeilen == [{"key": FEST, "label": "Roaccutane 30x"}], str(zeilen))
+
+check("leerer Name wird ignoriert statt gespeichert",
+      commands.product_labels({"labels": {FEST: "   "}}) == {})
+
 print(f"\n{failed} FEHLER" if failed else "\nALLES GRÜN")
 sys.exit(1 if failed else 0)

@@ -189,6 +189,29 @@ def group_name(status: dict) -> str:
     return status.get("product_name") or status["variant"]
 
 
+def dashboard_variants(statuses: list[dict], labels: Optional[dict] = None) -> list[dict]:
+    """Jede Zeile des Dashboards: `{key, label}`.
+
+    `key` ist der Varianten-String, mit dem gegen die Seite abgeglichen wird —
+    der bleibt beim Umbenennen unangetastet. `label` ist, wie die Zeile GERADE
+    heißt. Genau dieses Paar braucht `/product rename`: anbieten, was man sieht,
+    speichern unter dem, was sich nicht ändert.
+
+    Der Bot legt die Liste in `state.json` ab, damit der Worker sie im
+    Autocomplete anbieten kann, ohne `config.yml` nachzubauen.
+    """
+    labels = labels or {}
+    out: list[dict] = []
+    gesehen = set()
+    for s in statuses:
+        key = s.get("variant") or ""
+        if not key or key in gesehen:
+            continue
+        gesehen.add(key)
+        out.append({"key": key, "label": labels.get(key, key)})
+    return out
+
+
 def dashboard_group_names(statuses: list[dict]) -> list[str]:
     """Die Überschriften des Dashboards, ohne Dopplungen, in Anzeige-Reihenfolge.
 
@@ -323,11 +346,16 @@ def _stats_body_lines(e: dict, usd_eur: Optional[float]) -> list[str]:
 
 
 def build_stats_embed(cfg: dict, state: dict, usd_eur: Optional[float] = None,
-                      order: Optional[dict] = None) -> dict:
+                      order: Optional[dict] = None, labels: Optional[dict] = None) -> dict:
     """Persistent stats card — edited in place each run. Pin manually once."""
     bot_stats = state.get("bot_stats", {})
     products_state = state.get("products", {})
-    labels = variant_labels(cfg)
+    # Aliase kommen von aussen — GENAU wie beim Dashboard. Holte sich diese
+    # Karte sie weiter selbst aus `cfg`, kaeme sie ohne die per `/product rename`
+    # gesetzten Namen aus, und die beiden Karten im selben Channel zeigten
+    # wieder verschiedene Namen fuer dasselbe Produkt. Genau so ist es schon
+    # einmal passiert, nur andersherum.
+    labels = labels if labels is not None else variant_labels(cfg)
 
     checks = bot_stats.get("total_checks", 0)
     restocks = bot_stats.get("total_restocks", 0)
