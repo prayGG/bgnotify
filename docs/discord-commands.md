@@ -47,10 +47,14 @@ enthält ausschließlich die *Namen* von Secrets, nie deren Werte.
 | Bot-Lauf | 10 min | externer Cronjob |
 | Order-Check, Bestellung offen | 240 min | `orders.check_interval_minutes` |
 | Order-Check, nichts offen | 1440 min | `orders.idle_interval_minutes` |
-| Sendungsabfrage | 60 min | `tracking.check_interval_minutes` |
+| Sendungsabfrage | 15 min → effektiv 20 | `tracking.check_interval_minutes` |
 
-Pro Lauf wird höchstens **ein** Konto eingeloggt (Staggering) und **eine**
-Sendung abgefragt. Das ist Absicht: Es soll nicht so aussehen, als hinge ein
+Das 10-Minuten-Raster quantisiert die Sendungsabfrage: Mit ±10% Jitter ist jeder
+Wert zwischen 10 und 20 in der Praxis genau 20 Minuten. Für jeden Lauf müsste
+man auf 9 runter.
+
+Pro Lauf wird höchstens **ein** Konto eingeloggt (Staggering) und
+`tracking.max_per_run` Sendungen abgefragt (Standard 2). Das ist Absicht: Es soll nicht so aussehen, als hinge ein
 Automat am Kundenkonto.
 
 ---

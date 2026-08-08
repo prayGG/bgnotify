@@ -35,10 +35,23 @@ forum:
 # und meldet ab dann jede Station einzeln. Zusätzlich können Links von Hand
 # unter `manual_tracking` stehen (nur im PRIVATEN Gist, nie hier — das Repo ist
 # öffentlich), für Pakete, deren Kundenkonto der Bot nicht hat.
-# Takt = Abstand zwischen zwei Abfragen DERSELBEN Sendung; pro Lauf wird immer
-# nur eine Sendung abgefragt.
+# Takt = Abstand zwischen zwei Abfragen DERSELBEN Sendung.
+#
+# ACHTUNG, das Raster: Der Bot läuft alle 10 Minuten, öfter als das kann keine
+# Sendung abgefragt werden. Mit ±10% Jitter heißt 15 deshalb in der Praxis
+# GENAU 20 Minuten (Schwelle 13,5–16,5 min → beim 10-min-Lauf noch nicht fällig,
+# beim 20-min-Lauf schon). Jeder Wert zwischen 10 und 20 ergibt dasselbe. Wer
+# wirklich jeden Lauf will, muss auf 9 runter (Schwelle bleibt dann unter 10).
+#
+# Warum nicht aggressiver: Jede Abfrage startet einen eigenen Browser (~10 s).
+# Ein Rate-Limit droht dabei kaum — die Sendungsseite ist öffentlich, und jeder
+# Lauf kommt von einem frischen Runner mit neuer IP, aus Hermes' Sicht macht
+# also jede IP genau einen Aufruf.
 tracking:
-  check_interval_minutes: 60
+  check_interval_minutes: 15
+  # Sendungen pro Lauf. Bei zwei Paketen gleichzeitig würde sonst jedes nur
+  # jeden zweiten Lauf drankommen und der Takt sich still verdoppeln.
+  max_per_run: 2
 
 orders:
   # Takt bei OFFENER Bestellung (schnell genug für Statuswechsel + Tracking).
