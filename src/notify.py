@@ -174,22 +174,24 @@ def send_forum_post(webhook_url: str, embed: dict) -> bool:
     return _request("POST", webhook_url, payload) is not None
 
 
-def send_command_result(webhook_url: str, embed: dict) -> bool:
-    """Antwort auf einen Discord-Command (z.B. `/product add`) — ohne Ping.
+def send_command_result(app_id: str, token: str, embed: dict) -> bool:
+    """Ergebnis als Antwort auf einen Discord-Command nachreichen.
 
-    Kommt in den Bot-Channel, nicht zu den Meldungen: Was jemand selbst
-    angestoßen hat, muss niemanden anpingen und hat im Bestell-Channel nichts
-    verloren. Bewusst eigener Absender, damit es sich auch optisch von den
-    Restock-/Bestellmeldungen abhebt.
+    Landet im selben Channel, in dem der Command getippt wurde, und ist nur für
+    den Aufrufer sichtbar (Flag 64) — genau wie jede andere Command-Antwort.
+    Deshalb kein Webhook und kein Ping: Was jemand selbst angestoßen hat, geht
+    niemanden sonst etwas an.
+
+    Der Interaction-Token IST die Berechtigung, ein Auth-Header entfällt. Er
+    gilt 15 Minuten; danach antwortet Discord mit 404, was hier nur eine
+    Warnung wert ist — das Ergebnis liegt im Stand des Bots und erscheint beim
+    nächsten Aufruf des Commands sofort.
     """
-    if not webhook_url:
+    if not (app_id and token):
         return False
-    payload = {
-        "username": "bgnotify · bot",
-        "embeds": [embed],
-        "allowed_mentions": {"parse": []},
-    }
-    return _request("POST", webhook_url, payload) is not None
+    url = f"https://discord.com/api/v10/webhooks/{app_id}/{token}"
+    payload = {"embeds": [embed], "flags": 1 << 6}
+    return _request("POST", url, payload, quiet_404=True) is not None
 
 
 def send_order_update(

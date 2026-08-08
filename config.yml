@@ -6,13 +6,6 @@ discord_webhook_env: DISCORD_WEBHOOK_URL
 # das neue Secret weiter funktionieren.
 discord_stock_webhook_env: DISCORD_STOCK_WEBHOOK_URL
 
-# Bot-Channel: Antworten auf selbst getippte Commands (`/product add` meldet
-# hier die gefundenen Varianten). Das sind keine Meldungen, sondern Quittungen —
-# sie pingen nie und haben im Bestell-Channel nichts verloren. Fehlt das Secret,
-# fallen sie auf den Order-Webhook zurück: am falschen Ort sichtbar ist besser
-# als still verschluckt, und ohne Ping ist es dann trotzdem.
-discord_bot_webhook_env: DISCORD_BOT_WEBHOOK_URL
-
 # Eigener Webhook für BG's Forum-Posts auf thinksteroids.com. Lautlos (kein
 # @-Mention) — landet in einem dedizierten Channel. Wenn die env var leer
 # ist, wird der Forum-Check übersprungen.

@@ -20,6 +20,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 logging.basicConfig(level=logging.CRITICAL)
 
 from src import commands, notify, order_watch, orders  # noqa: E402
+from src.config import variant_labels  # noqa: E402
 
 failed = 0
 
@@ -61,8 +62,8 @@ class Lauf:
         notify.send_order_update = lambda hook, embed, *a, **k: self.karten.append(embed)
         # Getrennt gesammelt: Eine Command-Antwort DARF nicht über den
         # Meldungs-Versand laufen, sonst pingt sie und landet im falschen Channel.
-        notify.send_command_result = lambda hook, embed: self.quittungen.append(
-            {"hook": hook, "embed": embed})
+        notify.send_command_result = lambda app_id, token, embed, components=None: (
+            self.quittungen.append({"app_id": app_id, "token": token, "embed": embed}) or True)
         return self
 
     def __exit__(self, *exc):
@@ -162,6 +163,22 @@ zusammen = product_watch.merge_products(
 check("Command-Produkt kommt dazu", len(zusammen) == 1 and zusammen[0]["name"] == "BPC157 10mg", str(zusammen))
 check("Wortlaut der Variante bleibt roh", zusammen[0]["watch_variants"] == ["BPC157 10mg"])
 
+# /product rename — der gefaehrliche Teil ist, dass NUR die Anzeige wechselt.
+# Benennt man den Match-String mit um, greift der Abgleich gegen das Dropdown
+# der Seite ins Leere: Das Produkt stuende weiter im Dashboard und waere nie
+# wieder auf Lager, ohne dass irgendetwas nach einem Fehler aussieht.
+LANG = "Azelaic Acid 20% 30 gr cream"
+umbenannt = commands.command_products(
+    {"products": {"k": {"url": PROD, "name": LANG, "variants": [LANG], "label": "Azelaic 20% 30g"}}})[0]
+check("umbenannt → kurze Anzeige", umbenannt["name"] == "Azelaic 20% 30g", umbenannt["name"])
+check("… aber Match-String unveraendert", umbenannt["watch_variants"] == [LANG],
+      str(umbenannt["watch_variants"]))
+check("… als Alias wie in der config.yml",
+      variant_labels({"products": [umbenannt]}) == {LANG: "Azelaic 20% 30g"})
+ohne_label = commands.command_products(
+    {"products": {"k": {"url": PROD, "name": LANG, "variants": [LANG]}}})[0]
+check("ohne Umbenennung keine Aliase", "variant_labels" not in ohne_label)
+
 # Gleiche URL in beiden: die von Hand gepflegte Config gewinnt, sonst
 # ueberschriebe ein Command die Aliase und Kommentare aus der YAML.
 zusammen = product_watch.merge_products(
@@ -193,12 +210,11 @@ class ScanLauf(Lauf):
         return dict(self.daten)
 
     def scans(self):
-        product_watch.run_scans({}, BOT_HOOK)
+        product_watch.run_scans({})
         return self
 
 
-BOT_HOOK = "https://discord/bot-channel"
-auftrag = {"scans": {PROD: {"requested_at": "x"}}}
+auftrag = {"scans": {PROD: {"requested_at": "x", "app_id": "app-1", "token": "tok-1"}}}
 gefunden = {"title": "Peptides and HGH", "simple": False, "variants": ["BPC157 10mg"]}
 
 with ScanLauf(cmds=auftrag, state={}, daten=gefunden) as l:
@@ -211,8 +227,11 @@ with ScanLauf(cmds=auftrag, state={}, daten=gefunden) as l:
     # Eine Command-Antwort ist eine Quittung, keine Meldung: eigener Channel,
     # kein Ping. Ginge sie über send_order_update, stünde sie im Bestell-Channel
     # und würde alle anpingen, die dort auf Restocks warten.
-    check("… im Bot-Channel", [q["hook"] for q in l.quittungen] == [BOT_HOOK],
-          str([q["hook"] for q in l.quittungen]))
+    # Der Interaction-Token aus dem Auftrag ist der ganze Punkt: Damit landet die
+    # Antwort im Channel, in dem der Command getippt wurde, und nur dort.
+    check("… als Antwort auf den auslösenden Command",
+          [(q["app_id"], q["token"]) for q in l.quittungen] == [("app-1", "tok-1")],
+          str([(q["app_id"], q["token"]) for q in l.quittungen]))
     check("… und nicht über den Meldungs-Versand (der pingt)", l.karten == [],
           str([k.get("title") for k in l.karten]))
 

@@ -53,12 +53,12 @@ def merge_products(cfg: dict, cmds: dict) -> list:
     return aus_config
 
 
-def run_scans(cfg: dict, webhook: str) -> None:
+def run_scans(cfg: dict) -> None:
     """Offene Einlese-Aufträge abarbeiten. Fehler brechen nie den Lauf ab.
 
-    `webhook` zeigt auf den Bot-Channel: Das Ergebnis ist die Antwort auf einen
-    selbst getippten Command, keine Meldung. Deshalb ohne Ping und nicht im
-    Bestell-Channel.
+    Das Ergebnis geht als Antwort auf den auslösenden `/product add`-Command
+    zurück — selber Channel, nur für den Aufrufer sichtbar. Es ist eine
+    Quittung, keine Meldung: kein Webhook, kein Ping, kein Bestell-Channel.
     """
     import os
 
@@ -91,8 +91,14 @@ def run_scans(cfg: dict, webhook: str) -> None:
         daten["scanned_at"] = datetime.now(timezone.utc).isoformat()
         ergebnisse[url] = daten
 
-        if webhook:
-            notify.send_command_result(webhook, build_product_scan_embed(url, daten))
+        # Zurück an den Command, der das angestoßen hat. Klappt das nicht (der
+        # Interaction-Token gilt nur 15 Minuten), geht nichts verloren: Das
+        # Ergebnis steht im Stand, ein erneutes `/product add` zeigt es sofort.
+        auftrag = (cmds.get("scans") or {}).get(url) or {}
+        if not notify.send_command_result(auftrag.get("app_id", ""), auftrag.get("token", ""),
+                                          build_product_scan_embed(url, daten)):
+            log.info("products: '%s' eingelesen, aber keine Antwort zugestellt "
+                     "(Command zu lange her) — erscheint beim nächsten /product add", url)
         log.info("products: '%s' eingelesen (%d Variante(n))", url, len(daten.get("variants") or []))
 
     orders.save_order_state(token, gist_id, st)

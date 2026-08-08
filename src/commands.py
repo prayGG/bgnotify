@@ -131,8 +131,18 @@ def command_products(cmds: dict) -> list[dict]:
         if not url.startswith("http"):
             continue
         name = eintrag.get("name") or url.rstrip("/").rsplit("/", 1)[-1]
-        p = {"name": name, "url": url, "watch_variants": list(eintrag.get("variants") or [name])}
+        varianten = list(eintrag.get("variants") or [name])
+        p = {"name": name, "url": url, "watch_variants": varianten}
         if eintrag.get("emoji"):
             p["emoji"] = eintrag["emoji"]
+        # Anzeige-Name aus `/product rename`. Der Match-String bleibt der
+        # Originalwortlaut der Seite — umbenannt wird NUR die Anzeige, sonst
+        # griffe der Abgleich gegen das Dropdown ins Leere und das Produkt
+        # würde still nicht mehr überwacht. Genau dafür gibt es in der Config
+        # `variant_labels`; hier entsteht dieselbe Struktur.
+        label = (eintrag.get("label") or "").strip()
+        if label:
+            p["name"] = label
+            p["variant_labels"] = {v: label for v in varianten}
         out.append(p)
     return out
