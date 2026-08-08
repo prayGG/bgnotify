@@ -692,6 +692,22 @@ check("… mit dem Produkttitel", r.body.data.choices[0]?.name === "Peptides and
 r = await post(ac("add", [{ name: "link", value: PROD }, { name: "variante", value: "bpc", focused: true }]));
 check("Varianten-Autocomplete filtert", r.body.data.choices.length === 1 && r.body.data.choices[0].value === "BPC157 10mg", JSON.stringify(r.body.data.choices));
 
+// /product rename hatte gar keinen Autocomplete-Zweig und fiel auf die leere
+// Liste durch — im Client sah das aus wie "keine Produkte", nicht wie ein
+// fehlender Fall. Deshalb steht das hier fuer BEIDE Commands.
+fake.commands.products = { k1: { url: PROD, name: "Azelaic Acid 20% 30 gr cream" } };
+for (const sub of ["remove", "rename"]) {
+  r = await post(ac(sub, [{ name: "produkt", value: "", focused: true }]));
+  check(`Autocomplete fuer /product ${sub} schlaegt etwas vor`,
+    r.body.data.choices?.[0]?.value === "k1", JSON.stringify(r.body.data.choices));
+}
+// Nach dem Umbenennen muss der NEUE Name im Vorschlag stehen, sonst waere man
+// den langen Wortlaut genau dort nicht los, wo man ihn wieder auswaehlen muss.
+fake.commands.products.k1.label = "Azelaic 20% 30g";
+r = await post(ac("rename", [{ name: "produkt", value: "azelaic 20", focused: true }]));
+check("… und zeigt den aktuellen Anzeige-Namen",
+  r.body.data.choices?.[0]?.name === "Azelaic 20% 30g", JSON.stringify(r.body.data.choices));
+
 // /product list
 resetFake(ready());
 r = await post(cmd("product list"));
