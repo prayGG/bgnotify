@@ -39,7 +39,8 @@ from .embeds import build_shipment_embed
 
 log = logging.getLogger(__name__)
 
-_DEFAULT_INTERVAL = 60   # Minuten zwischen zwei Abfragen derselben Sendung
+_DEFAULT_INTERVAL = 15      # Minuten zwischen zwei Abfragen derselben Sendung
+_DEFAULT_MAX_PER_RUN = 2    # Sendungen pro Lauf (jede kostet einen eigenen Browser)
 
 
 def _parse_entry(val) -> tuple[str, list[str] | None, str]:
@@ -81,10 +82,12 @@ def _due(entry: dict, interval_minutes: int) -> bool:
 
 
 def check_shipments(cfg: dict, webhook: str, ping_ids: list[str], role_ids: list[str]) -> None:
-    """Alle Einträge aus `manual_tracking` prüfen und Änderungen posten.
+    """Alle verfolgten Sendungen prüfen und Änderungen posten.
 
-    Pro Lauf wird höchstens EINE Sendung abgefragt (Playwright ist teuer und
-    wir wollen Hermes nicht hämmern) — die am längsten überfällige.
+    Pro Lauf werden höchstens `tracking.max_per_run` Sendungen abgefragt — die
+    am längsten überfälligen zuerst. Der Deckel existiert, weil jede Abfrage
+    einen eigenen Browser startet; ohne ihn würde ein Lauf mit fünf offenen
+    Paketen eine Minute lang nur Sendungsseiten rendern.
     """
     token = os.environ.get("GIST_TOKEN", "")
     gist_id = os.environ.get("GIST_ID", "")
@@ -94,7 +97,9 @@ def check_shipments(cfg: dict, webhook: str, ping_ids: list[str], role_ids: list
         log.info("hermes: kein Order-Webhook — übersprungen")
         return
 
-    interval = int(((cfg.get("tracking") or {}).get("check_interval_minutes")) or _DEFAULT_INTERVAL)
+    tracking_cfg = cfg.get("tracking") or {}
+    interval = int(tracking_cfg.get("check_interval_minutes") or _DEFAULT_INTERVAL)
+    max_per_run = max(1, int(tracking_cfg.get("max_per_run") or _DEFAULT_MAX_PER_RUN))
 
     st = orders.load_order_state(token, gist_id)
     manual = st.get("manual_tracking") or {}
@@ -149,37 +154,48 @@ def check_shipments(cfg: dict, webhook: str, ping_ids: list[str], role_ids: list
         return
 
     due.sort(key=lambda t: t[2].get("last_check_at", ""))   # "" zuerst, dann ältester
-    label, url, entry, own_ping, owner = due[0]
-    targets = own_ping if own_ping is not None else ping_ids
-
-    entry["last_check_at"] = datetime.now(timezone.utc).isoformat()   # vor der Abfrage → Backoff
-    data = hermes.fetch_shipment(url)
-
-    if data:
-        events = data.get("events") or []          # bereits chronologisch sortiert
-        # Abgleich über Fingerabdrücke statt über Position/Anzahl: so ist es egal,
-        # in welcher Reihenfolge Hermes liefert, und unbekannte Meldungstexte
-        # funktionieren automatisch mit.
-        seen: list[str] = list(entry.get("seen_keys") or [])
-        known = set(seen)
-        new_events = [e for e in events if hermes.event_key(e) not in known]
-
-        if new_events:
-            first = not seen
-            notify.send_order_update(
-                webhook, build_shipment_embed(label, data, new_events, url, first=first,
-                                              owner=owner),
-                targets, role_ids,
-            )
-            # Nur die Fingerabdrücke der aktuell sichtbaren Ereignisse behalten —
-            # so wächst der Gist nicht unbegrenzt.
-            entry["seen_keys"] = [hermes.event_key(e) for e in events]
-            entry["status"] = data.get("summary", "")
-            if data.get("number"):
-                entry["number"] = data["number"]
-            log.info("hermes: '%s' → %d neue(s) Ereignis(se), zuletzt: %s",
-                     label, len(new_events), new_events[-1].get("text", "")[:60])
-        else:
-            log.info("hermes: '%s' unverändert (%d Ereignisse)", label, len(events))
+    for label, url, entry, own_ping, owner in due[:max_per_run]:
+        targets = own_ping if own_ping is not None else ping_ids
+        _check_one_shipment(label, url, entry, webhook, targets, role_ids, owner)
 
     orders.save_order_state(token, gist_id, st)
+
+
+def _check_one_shipment(label: str, url: str, entry: dict, webhook: str,
+                        targets: list[str], role_ids: list[str], owner: str) -> None:
+    """EINE Sendung abfragen und neue Ereignisse posten; mutiert `entry` in place.
+
+    Wirft nicht — `fetch_shipment` fängt seine Fehler selbst ab und gibt None
+    zurück. Wichtig, damit eine kaputte Sendungsseite nicht die zweite Sendung
+    desselben Laufs mitreißt.
+    """
+    entry["last_check_at"] = datetime.now(timezone.utc).isoformat()   # vor der Abfrage → Backoff
+    data = hermes.fetch_shipment(url)
+    if not data:
+        return
+
+    events = data.get("events") or []          # bereits chronologisch sortiert
+    # Abgleich über Fingerabdrücke statt über Position/Anzahl: so ist es egal,
+    # in welcher Reihenfolge Hermes liefert, und unbekannte Meldungstexte
+    # funktionieren automatisch mit.
+    seen: list[str] = list(entry.get("seen_keys") or [])
+    known = set(seen)
+    new_events = [e for e in events if hermes.event_key(e) not in known]
+
+    if not new_events:
+        log.info("hermes: '%s' unverändert (%d Ereignisse)", label, len(events))
+        return
+
+    notify.send_order_update(
+        webhook, build_shipment_embed(label, data, new_events, url, first=not seen,
+                                      owner=owner),
+        targets, role_ids,
+    )
+    # Nur die Fingerabdrücke der aktuell sichtbaren Ereignisse behalten —
+    # so wächst der Gist nicht unbegrenzt.
+    entry["seen_keys"] = [hermes.event_key(e) for e in events]
+    entry["status"] = data.get("summary", "")
+    if data.get("number"):
+        entry["number"] = data["number"]
+    log.info("hermes: '%s' → %d neue(s) Ereignis(se), zuletzt: %s",
+             label, len(new_events), new_events[-1].get("text", "")[:60])
