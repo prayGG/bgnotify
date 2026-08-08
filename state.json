@@ -1,11 +1,23 @@
 {
   "bot_stats": {
     "first_check_at": "2026-05-20T18:50:44.075159+00:00",
-    "last_check_at": "2026-08-08T10:30:40.221749+00:00",
-    "total_checks": 11415,
+    "last_check_at": "2026-08-08T10:40:41.205586+00:00",
+    "total_checks": 11416,
     "total_restocks": 3
   },
   "dashboard_message_id": "1510095616322175107",
+  "dashboard_names": [
+    "GHK CU",
+    "Tirzepatide",
+    "Retatrutide",
+    "BPC157/TB500 Mix",
+    "Modafinil",
+    "Roaccutane 20 mg (Roche)",
+    "Minoxidil 5 mg",
+    "Tretinoin",
+    "Azelaic Acid 20% 30 gr cream",
+    "Tazarotene cream/gel 0.1% (60 G/ box)"
+  ],
   "error_report": {
     "active": false
   },
@@ -84,7 +96,7 @@
       "3888239"
     ]
   },
-  "last_deploy_sha": "434a4aa691e03d07ad10c67b58955be9de1fafdf",
+  "last_deploy_sha": "c789e0497f6fcd9992e899574bab2a303d615ff2",
   "playstation": {},
   "products": {
     "https://bgpharmadrugs.to/product/minoxytop-5-mg-minoxidil-tablets-ip/": {
