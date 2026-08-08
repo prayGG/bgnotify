@@ -186,6 +186,18 @@ def _check_one_shipment(label: str, url: str, entry: dict, webhook: str,
         log.info("hermes: '%s' unverändert (%d Ereignisse)", label, len(events))
         return
 
+    # Alles neu, obwohl die Sendung schon bekannt war? Dann hat sich nicht die
+    # Sendung geändert, sondern wie wir die Seite lesen — Zeitzone, Datumsformat,
+    # Wortlaut. Hermes liefert die Historie kumulativ, ein echtes Update hat also
+    # IMMER Überschneidung mit dem Bekannten. Ohne diesen Riegel würde jede
+    # solche Umstellung den kompletten Verlauf ein zweites Mal in den Channel
+    # kippen. Also still neu eichen und einmal warnen.
+    if seen and len(new_events) == len(events):
+        entry["seen_keys"] = [hermes.event_key(e) for e in events]
+        log.warning("hermes: '%s' — alle %d Ereignisse unbekannt, Stand neu geeicht "
+                    "(Darstellung geändert?), nichts gepostet", label, len(events))
+        return
+
     notify.send_order_update(
         webhook, build_shipment_embed(label, data, new_events, url, first=not seen,
                                       owner=owner),

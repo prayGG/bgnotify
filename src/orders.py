@@ -155,6 +155,10 @@ def fetch(username: str, password: str, want_detail=None, cookies=None) -> tuple
             ctx = browser.new_context(
                 user_agent=UA,
                 locale="de-DE",
+                # Wie in hermes.py: ohne das läuft der Browser auf UTC (Runner)
+                # und alle im Browser formatierten Zeiten wären zwei Stunden
+                # daneben. Nebenbei passt es zum de-DE-Auftritt der Session.
+                timezone_id="Europe/Berlin",
                 viewport={"width": 1280, "height": 800},
             )
             ctx.add_init_script(
