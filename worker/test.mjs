@@ -704,6 +704,20 @@ r = await post(cmd("product list"));
 check("zeigt Aufgenommenes", r.embed.description.includes("BPC157 10mg"));
 check("zeigt auch Wartendes", r.embed.description.includes("wird beim nächsten Lauf eingelesen"), r.embed.description);
 
+// Umbenennen darf NUR die Anzeige treffen. Wanderte der Wortlaut mit, liefe der
+// Abgleich gegen das Dropdown der Seite ins Leere — das Produkt stuende weiter
+// im Dashboard und waere nie wieder auf Lager, ohne dass etwas nach Fehler aussieht.
+fake.commands.products.k1.variants = ["Azelaic Acid 20% 30 gr cream"];
+r = await post(cmd("product rename", { args: { produkt: "k1", name: "Azelaic 20% 30g" } }));
+check("umbenennen klappt", fake.commands.products.k1.label === "Azelaic 20% 30g", r.content);
+check("… Match-String unangetastet",
+  fake.commands.products.k1.variants[0] === "Azelaic Acid 20% 30 gr cream",
+  String(fake.commands.products.k1.variants));
+r = await post(cmd("product rename", { args: { produkt: "k1", name: "   " } }));
+check("leerer Name setzt zurueck", !("label" in fake.commands.products.k1), r.content);
+r = await post(cmd("product rename", { args: { produkt: "gibtsnicht", name: "X" } }));
+check("fest gepflegtes → Absage beim Umbenennen", r.content?.includes("config.yml"), r.content);
+
 r = await post(cmd("product remove", { args: { produkt: "k1" } }));
 check("entfernen klappt", !fake.commands.products.k1, r.content);
 r = await post(cmd("product remove", { args: { produkt: "gibtsnicht" } }));

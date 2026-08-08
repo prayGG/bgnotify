@@ -226,10 +226,35 @@ export function parseProductLink(raw) {
   return { url: `${parsed.origin}${parsed.pathname}` };
 }
 
-/** Seite zum Einlesen anmelden — das Ergebnis liefert erst der nächste Lauf. */
-export async function requestScan(env, state, url) {
+// Discord haelt einen Interaction-Token 15 Minuten lang fuer Nachreichungen
+// offen. Danach ist er wertlos.
+const INTERACTION_TTL_MS = 15 * 60 * 1000;
+
+/** Seite zum Einlesen anmelden — das Ergebnis liefert erst der nächste Lauf.
+ *
+ * Mitgegeben wird der Interaction-Token: Damit reicht der Actions-Bot sein
+ * Ergebnis als Antwort auf GENAU diesen Command nach — im selben Channel, nur
+ * fuer den Aufrufer sichtbar. Ohne den muesste er in einen festen Channel
+ * posten und alle anpingen, die dort auf etwas anderes warten.
+ *
+ * Der Token ist kurzlebig und liegt im PRIVATEN Gist. Abgelaufene werden bei
+ * jeder neuen Anmeldung weggeraeumt, damit keine toten Zugangsdaten
+ * herumliegen — der Bot selbst darf diese Datei nicht anfassen.
+ */
+export async function requestScan(env, state, url, interaction) {
   state.scans ||= {};
-  state.scans[url] = { requested_at: new Date().toISOString() };
+
+  const jetzt = Date.now();
+  for (const eintrag of Object.values(state.scans)) {
+    const alter = jetzt - Date.parse(eintrag.requested_at || 0);
+    if (!Number.isFinite(alter) || alter > INTERACTION_TTL_MS) delete eintrag.token;
+  }
+
+  state.scans[url] = {
+    requested_at: new Date().toISOString(),
+    app_id: interaction?.application_id || "",
+    token: interaction?.token || "",
+  };
   await saveState(env, state);
 }
 
@@ -254,6 +279,25 @@ export async function removeProduct(env, state, key) {
   delete state.products[key];
   await saveState(env, state);
   return true;
+}
+
+/**
+ * Anzeige-Namen aendern. Nur die Anzeige — der Wortlaut, mit dem der Bot gegen
+ * die Seite abgleicht (`variants`), bleibt unangetastet. Wuerde man den
+ * mitumbenennen, liefe der Abgleich gegen das Dropdown ins Leere und das
+ * Produkt waere still nicht mehr ueberwacht: Es stuende weiter im Dashboard,
+ * nur nie wieder auf Lager.
+ *
+ * Leerer Name setzt zurueck auf den Originalwortlaut.
+ */
+export async function renameProduct(env, state, key, label) {
+  const eintrag = state.products?.[key];
+  if (!eintrag) return null;
+  const sauber = (label || "").trim().slice(0, 80);
+  if (sauber) eintrag.label = sauber;
+  else delete eintrag.label;
+  await saveState(env, state);
+  return sauber || eintrag.name || key;
 }
 
 /**

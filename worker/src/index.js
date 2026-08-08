@@ -43,6 +43,7 @@ import {
   parseTrackingLink,
   removeAccount,
   removeProduct,
+  renameProduct,
   removeTracking,
   requestScan,
   setAccountEnabled,
@@ -584,7 +585,7 @@ async function handleCommand(interaction, env, ctx) {
 
       const scan = data.orders.product_scans?.[url];
       if (!scan) {
-        await requestScan(env, state, url);
+        await requestScan(env, state, url, interaction);
         let nachsatz = "Das dauert einen Lauf — ich melde mich hier, sobald ich weiß, was es dort gibt.";
         if (githubConfigured(env)) {
           try {
@@ -619,6 +620,19 @@ async function handleCommand(interaction, env, ctx) {
       const schon = await addProduct(env, state, url, scan.title, args.variante);
       return reply(
         `**${args.variante}** wird ${schon ? "weiterhin" : "ab jetzt"} beobachtet.\n\nAb dem nächsten Lauf steht es im Dashboard, und ein Restock pingt wie gewohnt.`
+      );
+    }
+
+    case "product rename": {
+      const heisst = await renameProduct(env, state, args.produkt, args.name);
+      if (heisst === null) {
+        return reply(
+          "Das ist kein per Command aufgenommenes Produkt. Die fest gepflegten stehen in `config.yml`."
+        );
+      }
+      return reply(
+        `Heißt im Dashboard jetzt **${heisst}**.\n\n` +
+          "Überwacht wird weiter derselbe Eintrag auf der Seite — umbenannt ist nur die Anzeige."
       );
     }
 

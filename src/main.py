@@ -75,11 +75,6 @@ def main() -> int:
     # channel. Fall back to the main webhook so restock alerts don't go silent
     # if the new secret hasn't been configured yet.
     stock_webhook = _webhook_from_cfg(cfg, "discord_stock_webhook_env", "DISCORD_STOCK_WEBHOOK_URL") or webhook
-    # Antworten auf Commands (`/product add`) gehören in den Bot-Channel, nicht
-    # zu den Meldungen. Fällt auf den Order-Webhook zurück, solange das Secret
-    # fehlt — dann steht es zwar wieder bei den Bestellungen, aber wenigstens
-    # ohne Ping. Lieber am falschen Ort sichtbar als still verschluckt.
-    bot_webhook = _webhook_from_cfg(cfg, "discord_bot_webhook_env", "DISCORD_BOT_WEBHOOK_URL") or order_webhook
 
     user_ids = load_ping_user_ids(cfg)
     role_ids = load_ping_role_ids(cfg)
@@ -129,7 +124,7 @@ def main() -> int:
         # 4c — Offene Produkt-Auftraege aus Discord (`/product add`). Nach den
         # Bestellungen, weil ein Einlesen nur ein Seitenabruf ist und nichts
         # blockiert; das Ergebnis kommt als eigene Karte in den Channel.
-        run_scans(cfg, bot_webhook)
+        run_scans(cfg)
 
         # 5 — PlayStation-Preise. Preissenkungen pingen wie ein Restock und laufen
         # über den BG-notify-Channel (stock_webhook). Die PS-Statuses landen mit

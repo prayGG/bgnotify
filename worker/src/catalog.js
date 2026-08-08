@@ -106,6 +106,15 @@ export const COMMANDS = [
         ],
       },
       {
+        name: "rename",
+        description: "Anzeige-Name eines Produkts ändern",
+        help: "Kürzeren Namen fürs Dashboard vergeben — die Überwachung bleibt.",
+        options: [
+          { name: "produkt", description: "welches Produkt", type: STRING, required: true, autocomplete: true },
+          { name: "name", description: "wie es heißen soll", type: STRING, required: true },
+        ],
+      },
+      {
         name: "remove",
         description: "Produkt nicht mehr beobachten",
         help: "Produkt nicht mehr beobachten.",
