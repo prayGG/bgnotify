@@ -91,6 +91,9 @@ jobs:
           PING_USER_IDS: "${{ secrets.DISCORDID }},${{ secrets.WEITERE_ID_HIER }}"
           # Bestellstatus aus dem BG-Kundenkonto (leer = Feature inaktiv)
           DISCORD_ORDER_WEBHOOK_URL: ${{ secrets.DISCORD_ORDER_WEBHOOK_URL }}
+          # Bot-Channel: Antworten auf Commands (`/product add`), ohne Ping.
+          # Fehlt das Secret, fallen sie auf den Order-Webhook zurück.
+          DISCORD_BOT_WEBHOOK_URL: ${{ secrets.DISCORD_BOT_WEBHOOK_URL }}
           GIST_TOKEN: ${{ secrets.GIST_TOKEN }}
           GIST_ID: ${{ secrets.GIST_ID }}
           # Konto a

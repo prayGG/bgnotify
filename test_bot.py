@@ -45,23 +45,29 @@ class Lauf:
         self.cmds, self.state, self.login_ok = cmds, state, login_ok
         self.geprueft: list[str] = []      # welche Konten eingeloggt wurden
         self.karten: list[dict] = []       # was nach Discord ging
+        self.quittungen: list[dict] = []   # Command-Antworten (eigener Channel, ohne Ping)
         self.gespeichert: dict = {}
 
     def __enter__(self):
         self._orig = (
             commands.load_commands, orders.load_order_state,
             orders.save_order_state, orders.fetch, notify.send_order_update,
+            notify.send_command_result,
         )
         commands.load_commands = lambda *a, **k: self.cmds
         orders.load_order_state = lambda *a, **k: self.state
         orders.save_order_state = lambda t, g, s: self.gespeichert.update(s) or True
         orders.fetch = self._fetch
         notify.send_order_update = lambda hook, embed, *a, **k: self.karten.append(embed)
+        # Getrennt gesammelt: Eine Command-Antwort DARF nicht über den
+        # Meldungs-Versand laufen, sonst pingt sie und landet im falschen Channel.
+        notify.send_command_result = lambda hook, embed: self.quittungen.append(
+            {"hook": hook, "embed": embed})
         return self
 
     def __exit__(self, *exc):
         (commands.load_commands, orders.load_order_state, orders.save_order_state,
-         orders.fetch, notify.send_order_update) = self._orig
+         orders.fetch, notify.send_order_update, notify.send_command_result) = self._orig
         return False
 
     def _fetch(self, user, pw, want_detail=None, cookies=None):
@@ -187,10 +193,11 @@ class ScanLauf(Lauf):
         return dict(self.daten)
 
     def scans(self):
-        product_watch.run_scans({}, "https://discord/hook", ["1"], [])
+        product_watch.run_scans({}, BOT_HOOK)
         return self
 
 
+BOT_HOOK = "https://discord/bot-channel"
 auftrag = {"scans": {PROD: {"requested_at": "x"}}}
 gefunden = {"title": "Peptides and HGH", "simple": False, "variants": ["BPC157 10mg"]}
 
@@ -199,7 +206,15 @@ with ScanLauf(cmds=auftrag, state={}, daten=gefunden) as l:
     check("offener Auftrag → Seite wird gelesen", l.gelesen == [PROD], str(l.gelesen))
     check("Ergebnis landet im Stand des Bots", PROD in l.gespeichert.get("product_scans", {}))
     check("Varianten gemerkt", l.gespeichert["product_scans"][PROD]["variants"] == ["BPC157 10mg"])
-    check("meldet den Fund", any("Varianten gefunden" in (k.get("description") or "") for k in l.karten))
+    check("meldet den Fund",
+          any("Varianten gefunden" in (q["embed"].get("description") or "") for q in l.quittungen))
+    # Eine Command-Antwort ist eine Quittung, keine Meldung: eigener Channel,
+    # kein Ping. Ginge sie über send_order_update, stünde sie im Bestell-Channel
+    # und würde alle anpingen, die dort auf Restocks warten.
+    check("… im Bot-Channel", [q["hook"] for q in l.quittungen] == [BOT_HOOK],
+          str([q["hook"] for q in l.quittungen]))
+    check("… und nicht über den Meldungs-Versand (der pingt)", l.karten == [],
+          str([k.get("title") for k in l.karten]))
 
 # Schon eingelesen → nicht nochmal. Sonst laege bei jedem Lauf dieselbe Seite an.
 fertig = {"product_scans": {PROD: {"title": "x", "simple": True, "variants": []}}}
@@ -213,8 +228,8 @@ with ScanLauf(cmds=auftrag, state={}, kaputt=True) as l:
     check("Seite kaputt → Fehler wird festgehalten",
           l.gespeichert["product_scans"][PROD].get("error", "").startswith("HTTP 404"))
     check("… und gemeldet statt verschluckt",
-          any("nicht lesbar" in (k.get("title") or "") for k in l.karten),
-          str([k.get("title") for k in l.karten]))
+          any("nicht lesbar" in (q["embed"].get("title") or "") for q in l.quittungen),
+          str([q["embed"].get("title") for q in l.quittungen]))
 
 print(f"\n{failed} FEHLER" if failed else "\nALLES GRÜN")
 sys.exit(1 if failed else 0)
