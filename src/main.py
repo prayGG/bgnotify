@@ -39,6 +39,7 @@ from .deploy import announce_deploy
 from .embeds import (
     build_dashboard_embed,
     dashboard_group_names,
+    dashboard_variants,
     build_forum_embed,
     build_oos_embed,
     build_ps_drop_embed,
@@ -97,6 +98,11 @@ def main() -> int:
         # aus `cfg` zieht (embeds.py) und deshalb immer richtig lag: zwei Karten
         # nebeneinander, eine mit dem neuen Namen, eine mit dem alten.
         labels = variant_labels(cfg)
+        # Per `/product rename` gesetzte Namen legen sich DARÜBER. Sie sind die
+        # jüngere Aussage, und nur so erreicht das Umbenennen auch die fest in
+        # `config.yml` gepflegten Produkte — sonst wären ausgerechnet Roaccutane
+        # und Tretinoin die einzigen, die man nicht umbenennen kann.
+        labels.update(commands.product_labels(gist_cmds))
 
         # 1 — Shop-Produkte. Den (unabhängigen) USD/EUR-Kurs holen wir parallel
         # in einem Thread: er trifft einen anderen Host als der Shop, also
@@ -157,11 +163,14 @@ def main() -> int:
         # Die Überschriften veröffentlichen, damit `/product move` im
         # Autocomplete genau das anbietet, was im Dashboard steht.
         state["dashboard_names"] = dashboard_group_names(statuses)
+        # Und die einzelnen Zeilen mit ihrem aktuellen Namen — daraus baut
+        # `/product rename` sein Autocomplete.
+        state["dashboard_variants"] = dashboard_variants(statuses, labels)
 
         if webhook:
             new_stats_id = notify.edit_in_place(
                 webhook,
-                build_stats_embed(cfg, state, usd_eur=usd_eur, order=order),
+                build_stats_embed(cfg, state, usd_eur=usd_eur, order=order, labels=labels),
                 message_id=state.get("stats_message_id", ""),
             )
             if new_stats_id:

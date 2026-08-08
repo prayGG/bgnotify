@@ -163,3 +163,18 @@ def product_order(cmds: dict) -> dict:
         except (TypeError, ValueError):
             continue
     return out
+
+
+def product_labels(cmds: dict) -> dict:
+    """Anzeige-Namen aus `/product rename`: `{Varianten-String: Anzeige}`.
+
+    Geschlüsselt nach dem Wortlaut, mit dem gegen die Seite abgeglichen wird —
+    der ändert sich beim Umbenennen nie. Dadurch greift es auch bei den fest in
+    `config.yml` gepflegten Produkten, ohne die Datei anzufassen: Beim Laden
+    wird diese Zuordnung über die aus der Config gelegt.
+    """
+    out: dict = {}
+    for key, label in (cmds.get("labels") or {}).items():
+        if str(label).strip():
+            out[str(key)] = str(label).strip()
+    return out

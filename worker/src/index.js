@@ -459,11 +459,20 @@ async function handleAutocomplete(interaction, env) {
     );
   }
 
-  // Beide arbeiten auf demselben Schluessel: das per Command aufgenommene
-  // Produkt. Angezeigt wird der aktuelle Anzeige-Name — nach einem `rename`
-  // stuende sonst weiter der lange Originalwortlaut im Vorschlag, also genau
-  // das, was man gerade losgeworden ist.
-  if (path === "product remove" || path === "product rename") {
+  if (path === "product rename") {
+    // Die Zeilen des Dashboards, wie sie GERADE heissen — der Bot legt sie in
+    // state.json ab. Angeboten wird der sichtbare Name, gespeichert wird unter
+    // dem Varianten-String, der sich beim Umbenennen nie aendert. Deshalb
+    // erreicht es auch die fest in config.yml gepflegten Produkte.
+    const zeilen = (await loadRepoState()).dashboard_variants || [];
+    return autocompleteResult(
+      zeilen
+        .filter((z) => passt(z.label || "") || passt(z.key || ""))
+        .map((z) => ({ name: clip(z.label || z.key, 90), value: clip(z.key, 100) }))
+    );
+  }
+
+  if (path === "product remove") {
     return autocompleteResult(
       Object.entries(data.commands.products || {})
         .map(([key, p]) => [key, p.label || p.name || key])
@@ -641,13 +650,12 @@ async function handleCommand(interaction, env, ctx) {
     case "product rename": {
       const heisst = await renameProduct(env, state, args.produkt, args.name);
       if (heisst === null) {
-        return reply(
-          "Das ist kein per Command aufgenommenes Produkt. Die fest gepflegten stehen in `config.yml`."
-        );
+        return reply("Wähl bitte eine Zeile aus dem Autocomplete — leer geht nicht.");
       }
       return reply(
         `Heißt im Dashboard jetzt **${heisst}**.\n\n` +
-          "Überwacht wird weiter derselbe Eintrag auf der Seite — umbenannt ist nur die Anzeige."
+          "Überwacht wird weiter derselbe Eintrag auf der Seite — umbenannt ist nur die " +
+          "Anzeige. Sichtbar ab dem nächsten Lauf."
       );
     }
 
