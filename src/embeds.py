@@ -180,8 +180,52 @@ def _dashboard_group_row(tree: str, short: str, s: dict, usd_eur: Optional[float
 # --------------------------------------------------------------------------
 # Dashboard (persistente Status-Message, wird in place editiert)
 # --------------------------------------------------------------------------
+def group_name(status: dict) -> str:
+    """Überschrift, unter der eine Variante im Dashboard hängt.
+
+    Zugleich der Schlüssel, unter dem `/product move` eine Position merkt —
+    deshalb an einer Stelle definiert statt an dreien abgeschrieben.
+    """
+    return status.get("product_name") or status["variant"]
+
+
+def dashboard_group_names(statuses: list[dict]) -> list[str]:
+    """Die Überschriften des Dashboards, ohne Dopplungen, in Anzeige-Reihenfolge.
+
+    Der Bot legt sie in `state.json` ab, damit der Worker im Autocomplete von
+    `/product move` genau das anbieten kann, was auch wirklich dasteht. Sonst
+    müsste er `config.yml` nachbauen und liefe bei jeder Änderung auseinander.
+    """
+    out: list[str] = []
+    for s in statuses:
+        n = group_name(s)
+        if n not in out:
+            out.append(n)
+    return out
+
+
+# Position für alles, was nicht von Hand einsortiert wurde. Mittig gewählt,
+# damit man ohne Umnummerieren sowohl darüber als auch darunter Platz hat.
+DEFAULT_POSITION = 100
+
+
+def _order_key(name: str, order: Optional[dict]) -> tuple:
+    """Zweitschlüssel der Sortierung: von Hand gesetzte Position, dann Name.
+
+    Die Verfügbarkeit bleibt der ERSTE Schlüssel — grün gehört nach oben, das
+    ist die Frage, die man beim Draufschauen stellt. Die Handsortierung
+    entscheidet nur innerhalb einer Stufe.
+    """
+    try:
+        pos = int((order or {}).get(name, DEFAULT_POSITION))
+    except (TypeError, ValueError):
+        pos = DEFAULT_POSITION
+    return (pos, name.lower())
+
+
 def build_dashboard_embed(
-    statuses: list[dict], usd_eur: Optional[float] = None, labels: Optional[dict] = None
+    statuses: list[dict], usd_eur: Optional[float] = None, labels: Optional[dict] = None,
+    order: Optional[dict] = None,
 ) -> dict:
     labels = labels or {}
 
@@ -190,10 +234,14 @@ def build_dashboard_embed(
     # zwei lose Einträge. Einzelvarianten-Produkte bleiben optisch unverändert.
     groups: dict[str, list[dict]] = {}
     for s in statuses:
-        groups.setdefault(s.get("product_name") or s["variant"], []).append(s)
+        groups.setdefault(group_name(s), []).append(s)
 
-    # Gruppen nach bestem Mitglied sortieren (in-stock zuerst, OOS ganz unten).
-    ordered = sorted(groups.items(), key=lambda kv: min(_stock_sort_key(m) for m in kv[1]))
+    # Gruppen nach bestem Mitglied sortieren (in-stock zuerst, OOS ganz unten),
+    # innerhalb einer Stufe nach der von Hand gesetzten Position.
+    ordered = sorted(
+        groups.items(),
+        key=lambda kv: (min(_stock_sort_key(m) for m in kv[1]), _order_key(kv[0], order)),
+    )
 
     blocks: list[str] = []
     for name, members in ordered:
@@ -274,7 +322,8 @@ def _stats_body_lines(e: dict, usd_eur: Optional[float]) -> list[str]:
     return lines
 
 
-def build_stats_embed(cfg: dict, state: dict, usd_eur: Optional[float] = None) -> dict:
+def build_stats_embed(cfg: dict, state: dict, usd_eur: Optional[float] = None,
+                      order: Optional[dict] = None) -> dict:
     """Persistent stats card — edited in place each run. Pin manually once."""
     bot_stats = state.get("bot_stats", {})
     products_state = state.get("products", {})
@@ -332,8 +381,9 @@ def build_stats_embed(cfg: dict, state: dict, usd_eur: Optional[float] = None) -
         label = e.get("name") or game.get("name") or url
         groups.append((emoji, label, [(label, e)]))
 
-    # Gleicher Schlüssel wie das Dashboard: in-stock-Produkte oben, OOS unten.
-    groups.sort(key=lambda g: min(_stock_sort_key(e) for _v, e in g[2]))
+    # Gleicher Schlüssel wie das Dashboard — beide Karten stehen untereinander
+    # im selben Channel, unterschiedliche Reihenfolgen wären nur verwirrend.
+    groups.sort(key=lambda g: (min(_stock_sort_key(e) for _v, e in g[2]), _order_key(g[1], order)))
 
     for emoji, name, members in groups:
         if len(members) == 1:
