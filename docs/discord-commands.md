@@ -85,7 +85,7 @@ sich nicht.
   gedeckelt auf genau einen Lauf über `_backfill_done`.
 - Bestellkarten erklären ihren Status in einer Zeile Klartext („Completed" =
   bei BG fertig und rausgeschickt, **nicht** zugestellt).
-- Alle Karten zeigen oben nur die Konto-Bezeichnung (`pray`, `mave`). Die
+- Alle Karten zeigen oben nur die Konto-Bezeichnung. Die
   Bestellnummer taucht nirgends auf: Konten ohne hinterlegte BG-Zugänge laufen
   nur über `manual_tracking` und haben nie eine.
 
@@ -212,7 +212,7 @@ Bootstrap: Solange die Rolle nicht existiert, darf nur der Server-Inhaber
   Sendungsdaten, die müssen nicht im Channel stehenbleiben.
 - **Knöpfe statt Nachfragen** — `/product add` zeigt Varianten als Auswahlmenü,
   `/account remove` fragt mit *Abbrechen / Löschen*.
-- **Fehler, die etwas sagen** — „Kein Konto `mave` — meintest du `maveg`?"
+- **Fehler, die etwas sagen** — „Kein Konto `xyz` — meintest du `xy`?"
 
 ---
 

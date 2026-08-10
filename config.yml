@@ -75,17 +75,16 @@ orders:
   # `label` ist reine Anzeige: steht als Titel auf den Bestell-/Tracking-Karten
   # ("pray · #10042" statt nur "#10042"), damit im gemeinsamen Channel sofort
   # klar ist, wessen Bestellung das ist. Weglassen = wie vorher nur die Nummer.
+  #
+  # Weitere Konten kommen NICHT hierher, sondern über `/account add` in Discord:
+  # Zugangsdaten landen dann verschlüsselt als GitHub-Secret, der Anzeigename im
+  # privaten Gist. Nichts davon steht in diesem öffentlichen Repo.
   accounts:
     - name: a
       label: pray
       username_env: BG_USERNAME
       password_env: BG_PASSWORD
       ping_env: DISCORDID            # Secret mit der Discord-User-ID für Konto a
-    - name: b
-      label: mave
-      username_env: BG_USERNAME_2
-      password_env: BG_PASSWORD_2
-      ping_env: WEITERE_ID_HIER      # bestehendes Secret mit der Discord-ID für Konto b
 
 notifications:
   # Discord User-IDs werden bei Restocks gepingt. Damit die IDs NICHT im

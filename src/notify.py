@@ -6,8 +6,7 @@ Two delivery patterns, each with a focused job:
   PATCHed silently each run. Discord doesn't push notifications for edits, so
   this never spams. POSTs a fresh message if the saved id is missing or 404.
 
-- `send_*` — one new POST per event. Pinging variants (restock, PS price drop,
-  order update) include `<@user_id>`/`<@&role_id>` mentions in the content;
+- `send_*` — one new POST per event. Pinging variants (restock, order update) include `<@user_id>`/`<@&role_id>` mentions in the content;
   silent variants (OOS, forum post, deploy announcement) never mention anyone.
 """
 from __future__ import annotations
@@ -25,31 +24,16 @@ log = logging.getLogger(__name__)
 _MAX_ATTEMPTS = 3
 
 
-def _request(
-    method: str,
-    url: str,
-    payload: Optional[dict] = None,
-    *,
-    quiet_404: bool = False,
-    headers: Optional[dict] = None,
-) -> Optional[dict]:
+def _request(method: str, url: str, payload: Optional[dict] = None, *, quiet_404: bool = False) -> Optional[dict]:
     """Send Discord webhook request with retries for 429/5xx/network errors.
 
     Returns parsed JSON on success, {} on 404 (when quiet_404) or empty body,
     None when all attempts failed. Retries respect Discord's `retry_after` on
     429 and use exponential backoff on 5xx and network errors.
-
-    `headers` gibt es für die Bot-Route: Ein Webhook trägt seine Berechtigung in
-    der URL, ein Bot-Aufruf braucht einen Authorization-Header.
     """
     for attempt in range(_MAX_ATTEMPTS):
         try:
-            r = requests.request(
-                method, url,
-                json=payload if payload is not None else None,
-                headers=headers,
-                timeout=15,
-            )
+            r = requests.request(method, url, json=payload if payload is not None else None, timeout=15)
         except requests.RequestException as e:
             if attempt < _MAX_ATTEMPTS - 1:
                 wait = 2 ** attempt
@@ -132,26 +116,6 @@ def send_restock_alert(
     return _request("POST", webhook_url, payload) is not None
 
 
-def send_ps_price_drop(
-    webhook_url: str,
-    embed: dict,
-    user_ids: Optional[list[str]] = None,
-    role_ids: Optional[list[str]] = None,
-) -> bool:
-    """One POST per PlayStation game price drop, into the dedicated PS channel.
-    Pings like a restock — a cheaper game is the whole point of the channel."""
-    if not webhook_url:
-        return False
-    prefix, allowed = _mentions(user_ids or [], role_ids or [])
-    payload = {
-        "username": "bgnotify · playstation",
-        "content": prefix,
-        "embeds": [embed],
-        "allowed_mentions": allowed,
-    }
-    return _request("POST", webhook_url, payload) is not None
-
-
 def send_oos_alert(webhook_url: str, embed: dict) -> bool:
     """Silent out-of-stock alert — no pings. Gleicher Channel-Name wie Restock
     (bg-notify); die Embeds (RESTOCKED/OUT OF STOCK) unterscheiden sich eh."""
@@ -175,63 +139,6 @@ def send_update_announcement(webhook_url: str, embed: dict) -> bool:
         "allowed_mentions": {"parse": []},
     }
     return _request("POST", webhook_url, payload) is not None
-
-
-def send_bot_message(bot_token: str, channel_id: str, embed: dict) -> bool:
-    """Als Bot direkt in einen Channel schreiben — ohne Webhook.
-
-    Der Bot darf das überall, wo er Schreibrechte hat; ein Webhook kann immer nur
-    in den einen Channel, für den er angelegt wurde. Der Preis ist der feste
-    Absendername: Ein Bot postet als er selbst, `bgnotify · updates` als
-    Absender gibt es hier nicht. Für Deploy-Karten und Fehler-Reports ist das
-    der bessere Tausch — die stehen ohnehin unter einem eigenen Embed-Titel.
-    """
-    if not (bot_token and channel_id):
-        return False
-    return _request(
-        "POST",
-        f"https://discord.com/api/v10/channels/{channel_id}/messages",
-        {"embeds": [embed], "allowed_mentions": {"parse": []}},
-        headers={"Authorization": f"Bot {bot_token}",
-                 "User-Agent": "bgnotify-bot"},
-    ) is not None
-
-
-class UpdateTarget:
-    """Wohin Meldungen gehen, die zu keinem Command gehören.
-
-    Deploy-Karten und Fehler-Reports entstehen im Actions-Lauf, nicht aus einer
-    Interaktion — es gibt also keinen Channel, der sich aus dem Anlass ergäbe,
-    und keinen Interaction-Token, über den man antworten könnte. Bisher war das
-    Ziel deshalb ein fest eingetragener Webhook. Der zeigte auf einen Channel,
-    den niemand sah, und das fiel monatelang nicht auf: Discord quittiert einen
-    Webhook-POST auch dann mit 204, wenn die Nachricht am Ende niemand liest.
-
-    Jetzt gilt zuerst der Channel, in dem zuletzt ein Command lief (den merkt
-    sich der Worker im Gist) — dorthin schreibt der Bot mit seinem eigenen
-    Token. Der Webhook bleibt als Rückfallebene: solange kein Bot-Token gesetzt
-    ist oder noch nie ein Command lief, ändert sich nichts am alten Verhalten.
-    """
-
-    def __init__(self, webhook: str = "", bot_token: str = "", channel_id: str = "") -> None:
-        self.webhook = webhook
-        self.bot_token = bot_token
-        self.channel_id = channel_id
-
-    def __bool__(self) -> bool:
-        """Gibt es überhaupt einen Weg? Sonst spart sich der Aufrufer das Bauen
-        des Embeds — und meldet stattdessen, dass niemand zuhört."""
-        return bool((self.bot_token and self.channel_id) or self.webhook)
-
-    def send(self, embed: dict) -> bool:
-        if self.bot_token and self.channel_id:
-            if send_bot_message(self.bot_token, self.channel_id, embed):
-                return True
-            # Nicht still aufgeben: Fehlt dem Bot in dem Channel das Schreibrecht,
-            # ist der Webhook (falls gesetzt) immer noch besser als nichts.
-            log.warning("Channel %s nicht beschreibbar — versuche den Updates-Webhook",
-                        self.channel_id)
-        return send_update_announcement(self.webhook, embed)
 
 
 def send_forum_post(webhook_url: str, embed: dict) -> bool:

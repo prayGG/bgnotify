@@ -95,15 +95,12 @@ def build_updates_embed(commits: list[tuple[str, str]], head_sha: str) -> dict:
     }
 
 
-def announce_deploy(state: dict, updates: "notify.UpdateTarget") -> None:
+def announce_deploy(state: dict, updates_webhook: str) -> None:
     """Post a deploy embed to the updates channel when HEAD has moved.
 
     Tracks the last-announced commit in `state["last_deploy_sha"]`. On first
     run after the feature lands, we record HEAD without posting (no history
     to diff against — would otherwise spam every old commit at once).
-
-    `updates` sagt, WOHIN — in der Regel der Channel, in dem zuletzt ein Command
-    lief; siehe `notify.UpdateTarget`.
     """
     head_sha = _git("rev-parse", "HEAD")
     if not head_sha:
@@ -112,7 +109,7 @@ def announce_deploy(state: dict, updates: "notify.UpdateTarget") -> None:
     if head_sha == last_sha:
         return
 
-    if last_sha and updates:
+    if last_sha and updates_webhook:
         reachable = _sha_reachable(last_sha)
         commits = _commits_since(last_sha) if reachable else []
         # When the previous SHA *is* reachable but the only commits in the
@@ -124,7 +121,7 @@ def announce_deploy(state: dict, updates: "notify.UpdateTarget") -> None:
             state["last_deploy_sha"] = head_sha
             return
         embed = build_updates_embed(commits, head_sha)
-        if not updates.send(embed):
+        if not notify.send_update_announcement(updates_webhook, embed):
             log.warning("deploy announcement failed — will retry next run")
             return  # keep last_sha so we re-try on the next run
 

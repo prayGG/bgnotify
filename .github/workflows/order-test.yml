@@ -35,5 +35,3 @@ jobs:
           WEITERE_ID_HIER: ${{ secrets.WEITERE_ID_HIER }}
           BG_USERNAME: ${{ secrets.BG_USERNAME }}
           BG_PASSWORD: ${{ secrets.BG_PASSWORD }}
-          BG_USERNAME_2: ${{ secrets.BG_USERNAME_2 }}
-          BG_PASSWORD_2: ${{ secrets.BG_PASSWORD_2 }}

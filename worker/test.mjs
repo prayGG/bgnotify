@@ -344,16 +344,16 @@ resetFake({
   ...ready(),
   orders: {
     auto_tracking: { "pray #10042": { url: "https://t/1" } },
-    manual_tracking: { mave: { url: "https://t/2" } },
+    manual_tracking: { zweit: { url: "https://t/2" } },
     manual_tracking_state: {
       "pray #10042": { status: "Sendung ist unterwegs", last_check_at: frisch },
-      mave: { status: "Sendung wurde zugestellt.", last_check_at: frisch },
+      zweit: { status: "Sendung wurde zugestellt.", last_check_at: frisch },
     },
   },
 });
 r = await post(cmd("track list"));
 t = r.embed.description;
-check("listet beide Quellen", t.includes("pray #10042") && t.includes("mave"));
+check("listet beide Quellen", t.includes("pray #10042") && t.includes("zweit"));
 check("kennzeichnet Herkunft", t.includes("automatisch") && t.includes("von Hand"));
 check("erkennt Zustellung", t.includes("✅"), t.split("\n")[2]);
 check("unterwegs steht oben", t.indexOf("🚚") < t.indexOf("✅"));
@@ -363,7 +363,7 @@ section("/account list");
 // --------------------------------------------------------------------------
 resetFake({
   ...ready(),
-  configYml: "accounts:\n    - name: a\n      label: pray\n    - name: b\n      label: mave\n",
+  configYml: "accounts:\n    - name: a\n      label: pray\n    - name: b\n      label: zweit\n",
   orders: {
     enabled: { a: "on", b: "off" },
     accounts: {
@@ -374,7 +374,7 @@ resetFake({
 });
 r = await post(cmd("account list"));
 t = r.embed.description;
-check("nutzt die Namen aus config.yml", t.includes("pray") && t.includes("mave"), t.split("\n")[0]);
+check("nutzt die Namen aus config.yml", t.includes("pray") && t.includes("zweit"), t.split("\n")[0]);
 check("zeigt an/aus", t.includes("🟢") && t.includes("⚪"));
 check("zählt offene Bestellungen", t.includes("**1** offen"));
 check("nennt KEINE Bestellnummern", !t.includes("#1") && !t.includes("#2"));
@@ -471,21 +471,21 @@ r = await post(cmd("track add", { args: { link: "nicht mal eine url" } }));
 check("Unsinn → abgelehnt", r.content?.includes("keine gültige URL"), r.content);
 
 r = await post(cmd("track add", {
-  args: { link: "https://www.myhermes.de/x?TrackID=H1000000000000000002", name: "mave" },
+  args: { link: "https://www.myhermes.de/x?TrackID=H1000000000000000002", name: "zweit" },
 }));
-check("Hermes-Link wird eingetragen", fake.commands.tracking?.mave?.url.includes("H1000000000000000002"));
-check("KEINE Discord-ID im Gist", !JSON.stringify(fake.commands.tracking).includes(OTHER), JSON.stringify(fake.commands.tracking.mave));
+check("Hermes-Link wird eingetragen", fake.commands.tracking?.zweit?.url.includes("H1000000000000000002"));
+check("KEINE Discord-ID im Gist", !JSON.stringify(fake.commands.tracking).includes(OTHER), JSON.stringify(fake.commands.tracking.zweit));
 check("schreibt NUR commands.json", fake.patchedFiles.join(",") === "commands.json");
 
 r = await post(cmd("track list"));
-check("/track list zeigt ihn sofort", r.embed.description.includes("mave") && r.embed.description.includes("via Discord"), r.embed.description);
+check("/track list zeigt ihn sofort", r.embed.description.includes("zweit") && r.embed.description.includes("via Discord"), r.embed.description);
 
 r = await post(cmd("track add", { args: { link: "https://tracking.hermesworld.com/?TrackID=H999888777666" } }));
-const abgeleitet = Object.keys(fake.commands.tracking).find((k) => k !== "mave");
+const abgeleitet = Object.keys(fake.commands.tracking).find((k) => k !== "zweit");
 check("ohne Namen wird einer abgeleitet", Boolean(abgeleitet), abgeleitet);
 
-r = await post(cmd("track remove", { args: { name: "mave" } }));
-check("entfernen klappt", !fake.commands.tracking.mave, r.content);
+r = await post(cmd("track remove", { args: { name: "zweit" } }));
+check("entfernen klappt", !fake.commands.tracking.zweit, r.content);
 
 r = await post(cmd("track remove", { args: { name: "gibtsnicht" } }));
 check("unbekannter Name → ehrliche Absage", r.content?.includes("steht nicht in der Liste"), r.content);
@@ -540,19 +540,19 @@ const modal = (werte, { roles = [ROLE] } = {}) => ({
 });
 
 resetFake(ready());
-r = await post(modal({ label: "kollege", user: "mave@x.de", pass: "geheim123" }), { env: GH_ENV });
+r = await post(modal({ label: "kollege", user: "zweit@example.invalid", pass: "geheim123" }), { env: GH_ENV });
 check("legt drei Secrets an", Object.keys(fake.secrets).length === 3, Object.keys(fake.secrets).join(", "));
 check("belegt Platz 3", Boolean(fake.commands.accounts?.["3"]), JSON.stringify(fake.commands.accounts));
 check("merkt sich nur den Anzeigenamen", JSON.stringify(fake.commands.accounts["3"]).includes("kollege"));
 
 const gespeichert = JSON.stringify(fake.commands);
 check("KEIN Passwort im Gist", !gespeichert.includes("geheim123"), gespeichert.slice(0, 80));
-check("KEIN Benutzername im Gist", !gespeichert.includes("mave@x.de"));
+check("KEIN Benutzername im Gist", !gespeichert.includes("zweit@example.invalid"));
 check("KEINE Discord-ID im Gist", !gespeichert.includes(OTHER));
 check("Discord-ID liegt als Secret", fake.secrets.DISCORDID_3 !== undefined);
 
 const roh = Object.values(fake.secrets).join("|");
-check("Secrets gehen NUR verschlüsselt raus", !roh.includes("geheim123") && !roh.includes("mave@x.de"), roh.slice(0, 60));
+check("Secrets gehen NUR verschlüsselt raus", !roh.includes("geheim123") && !roh.includes("zweit@example.invalid"), roh.slice(0, 60));
 
 // Der eigentliche Beweis: mit dem privaten Schlüssel muss GENAU das Original
 // wieder herauskommen. „Sieht anders aus" wäre auch bei kaputter
@@ -563,7 +563,7 @@ const entsiegelt = (b64) => {
   return auf ? new TextDecoder().decode(auf) : null;
 };
 check("BG_PASSWORD_3 entschlüsselt zum Original", entsiegelt(fake.secrets.BG_PASSWORD_3) === "geheim123", String(entsiegelt(fake.secrets.BG_PASSWORD_3)));
-check("BG_USERNAME_3 entschlüsselt zum Original", entsiegelt(fake.secrets.BG_USERNAME_3) === "mave@x.de");
+check("BG_USERNAME_3 entschlüsselt zum Original", entsiegelt(fake.secrets.BG_USERNAME_3) === "zweit@example.invalid");
 check("DISCORDID_3 enthält die ID des Aufrufers", entsiegelt(fake.secrets.DISCORDID_3) === OTHER);
 
 check("bittet um Login-Prüfung", fake.commands.accounts["3"].verify === true);
@@ -617,7 +617,7 @@ section("Autocomplete");
 // --------------------------------------------------------------------------
 resetFake({
   ...ready(),
-  configYml: "accounts:\n    - name: a\n      label: pray\n    - name: b\n      label: mave\n",
+  configYml: "accounts:\n    - name: a\n      label: pray\n    - name: b\n      label: zweit\n",
   orders: { accounts: { a: {}, b: {} } },
 });
 r = await post({ ...cmd("account enable"), type: 4, data: { name: "account", options: [{ type: 1, name: "enable", options: [{ name: "konto", value: "", focused: true }] }] } });
@@ -626,7 +626,7 @@ check("schlägt beide Konten vor", r.body.data.choices.length === 2, JSON.string
 check("zeigt den Anzeigenamen", r.body.data.choices[0].name.includes("pray"), r.body.data.choices[0].name);
 check("liefert aber den Schlüssel", r.body.data.choices[0].value === "a");
 
-r = await post({ ...cmd("account enable"), type: 4, data: { name: "account", options: [{ type: 1, name: "enable", options: [{ name: "konto", value: "mav", focused: true }] }] } });
+r = await post({ ...cmd("account enable"), type: 4, data: { name: "account", options: [{ type: 1, name: "enable", options: [{ name: "konto", value: "zwei", focused: true }] }] } });
 check("filtert nach Eingabe", r.body.data.choices.length === 1 && r.body.data.choices[0].value === "b");
 
 // Selbst hinterlegte Konten tragen ihren Namen in commands.json, nicht in
@@ -649,7 +649,7 @@ r = await post(ohneRolle);
 check("ohne Rolle → leere Liste statt Verrat", r.body.data.choices.length === 0);
 
 resetFake(ready());
-fake.commands.tracking = { mave: { url: "https://x" }, "pray #1": { url: "https://y" } };
+fake.commands.tracking = { zweit: { url: "https://x" }, "pray #1": { url: "https://y" } };
 r = await post({ ...cmd("track remove"), type: 4, data: { name: "track", options: [{ type: 1, name: "remove", options: [{ name: "name", value: "", focused: true }] }] } });
 check("schlägt eingetragene Sendungen vor", r.body.data.choices.length === 2, JSON.stringify(r.body.data.choices.map((c) => c.value)));
 
@@ -864,31 +864,6 @@ resetFake({
 });
 r = await post(cmd("product add", { args: { link: LANG } }));
 check("zu lange URL → faellt auf den Textweg zurueck", !r.body.data.components && r.content?.includes("Autocomplete"), r.content);
-
-// --------------------------------------------------------------------------
-section("Channel merken");
-// --------------------------------------------------------------------------
-// Deploy-Karten und Fehler-Reports des Actions-Bots gehoeren zu keinem Command
-// und hatten deshalb bisher einen fest eingetragenen Webhook — der zeigte auf
-// einen Channel, den niemand sah. Jetzt merkt der Worker, wo zuletzt jemand
-// SICHTBAR etwas getan hat.
-resetFake(ready());
-r = await post(cmd("ping"));
-check("Command hinterlaesst den Channel", fake.commands.guilds[GUILD]?.channel_id === CHANNEL, JSON.stringify(fake.commands.guilds));
-check("… mit Zeitstempel", Boolean(fake.commands.guilds[GUILD]?.channel_at));
-check("… und ohne order-state.json anzufassen", fake.patchedFiles.join(",") === "commands.json");
-
-// Zweiter Command im selben Channel: nichts Neues zu schreiben. Sonst waere
-// jeder Command ein Gist-PATCH ohne neuen Inhalt.
-fake.patchedFiles = [];
-r = await post(cmd("ping"));
-check("gleicher Channel → kein erneutes Schreiben", fake.patchedFiles.length === 0, fake.patchedFiles.join(","));
-
-// Ohne Rolle wird nichts gemerkt: Wer nicht darf, soll auch nicht bestimmen,
-// wohin die Meldungen gehen.
-resetFake(ready());
-r = await post(cmd("ping", { roles: [] }));
-check("ohne Rolle → Channel bleibt ungesetzt", !fake.commands.guilds[GUILD]?.channel_id, JSON.stringify(fake.commands.guilds));
 
 // --------------------------------------------------------------------------
 section("Discord-Grenzen der Übersicht");

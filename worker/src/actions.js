@@ -69,34 +69,6 @@ export function parseTrackingLink(raw) {
   return { url, suggested: id ? `Sendung ${id.slice(-6)}` : "" };
 }
 
-/**
- * Merken, in welchem Channel gerade ein Command lief.
- *
- * Der Actions-Bot hat für seine anlasslosen Meldungen — Deploy-Karten,
- * Fehler-Reports — keinen Channel, der sich aus dem Anlass ergäbe: Sie
- * entstehen im Lauf, nicht aus einer Interaktion. Bisher stand dafür ein fest
- * eingetragener Webhook, der auf einen Channel zeigte, den niemand sah. Das
- * fiel monatelang nicht auf, weil Discord einen Webhook-POST auch dann mit 204
- * quittiert, wenn die Nachricht am Ende niemand liest.
- *
- * Ein hier gemerkter Channel ist die ehrlichere Angabe: Er stammt daher, dass
- * jemand SICHTBAR dort etwas getan hat. Zieht man mit den Commands um, ziehen
- * die Meldungen mit.
- *
- * Geschrieben wird nur bei echtem Wechsel — sonst wäre jeder Command ein
- * Gist-PATCH ohne neuen Inhalt.
- */
-export async function rememberChannel(env, state, guildId, channelId) {
-  if (!guildId || !channelId) return false;
-  state.guilds ||= {};
-  const entry = (state.guilds[guildId] ||= {});
-  if (entry.channel_id === channelId) return false;
-  entry.channel_id = channelId;
-  entry.channel_at = new Date().toISOString();
-  await saveState(env, state);
-  return true;
-}
-
 /** Konto an- oder ausschalten. Gibt den Text für die Antwort zurück. */
 export async function setAccountEnabled(env, state, name, on, known) {
   state.enabled ||= {};

@@ -395,20 +395,6 @@ def build_stats_embed(cfg: dict, state: dict, usd_eur: Optional[float] = None,
             members.sort(key=lambda ve: _stock_sort_key(ve[1]))
             groups.append((emoji, name, members))
 
-    # PS-Spiele als eigene Ein-Varianten-Gruppen einreihen — gleiches Rendering
-    # (Sparkline, tief/hoch, OOS-Dauer, Restocks).
-    ps_state = state.get("playstation", {})
-    for game in (cfg.get("playstation") or {}).get("games") or []:
-        url = game.get("url")
-        if not url:
-            continue
-        e = ps_state.get(url)
-        if not e:
-            continue
-        emoji = game.get("emoji") or "🎮"
-        label = e.get("name") or game.get("name") or url
-        groups.append((emoji, label, [(label, e)]))
-
     # Gleicher Schlüssel wie das Dashboard — beide Karten stehen untereinander
     # im selben Channel, unterschiedliche Reihenfolgen wären nur verwirrend.
     groups.sort(key=lambda g: (min(_stock_sort_key(e) for _v, e in g[2]), _order_key(g[1], order)))
@@ -470,29 +456,6 @@ def build_oos_embed(item: dict, usd_eur: Optional[float] = None, labels: Optiona
         "description": last_line + link_line,
         "color": COLOR_OUT,
         "footer": {"text": "bgpharmadrugs.to"},
-        "timestamp": datetime.now(timezone.utc).isoformat(),
-    }
-
-
-# --------------------------------------------------------------------------
-# PlayStation-Preissenkung
-# --------------------------------------------------------------------------
-def build_ps_drop_embed(drop: dict) -> dict:
-    """Embed für eine PS-Preissenkung — grüner Akzent, neuer Preis groß,
-    alter Preis + Rabatt als Kontext, Link in den Store."""
-    # PS-Preise sind EUR (de-de-Store) — display_price formatiert sie ins
-    # deutsche Anzeigeformat (Kurs nicht nötig, daher None).
-    new_s = display_price(drop.get("new_price") or "", None)
-    old_s = display_price(drop.get("old_price") or "", None)
-    disc = drop.get("discount_text") or ""
-    disc_suffix = f"⠀·⠀**{disc}**" if disc else ""
-    lines = f"### ⠀{new_s}\n_last {old_s}_{disc_suffix}" if old_s else f"### ⠀{new_s}"
-    return {
-        "author": {"name": "✦⠀⠀preis gesenkt⠀⠀✦"},
-        "title": drop.get("name") or "PlayStation",
-        "description": lines + f"\n\n**[→⠀⠀Im PS Store ansehen]({drop['url']})**",
-        "color": COLOR_IN_STOCK,
-        "footer": {"text": "store.playstation.com"},
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }
 
@@ -575,10 +538,10 @@ def _order_link(url: Optional[str]) -> str:
 def _titled(owner: Optional[str], order_id: str) -> str:
     """Titel jeder Bestell-, Tracking- und Sendungskarte: nur die Konto-Bezeichnung.
 
-    Oben steht schlicht "pray" bzw. "mave" — dieselbe Zeile, egal ob die Karte aus
+    Oben steht schlicht der Kontoname — dieselbe Zeile, egal ob die Karte aus
     dem Kundenkonto kommt oder aus einer von Hand eingetragenen Sendung. Die
     Bestellnummer taucht bewusst NIRGENDS auf: Konten ohne hinterlegte BG-Zugänge
-    (mave läuft nur über `manual_tracking`) haben nie eine, dann stünde sie mal da
+    (nur über `manual_tracking` verfolgt) haben nie eine, dann stünde sie mal da
     und mal nicht. Wer die Nummer braucht, klickt "Bestellung ansehen".
 
     Ohne `owner` — Konto ohne `label` in der config — bleibt die Nummer der
@@ -618,9 +581,9 @@ def build_shipment_embed(label: str, data: dict, new_events: list[dict], url: st
     Ist die Sendung zugestellt, kommen die Zustelldetails (Datum/Uhrzeit/Ort) mit.
 
     Gehört die Sendung zu einer Bestellung (`owner` bekannt), steht oben dasselbe
-    wie auf deren Bestell- und Tracking-Karten: "pray". Von Hand eingetragene
+    wie auf deren Bestell- und Tracking-Karten. Von Hand eingetragene
     Sendungen haben kein Konto — die behalten ihr im Gist frei gewähltes Label,
-    das dann genauso schlicht der Name sein sollte ("mave").
+    das dann genauso schlicht der Kontoname sein sollte.
     """
     head = "🚚⠀**Sendung wird verfolgt**" if first else "📍⠀**Neuer Sendungsstatus**"
 
@@ -642,8 +605,8 @@ def build_shipment_embed(label: str, data: dict, new_events: list[dict], url: st
 
     parts.append(f"\n**[→⠀⠀Sendung verfolgen]({url})**")
 
-    # Zu einer Bestellung gehörend → gleicher Titel wie deren Karten ("pray").
-    # Von Hand eingetragen → das im Gist frei gewählte Label ("mave").
+    # Zu einer Bestellung gehörend → gleicher Titel wie deren Karten.
+    # Von Hand eingetragen → das im Gist frei gewählte Label.
     title = _titled(owner, str(order_id)) if (owner or order_id) else label
     return {
         "author": {"name": "✦⠀⠀sendung⠀⠀✦"},

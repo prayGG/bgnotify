@@ -6,14 +6,13 @@ Ablauf pro Run (GitHub Actions, `python -m src.main`):
 2. Deploy-Announcement, wenn HEAD sich bewegt hat (`deploy`)
 3. Neue BG-Forum-Posts (`forum_watch`, intervall-gegated)
 4. Bestellstatus + Tracking (`order_watch`, Stand im privaten Gist)
-5. PlayStation-Preise (`ps_watch`) — Statuses landen mit auf dem Dashboard
-6. Dashboard + Stats-Karte in place editieren, Alerts posten (`notify`)
-7. Fehler-Report in den Updates-Channel, wenn der Run Errors hatte (`health`)
-8. state.json speichern (der Workflow committet sie zurück auf main)
+5. Dashboard + Stats-Karte in place editieren, Alerts posten (`notify`)
+6. Fehler-Report in den Updates-Channel, wenn der Run Errors hatte (`health`)
+7. state.json speichern (der Workflow committet sie zurück auf main)
 
 Die Module dahinter:
-- Scraper (reines Fetch+Parse): `bgpharma`, `playstation`, `forum`, `orders`
-- Watcher (State + Transitions):  `stock_watch`, `ps_watch`, `forum_watch`, `order_watch`
+- Scraper (reines Fetch+Parse): `bgpharma`, `forum`, `orders`
+- Watcher (State + Transitions):  `stock_watch`, `forum_watch`, `order_watch`
 - Darstellung (Embeds):           `embeds`
 - Discord-Versand:                `notify`
 - Fehler-Report:                  `health`
@@ -42,7 +41,6 @@ from .embeds import (
     dashboard_variants,
     build_forum_embed,
     build_oos_embed,
-    build_ps_drop_embed,
     build_restock_embed,
     build_stats_embed,
 )
@@ -51,7 +49,6 @@ from .hermes_watch import check_shipments
 from .order_watch import check_orders
 from .pricing import fetch_usd_eur_rate
 from .product_watch import merge_products, run_scans
-from .ps_watch import check_playstation
 from .stock_watch import check_products
 
 log = logging.getLogger(__name__)
@@ -70,15 +67,7 @@ def main() -> int:
     webhook = _webhook_from_cfg(cfg, "discord_webhook_env", "DISCORD_WEBHOOK_URL")
     if not webhook:
         log.warning("env var %s is empty — Discord disabled", cfg.get("discord_webhook_env", "DISCORD_WEBHOOK_URL"))
-    # Deploy-Karten und Fehler-Reports gehören zu keinem Command — es gibt also
-    # keinen Channel, der sich aus dem Anlass ergäbe. Erste Wahl ist deshalb der,
-    # in dem zuletzt ein Command lief; den trägt der Worker ins Gist ein, und
-    # gelesen wird er weiter unten (er steht erst nach dem Gist-Abruf fest).
-    # Der Webhook bleibt Rückfallebene.
-    updates = notify.UpdateTarget(
-        webhook=_webhook_from_cfg(cfg, "discord_updates_webhook_env", "DISCORD_UPDATES_WEBHOOK_URL"),
-        bot_token=os.environ.get("DISCORD_BOT_TOKEN", ""),
-    )
+    updates_webhook = _webhook_from_cfg(cfg, "discord_updates_webhook_env", "DISCORD_UPDATES_WEBHOOK_URL")
     forum_webhook = _webhook_from_cfg(cfg, "discord_forum_webhook_env", "DISCORD_FORUM_WEBHOOK_URL")
     order_webhook = _webhook_from_cfg(cfg, "discord_order_webhook_env", "DISCORD_ORDER_WEBHOOK_URL")
     # Stock-alerts (restock + OOS) ideally go to the dedicated bg-notify
@@ -98,7 +87,6 @@ def main() -> int:
             os.environ.get("GIST_TOKEN", ""), os.environ.get("GIST_ID", "")
         )
         cfg["products"] = merge_products(cfg, gist_cmds)
-        updates.channel_id = commands.updates_channel(gist_cmds)
 
         # ERST JETZT die Anzeige-Aliase einsammeln. Vor dem Merge kannte diese
         # Liste nur die aus `config.yml` — die per `/product rename` gesetzten
@@ -125,7 +113,7 @@ def main() -> int:
         log.info("USD->EUR rate: %s", usd_eur)
 
         # 2 — Deploy-Announcement
-        announce_deploy(state, updates)
+        announce_deploy(state, updates_webhook)
 
         # 3 — Forum-Posts
         new_forum_posts = check_forum(cfg, state)
@@ -149,18 +137,7 @@ def main() -> int:
         # blockiert; das Ergebnis kommt als eigene Karte in den Channel.
         run_scans(cfg)
 
-        # 5 — PlayStation-Preise. Preissenkungen pingen wie ein Restock und laufen
-        # über den BG-notify-Channel (stock_webhook). Die PS-Statuses landen mit
-        # auf dem Dashboard; die Stats-Karte zieht ihre PS-Einträge aus dem State.
-        ps_statuses, ps_drops = check_playstation(cfg, state)
-        statuses.extend(ps_statuses)
-        if ps_drops and stock_webhook:
-            for d in ps_drops:
-                notify.send_ps_price_drop(stock_webhook, build_ps_drop_embed(d), user_ids, role_ids)
-        elif ps_drops:
-            log.info("playstation: %d price drop(s) but stock webhook is empty", len(ps_drops))
-
-        # 6 — Discord aktualisieren. Dashboard + Stats sind persistente Karten im
+        # 5 — Discord aktualisieren. Dashboard + Stats sind persistente Karten im
         # Status-Channel und brauchen daher den Haupt-Webhook. Restock-/OOS-
         # Alerts gehen unabhängig davon in den Stock-Channel — deshalb NICHT an
         # `webhook` gekoppelt (sonst feuern sie nicht, wenn nur der Stock-Webhook
@@ -203,14 +180,14 @@ def main() -> int:
         # Harter Crash: erst melden + State sichern, dann den Run trotzdem
         # fehlschlagen lassen, damit der Workflow rot wird.
         log.exception("run crashed: %s: %s", type(e).__name__, e)
-        health.report(state, updates, errors)
+        health.report(state, updates_webhook, errors)
         save_state(state)
         raise
 
-    # 7 — Fehler-Report (nur wenn sich das Fehlerbild geändert hat)
-    health.report(state, updates, errors)
+    # 6 — Fehler-Report (nur wenn sich das Fehlerbild geändert hat)
+    health.report(state, updates_webhook, errors)
 
-    # 8 — State persistieren
+    # 7 — State persistieren
     save_state(state)
     return 0
 

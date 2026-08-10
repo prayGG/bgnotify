@@ -23,7 +23,7 @@ export async function loadRepoState() {
 }
 
 /**
- * Kontoschlüssel → Anzeigename aus `config.yml`, also `a → pray`, `b → mave`.
+ * Kontoschlüssel → Anzeigename aus `config.yml`, also etwa `a → haupt`.
  *
  * Bewusst per Regex statt mit einem YAML-Parser: Gebraucht werden genau zwei
  * Felder, und dafür lohnt keine Abhängigkeit im Worker-Bundle. Findet sich

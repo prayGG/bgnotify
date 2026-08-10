@@ -87,26 +87,17 @@ jobs:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
           DISCORD_STOCK_WEBHOOK_URL: ${{ secrets.DISCORD_STOCK_WEBHOOK_URL }}
           DISCORD_UPDATES_WEBHOOK_URL: ${{ secrets.DISCORD_UPDATES_WEBHOOK_URL }}
-          # Damit gehen Deploy-Karten und Fehler-Reports in den Channel, in dem
-          # zuletzt ein Command lief — der Worker trägt ihn ins Gist ein. Ein
-          # Webhook kann immer nur in den einen Channel, für den er angelegt
-          # wurde, und quittiert auch dann mit 204, wenn dort niemand mitliest.
-          # Genau so lief `DISCORD_UPDATES_WEBHOOK_URL` monatelang ins Leere.
-          # Leer = alles wie vorher, dann gilt weiter der Webhook.
-          DISCORD_BOT_TOKEN: ${{ secrets.DISCORD_BOT_TOKEN }}
           DISCORD_FORUM_WEBHOOK_URL: ${{ secrets.DISCORD_FORUM_WEBHOOK_URL }}
           PING_USER_IDS: "${{ secrets.DISCORDID }},${{ secrets.WEITERE_ID_HIER }}"
           # Bestellstatus aus dem BG-Kundenkonto (leer = Feature inaktiv)
           DISCORD_ORDER_WEBHOOK_URL: ${{ secrets.DISCORD_ORDER_WEBHOOK_URL }}
           GIST_TOKEN: ${{ secrets.GIST_TOKEN }}
           GIST_ID: ${{ secrets.GIST_ID }}
-          # Konto a
+          # Fest hinterlegtes Kundenkonto. Weitere kommen über `/account add`
+          # und belegen die vorverdrahteten Plätze weiter unten.
           BG_USERNAME: ${{ secrets.BG_USERNAME }}
           BG_PASSWORD: ${{ secrets.BG_PASSWORD }}
           DISCORDID: ${{ secrets.DISCORDID }}
-          # Konto b (leer/abwesend = wird einfach übersprungen)
-          BG_USERNAME_2: ${{ secrets.BG_USERNAME_2 }}
-          BG_PASSWORD_2: ${{ secrets.BG_PASSWORD_2 }}
           WEITERE_ID_HIER: ${{ secrets.WEITERE_ID_HIER }}
           # Plätze für Konten, die sich Leute per `/account add` selbst
           # hinterlegen. Sie müssen hier VORAB stehen, auch wenn sie leer sind:
