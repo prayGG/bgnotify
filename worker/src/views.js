@@ -37,6 +37,13 @@ function truthy(v) {
  * wüsste, ob der Command angekommen ist.
  */
 function accountEnabled(st, cmd, name) {
+  // Der Bot schaltet ein Konto nach der Zustellung selbst ab und legt dafür
+  // `_auto_off` in seinen Stand — `commands.json` kann er nicht zurückschreiben,
+  // die gehört dem Worker. Ohne diese Zeile stünde hier „an", während sich der
+  // Bot längst nicht mehr einloggt: die Sorte Anzeige, der man danach nichts
+  // mehr glaubt.
+  if (st.accounts?.[name]?._auto_off) return false;
+
   const wunsch = cmd?.enabled?.[name];
   if (wunsch !== undefined) return truthy(wunsch);
 
@@ -173,6 +180,13 @@ export async function accountListView(st, cmd = {}) {
     const orders = Object.values(acct.orders || {});
     const offen = orders.filter((o) => !ORDER_DONE.has(o.status)).length;
 
+    // Ging der letzte Abruf schief, ist DAS die Nachricht. Vorher stand hier
+    // nur „geprüft vor 5 min" — und das sah genauso aus, ob der Login stand
+    // oder das Passwort seit Wochen falsch ist. Wer eine Kontoliste aufruft,
+    // will genau das wissen.
+    const kaputt = acct.login_ok === false;
+    const ruht = Boolean(acct._auto_off);
+
     // Anzeigename aus config.yml, sonst der Schlüssel. Bestellnummern bleiben
     // bewusst draußen — die Zahl reicht, um zu wissen, ob etwas läuft.
     const titel = labels[name] || name;
@@ -180,7 +194,12 @@ export async function accountListView(st, cmd = {}) {
       acct.last_check_at ? `geprüft ${ago(acct.last_check_at)}` : "noch nie geprüft",
       offen ? `**${offen}** offen` : `${orders.length} erledigt`,
     ];
-    return `${on ? "🟢" : "⚪"}⠀**${titel}**⠀·⠀${on ? "an" : "aus"}\n⠀⠀⠀${teile.join("⠀·⠀")}`;
+    if (kaputt) teile.push("**Abruf fehlgeschlagen**");
+    const dot = kaputt ? "❌" : ruht ? "💤" : on ? "🟢" : "⚪";
+    // „ruht" statt „aus": Ausgeschaltet hat es niemand — es ist fertig. Wer das
+    // verwechselt, sucht den Schalter, den er nie umgelegt hat.
+    const zustand = ruht ? "ruht (alles zugestellt)" : on ? "an" : "aus";
+    return `${dot}⠀**${titel}**⠀·⠀${zustand}\n⠀⠀⠀${teile.join("⠀·⠀")}`;
   });
 
   return {

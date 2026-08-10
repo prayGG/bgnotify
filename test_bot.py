@@ -340,6 +340,152 @@ check("leerer Name wird ignoriert statt gespeichert",
       commands.product_labels({"labels": {FEST: "   "}}) == {})
 
 # --------------------------------------------------------------------------
+section("Konto schaltet sich nach der Zustellung selbst ab")
+# --------------------------------------------------------------------------
+# Einschalten heisst "ich habe bestellt", nicht "ab jetzt fuer immer". Sonst
+# muesste man daran denken, es zurueckzunehmen — und genau daran denkt niemand.
+fertig = {"orders": {"1": {"status": "completed", "tracking_registered": True}},
+          "_initialized": True, "_was_enabled": True, "_settled_runs": 1}
+
+# EIN erledigter Abruf reicht nicht. Man schaltet ein, WEIL man bestellt hat —
+# im Shop steht die Bestellung dann aber oft noch gar nicht, und das Konto
+# schliefe sofort wieder ein, ohne sie je gesehen zu haben.
+with Lauf(cmds={"enabled": {"a": "on"}},
+          state={"enabled": {}, "accounts": {"a": dict(fertig, _settled_runs=0)}}) as l:
+    l.run(CFG)
+    check("erster erledigter Abruf → noch NICHT abschalten",
+          not l.state["accounts"]["a"].get("_auto_off"),
+          str(l.state["accounts"]["a"].get("_settled_runs")))
+
+with Lauf(cmds={"enabled": {"a": "on"}},
+          state={"enabled": {}, "accounts": {"a": dict(fertig)}}) as l:
+    l.run(CFG)
+    check("zweiter → Konto ruht", l.state["accounts"]["a"].get("_auto_off") is True,
+          str(l.state["accounts"]["a"].get("_auto_off")))
+    check("… und sagt es als Karte", any("ruht" in (k.get("description") or "") for k in l.karten),
+          str([k.get("title") for k in l.karten]))
+
+# Der springende Punkt: Der Discord-Wunsch steht weiter auf "on" — der Bot kann
+# commands.json nicht zurueckschreiben, die gehoert dem Worker. Ohne `_auto_off`
+# wuerde der Wunsch das Abschalten bei jedem Lauf wieder ueberstimmen.
+ruht = dict(fertig, _auto_off=True)
+with Lauf(cmds={"enabled": {"a": "on"}},
+          state={"enabled": {}, "accounts": {"a": dict(ruht)}}) as l:
+    l.run(CFG)
+    check("Wunsch bleibt 'on', trotzdem kein Login mehr", l.geprueft == [], str(l.geprueft))
+    check("… und die Karte kommt nicht nochmal", l.karten == [], str(len(l.karten)))
+
+# Und es muss sich wieder einschalten lassen. Der Wechsel aus→an hebt das
+# Auto-Aus auf — sonst waere das Konto endgueltig tot.
+with Lauf(cmds={"enabled": {"a": "on"}},
+          state={"enabled": {}, "accounts": {"a": dict(ruht, _was_enabled=False)}}) as l:
+    l.run(CFG)
+    check("/account enable weckt es wieder", l.geprueft == ["haupt@x.de"], str(l.geprueft))
+    check("… und raeumt das Auto-Aus weg", not l.state["accounts"]["a"].get("_auto_off"))
+
+# Eine offene Bestellung haelt es wach.
+with Lauf(cmds={"enabled": {"a": "on"}},
+          state={"enabled": {}, "accounts": {"a": dict(fertig, orders={
+              "1": {"status": "completed", "tracking_registered": True},
+              "2": {"status": "processing"}})}}) as l:
+    l.run(CFG)
+    check("offene Bestellung → bleibt an", not l.state["accounts"]["a"].get("_auto_off"))
+
+# Und ein noch nicht eingesammelter Tracking-Link ebenso: "completed" heisst
+# nicht, dass der Link schon da ist — nach dem Abschalten kaeme niemand mehr ran.
+with Lauf(cmds={"enabled": {"a": "on"}},
+          state={"enabled": {}, "accounts": {"a": dict(fertig, orders={
+              "1": {"status": "completed"}})}}) as l:
+    l.run(CFG)
+    check("Tracking noch nicht eingesammelt → bleibt an",
+          not l.state["accounts"]["a"].get("_auto_off"))
+
+# Laufende Sendung dieses Kontos ebenfalls. Verfolgt wird sie zwar ohne Login
+# weiter — "aus" soll aber heissen, was es aussagt.
+with Lauf(cmds={"enabled": {"a": "on"}},
+          state={"enabled": {}, "accounts": {"a": dict(fertig)},
+                 "auto_tracking": {"haupt #1": {"url": "https://h", "account": "a"}},
+                 "manual_tracking_state": {"haupt #1": {"status": "Sendung ist unterwegs"}}}) as l:
+    l.run(CFG)
+    check("Paket noch unterwegs → bleibt an", not l.state["accounts"]["a"].get("_auto_off"))
+
+with Lauf(cmds={"enabled": {"a": "on"}},
+          state={"enabled": {}, "accounts": {"a": dict(fertig)},
+                 "auto_tracking": {"haupt #1": {"url": "https://h", "account": "a"}},
+                 "manual_tracking_state": {"haupt #1": {"status": "Sendung wurde zugestellt"}}}) as l:
+    l.run(CFG)
+    check("zugestellt → jetzt ruht es", l.state["accounts"]["a"].get("_auto_off") is True)
+
+# Kommt zwischendrin wieder etwas rein, faengt der Zaehler von vorn an — sonst
+# koennte ein halbes Jahr alter Ruhestand mitten in einer laufenden Bestellung
+# mit einem einzigen weiteren Abruf zuschlagen.
+with Lauf(cmds={"enabled": {"a": "on"}},
+          state={"enabled": {}, "accounts": {"a": dict(fertig, orders={
+              "1": {"status": "processing"}})}}) as l:
+    l.run(CFG)
+    check("wieder etwas offen → Zaehler zurueck auf null",
+          not l.state["accounts"]["a"].get("_settled_runs"),
+          str(l.state["accounts"]["a"].get("_settled_runs")))
+
+# Ein gescheiterter Abruf darf NICHT abschalten: Der Stand von eben ist dann
+# womoeglich unvollstaendig, und ein Netzfehler ist kein "alles erledigt".
+with Lauf(cmds={"enabled": {"a": "on"}},
+          state={"enabled": {}, "accounts": {"a": dict(fertig)}}, login_ok=False) as l:
+    l.run(CFG)
+    check("Abruf gescheitert → NICHT abschalten", not l.state["accounts"]["a"].get("_auto_off"))
+
+# --------------------------------------------------------------------------
+section("Karteileichen im Kontostand")
+# --------------------------------------------------------------------------
+# `/account remove` loescht den Eintrag in commands.json, kommt aber an
+# order-state.json nicht heran — der Worker darf sie bewusst nicht anfassen.
+# Der Rest blieb deshalb fuer immer in `/account list` stehen, unter seinem
+# rohen Schluessel ("s3"), ohne je wieder geprueft zu werden.
+leiche = {"enabled": {"a": "on", "s3": "on"},
+          "accounts": {"a": {"last_check_at": "2026-08-10T00:00:00+00:00"},
+                       "s3": {"orders": {}}}}
+with Lauf(cmds={"enabled": {"a": "on"}}, state=dict(leiche, accounts=dict(leiche["accounts"]))) as l:
+    l.run(CFG)
+    check("entferntes Konto verschwindet aus dem Stand",
+          "s3" not in l.state["accounts"], str(list(l.state["accounts"])))
+    check("… samt seinem An/Aus-Schalter", "s3" not in l.state["enabled"], str(l.state["enabled"]))
+    check("… und das echte Konto bleibt", "a" in l.state["accounts"])
+
+# Die Absicherung, auf die es ankommt: Ist commands.json gerade nicht lesbar,
+# kommt {} zurueck — dann saehen ALLE selbst hinterlegten Konten wie Leichen
+# aus, und ein Aussetzer beim Lesen loeschte ihren ganzen Bestellverlauf.
+with Lauf(cmds={}, state=dict(leiche, accounts=dict(leiche["accounts"]))) as l:
+    l.run(CFG)
+    check("commands.json unlesbar → NICHTS wird geloescht",
+          "s3" in l.state["accounts"], str(list(l.state["accounts"])))
+
+# Ein Konto aus config.yml ohne Secrets (wie mave) ist keine Leiche — es steht
+# ja weiter in der Datei. Es faellt nur bei der Secret-Pruefung raus.
+CFG_MAVE = {"orders": dict(CFG["orders"], accounts=CFG["orders"]["accounts"] + [
+    {"name": "b", "label": "mave", "username_env": "BG_USERNAME_2", "password_env": "BG_PASSWORD_2"}])}
+with Lauf(cmds={"enabled": {"a": "on"}},
+          state={"enabled": {"a": "on"}, "accounts": {"a": {}, "b": {}}}) as l:
+    l.run(CFG_MAVE)
+    check("Konto aus config.yml ohne Secrets bleibt stehen", "b" in l.state["accounts"])
+
+# --------------------------------------------------------------------------
+section("Steht der Login noch?")
+# --------------------------------------------------------------------------
+# Vorher wurde `login_ok` NUR bei der Erstpruefung gesetzt. `/account list`
+# zeigte danach ewig "geprueft vor 5 min" — gleich aussehend, ob der Login
+# steht oder das Passwort seit Wochen falsch ist.
+with Lauf(cmds={"enabled": {"a": "on"}}, state={"enabled": {}, "accounts": {}}) as l:
+    l.run(CFG)
+    check("geglueckter Abruf haelt das fest", l.state["accounts"]["a"].get("login_ok") is True,
+          str(l.state["accounts"]["a"]))
+
+with Lauf(cmds={"enabled": {"a": "on"}},
+          state={"enabled": {}, "accounts": {"a": {"login_ok": True}}}, login_ok=False) as l:
+    l.run(CFG)
+    check("gescheiterter Abruf auch — bei JEDEM Lauf, nicht nur beim ersten",
+          l.state["accounts"]["a"].get("login_ok") is False, str(l.state["accounts"]["a"]))
+
+# --------------------------------------------------------------------------
 section("Wohin Deploy-Karten und Fehler-Reports gehen")
 # --------------------------------------------------------------------------
 # Der Webhook dafuer zeigte monatelang auf einen Channel, den niemand sah — und

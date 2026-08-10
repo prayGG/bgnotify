@@ -62,6 +62,9 @@ tracking:
 orders:
   # Takt bei OFFENER Bestellung (schnell genug für Statuswechsel + Tracking).
   check_interval_minutes: 240
+  # Ein Konto schaltet sich nach der Zustellung von selbst wieder aus (siehe
+  # `_account_settled` in src/order_watch.py). `/account enable` ist damit eine
+  # Aussage über EINE Bestellung, kein Dauerzustand, den man vergisst.
   # Ruhe-Takt wenn nichts offen ist (alles completed/cancelled) — nur um neue
   # Bestellungen zu entdecken. ~1× täglich; spart Logins wenn man nicht bestellt.
   idle_interval_minutes: 1440

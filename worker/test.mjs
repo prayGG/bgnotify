@@ -379,6 +379,29 @@ check("zeigt an/aus", t.includes("🟢") && t.includes("⚪"));
 check("zählt offene Bestellungen", t.includes("**1** offen"));
 check("nennt KEINE Bestellnummern", !t.includes("#1") && !t.includes("#2"));
 
+// Ob der Login noch steht, ist die eigentliche Frage an eine Kontoliste.
+// Vorher stand da nur "geprueft vor 5 min" — gleich aussehend, ob es geht oder
+// das Passwort seit Wochen falsch ist.
+fake.orders.accounts.a.login_ok = false;
+r = await post(cmd("account list"));
+t = r.embed.description;
+check("kaputter Login faellt auf", t.includes("❌") && t.includes("Abruf fehlgeschlagen"), t.split("\n")[1]);
+
+fake.orders.accounts.a.login_ok = true;
+r = await post(cmd("account list"));
+check("… und ein heiler Login sagt nichts dazu",
+  !r.embed.description.includes("fehlgeschlagen"), r.embed.description.split("\n")[1]);
+
+// Nach der Zustellung schaltet der Bot selbst ab. Der Discord-Wunsch steht dann
+// weiter auf "on" — stuende hier "an", waere das schlicht falsch.
+fake.orders.accounts.a._auto_off = true;
+fake.commands.enabled = { a: "on" };
+r = await post(cmd("account list"));
+check("selbst abgeschaltetes Konto zeigt 'ruht', nicht 'an'",
+  r.embed.description.includes("ruht") && !r.embed.description.includes("⠀·⠀an"),
+  r.embed.description.split("\n")[0]);
+delete fake.orders.accounts.a._auto_off;
+
 // --------------------------------------------------------------------------
 section("/panel");
 // --------------------------------------------------------------------------
@@ -544,12 +567,11 @@ check("BG_USERNAME_3 entschlüsselt zum Original", entsiegelt(fake.secrets.BG_US
 check("DISCORDID_3 enthält die ID des Aufrufers", entsiegelt(fake.secrets.DISCORDID_3) === OTHER);
 
 check("bittet um Login-Prüfung", fake.commands.accounts["3"].verify === true);
-// Wer gerade seine Zugangsdaten eingetippt hat, hat damit schon gesagt, was er
-// will. Ihn danach noch `/account enable` tippen zu lassen, ist eine Huerde ohne
-// Zweck — und eine, die man erst bemerkt, wenn man merkt, dass nichts kommt.
-// (Konten aus config.yml starten weiterhin aus: die stehen dauerhaft drin.)
-check("ist sofort eingeschaltet", fake.commands.enabled?.s3 === "on", JSON.stringify(fake.commands.enabled));
-check("sagt das in der Antwort", fake.followUp.includes("eingeschaltet"), fake.followUp.split("\n")[0]);
+// Bewusst AUS: Ein Login ist das Auffaelligste, was der Bot bei BG tut.
+// Eingeschaltet wird erst, wenn wirklich etwas unterwegs ist — und nach der
+// Zustellung schaltet der Bot von selbst wieder ab.
+check("bleibt ausgeschaltet", !fake.commands.enabled?.s3, JSON.stringify(fake.commands.enabled));
+check("sagt das in der Antwort", fake.followUp.includes("/account enable"), fake.followUp.split("\n").pop());
 check("stößt dafür sofort einen Lauf an", fake.dispatched === 1, `${fake.dispatched} Dispatches`);
 check("sagt das auch", fake.followUp.includes("wird gerade geprüft"), fake.followUp.split("\n").pop());
 
