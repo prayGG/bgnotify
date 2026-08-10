@@ -1,11 +1,11 @@
 {
   "bot_stats": {
     "first_check_at": "2026-05-20T18:50:44.075159+00:00",
-    "last_check_at": "2026-08-10T12:20:47.027741+00:00",
-    "total_checks": 11714,
+    "last_check_at": "2026-08-10T23:22:36.030692+00:00",
+    "total_checks": 11781,
     "total_restocks": 3
   },
-  "dashboard_message_id": "1510095616322175107",
+  "dashboard_message_id": "1536515159437082797",
   "dashboard_names": [
     "GHK CU",
     "Tirzepatide",
@@ -68,7 +68,7 @@
     "active": false
   },
   "forum": {
-    "last_check_at": "2026-08-10T11:20:38.765495+00:00",
+    "last_check_at": "2026-08-10T22:01:01.860033+00:00",
     "seeded": true,
     "seen_post_ids": [
       "3818721",
@@ -142,7 +142,7 @@
       "3888239"
     ]
   },
-  "last_deploy_sha": "388e031f90393d36f169489fee4b882ecc666203",
+  "last_deploy_sha": "c7658994ca353e28dc3b6645b8e13eee7df35543",
   "products": {
     "https://bgpharmadrugs.to/product/minoxytop-5-mg-minoxidil-tablets-ip/": {
       "Minoxidil 5 mg": {
@@ -154,7 +154,7 @@
         "lowest_price_at": "2026-06-17T14:50:55.842568+00:00",
         "out_since": "2026-06-17T14:50:55.842568+00:00",
         "price_history": [
-          30.29,
+          35.0,
           30.37,
           35.0,
           30.37,
@@ -198,13 +198,13 @@
         "previous_price": "49.00$",
         "price": "€ 42.52",
         "price_history": [
-          49.0,
-          42.48,
           42.4,
+          42.52,
           49.0,
-          42.4,
+          42.52,
           49.0,
-          42.4,
+          42.52,
+          49.0,
           42.52,
           49.0,
           42.52,
@@ -610,5 +610,5 @@
       }
     }
   },
-  "stats_message_id": "1510095614577344647"
+  "stats_message_id": "1536515157574815877"
 }
