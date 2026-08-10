@@ -4,10 +4,13 @@
  * Discord schickt jeden Slash-Command als HTTPS-POST hierher — es braucht also
  * KEINEN dauerlaufenden Bot-Prozess (und damit keinen gemieteten Server). Der
  * Worker beantwortet den Command und schreibt in das private Gist; die
- * Meldungen selbst (Restocks, Bestellungen, Sendungen) verschickt der
- * Actions-Bot über seine Webhooks. Eine Ausnahme: Deploy-Karten und
- * Fehler-Reports gehören zu keinem Channel im Voraus — für die merkt sich der
- * Worker hier, wo zuletzt ein Command lief.
+ * Meldungen selbst (Restocks, Bestellungen, Sendungen, Deploys) verschickt der
+ * Actions-Bot über seine Webhooks.
+ *
+ * Was ein Command AUSLÖST, kommt dagegen als Antwort auf genau diesen Command
+ * zurück — im selben Channel, nur für den Aufrufer sichtbar. Auch dann, wenn
+ * das Ergebnis erst der nächste Bot-Lauf kennt: Der Interaction-Token wandert
+ * dafür ins Gist (`requestScan`), und der Bot reicht die Antwort damit nach.
  *
  * Stand: vollständig (Schritte 1–7).
  *   lesen      /status, /track list, /account list, /product list
@@ -48,7 +51,6 @@ import {
   removeProduct,
   renameProduct,
   moveProduct,
-  rememberChannel,
   removeTracking,
   requestScan,
   setAccountEnabled,
@@ -562,19 +564,6 @@ async function handleCommand(interaction, env, ctx) {
   // denselben Gist-Eintrag konkurrieren — und im Zweifel zwei Nachrichten im
   // Channel hinterlassen.
   if (path !== "panel") refreshIfStale(env, state, interaction.guild_id, ctx);
-
-  // Wo gerade jemand tippt, ist auch der Ort, an dem er die Meldungen des Bots
-  // sehen will. Bis hierher haben Deploy-Karten und Fehler-Reports einen fest
-  // eingetragenen Webhook benutzt — der zeigte auf einen Channel, den niemand
-  // sah, und das konnte niemand merken: Discord quittiert einen Webhook-POST
-  // auch dann mit 204, wenn dort keiner mitliest. Läuft im Hintergrund, damit
-  // die Antwort darauf nicht wartet; scheitert es, ist nur der alte Channel
-  // einen Command länger gültig.
-  const gemerkt = rememberChannel(env, state, interaction.guild_id, interaction.channel_id).catch(
-    () => {}
-  );
-  if (ctx?.waitUntil) ctx.waitUntil(gemerkt);
-  else await gemerkt;
 
   const args = optionValues(interaction.data);
   const userId = interaction.member.user.id;

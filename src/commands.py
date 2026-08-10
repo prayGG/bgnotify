@@ -165,26 +165,6 @@ def product_order(cmds: dict) -> dict:
     return out
 
 
-def updates_channel(cmds: dict) -> str:
-    """Channel, in dem zuletzt ein Command lief — dorthin gehen Deploy-Karten
-    und Fehler-Reports.
-
-    Der Worker schreibt ihn bei jedem Command mit. Bei mehreren Servern gewinnt
-    der jüngste Eintrag: „wo zuletzt jemand war" ist die einzige Angabe, die
-    hier ohne Rückfrage stimmen kann. Ohne Zeitstempel (alter Stand) zählt der
-    Eintrag als ältestmöglich, damit ein frischer ihn sicher schlägt.
-    """
-    neuester, zeit = "", ""
-    for g in (cmds.get("guilds") or {}).values():
-        cid = str((g or {}).get("channel_id") or "")
-        if not cid.isdigit():
-            continue
-        wann = str((g or {}).get("channel_at") or "")
-        if not neuester or wann > zeit:
-            neuester, zeit = cid, wann
-    return neuester
-
-
 def product_labels(cmds: dict) -> dict:
     """Anzeige-Namen aus `/product rename`: `{Varianten-String: Anzeige}`.
 

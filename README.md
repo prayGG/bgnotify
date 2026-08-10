@@ -1,19 +1,39 @@
 # bgnotify
 
-Privater Discord-Notify-Bot. Läuft als GitHub-Action und überwacht:
+Discord-Bot als GitHub-Action. Überwacht einen WooCommerce-Shop und den eigenen
+Bestellstatus, bedient wird er per Slash-Command.
 
-- **Shop-Produkte** (WooCommerce) — Restock-/Out-of-stock-Alerts, Preis-History,
-  persistentes Status-Dashboard + Stats-Karte
-- **PlayStation Store** — Preissenkungs-Alerts für konfigurierte Spiele
-- **Forum-Posts** — neue Posts eines bestimmten Autors (XenForo, via Playwright)
-- **Bestellstatus** — eigenes Kundenkonto, Status-Updates + Hermes-Tracking
-  in einen privaten Channel (Stand im privaten Gist, nie im Repo)
-- **Sendungsverfolgung** — sobald bei einer Bestellung ein Tracking-Link
-  auftaucht, wird die Sendung automatisch weiterverfolgt: jede Hermes-Station
-  als eigene Meldung, bis zur Zustellung. Ohne hinterlegtes Kundenkonto geht
-  auch ein Link von Hand (privates Gist, `manual_tracking`)
+- **Produkte** — Restock- und Out-of-stock-Alerts, Preisverlauf, ein
+  Status-Dashboard und eine Stats-Karte, die sich selbst aktualisieren
+- **Bestellungen** — Statuswechsel aus dem Kundenkonto in einen privaten Channel
+- **Sendungen** — taucht bei einer Bestellung ein Tracking-Link auf, wird die
+  Sendung automatisch weiterverfolgt: jede Hermes-Station als eigene Meldung,
+  bis zur Zustellung
+- **Forum** — neue Beiträge eines bestimmten Autors
 
-## Architektur
+Der Bot läuft alle zehn Minuten. Was er dabei erfährt, landet je nach Sorte in
+einem anderen Channel; alles Persönliche (Bestellungen, Cookies, Konten) liegt
+in einem **privaten Gist**, nie in diesem Repo.
+
+## Commands
+
+Slash-Commands laufen über einen Cloudflare Worker (`worker/`) — Discord
+schickt jeden Command als HTTPS-POST dorthin, es braucht also keinen
+dauerlaufenden Prozess. Antworten sieht immer nur, wer den Command aufgerufen
+hat.
+
+| | |
+|---|---|
+| `/status` `/account list` `/track list` `/product list` | ansehen |
+| `/account add` `/account remove` `/account enable` `/account disable` | Konten |
+| `/track add` `/track remove` | Sendungen |
+| `/product add` `/product remove` `/product rename` `/product move` | Produkte |
+| `/run` | Lauf sofort anstoßen |
+| `/setup` `/panel` `/ping` | Einrichtung |
+
+Details und Einrichtung: [`worker/README.md`](worker/README.md).
+
+## Aufbau
 
 ```
 src/
@@ -21,63 +41,64 @@ src/
 │
 │   Scraper — reines Fetch + Parse, kein State:
 ├── bgpharma.py      WooCommerce-Produkte (simple + variable/AJAX)
-├── playstation.py   PS-Store-Preis aus dem eingebetteten Seiten-JSON
-├── forum.py         XenForo-Suche via Playwright (Incapsula-Bypass)
-├── orders.py        Kundenkonto-Login + Order-Parsing, Gist-State-I/O
+├── forum.py         XenForo-Suche via Playwright
+├── orders.py        Kundenkonto-Login + Order-Parsing
+├── hermes.py        Sendungsverlauf
 │
-│   Watcher — State führen, Transitions erkennen:
-├── stock_watch.py   Produkt-Checks inkl. Site-wide-Outage-Guard
-├── ps_watch.py      PS-Preise (gleiche State-Form wie Produkte)
-├── forum_watch.py   neue Posts diffen, intervall-gegated
-├── order_watch.py   Bestellungen diffen, Account-Staggering
+│   Watcher — State führen, Änderungen erkennen:
+├── stock_watch.py   Produkt-Checks inkl. Outage-Guard
+├── forum_watch.py   neue Beiträge
+├── order_watch.py   Bestellungen, ein Konto pro Lauf
+├── hermes_watch.py  Sendungen bis zur Zustellung
+├── product_watch.py per Command aufgenommene Produkte
 │
 │   Darstellung + Versand:
-├── embeds.py        alle Discord-Embed-Builder (Dashboard, Stats, Alerts, …)
-├── notify.py        Webhook-Versand (Edit-in-place + Event-Posts, Retries)
-├── deploy.py        Deploy-Announcement bei neuem HEAD
+├── embeds.py        alle Discord-Embeds
+├── notify.py        Webhook-Versand (Edit-in-place, Retries)
+├── deploy.py        Deploy-Karte bei neuem Stand
+├── health.py        Fehler-Report am Lauf-Ende
 │
 │   Basis:
-├── config.py        config.yml + state.json laden/speichern, Ping-IDs
-├── pricing.py       USD→EUR-Kurs, Preis-Parsing/-Formatierung
-│
-│   Manuelle Tests (Actions → Run workflow):
-├── test_ping.py     postet jeden Embed-Typ testweise in seinen Channel
-└── order_test.py    Order-Diagnose + Embed-Vorschau (echter Login, read-only)
+├── commands.py      liest, was per Slash-Command gesetzt wurde
+├── config.py        config.yml + state.json
+└── pricing.py       USD→EUR, Preis-Formatierung
 ```
 
-## Dateien
-
-| Datei | Zweck |
+| Wo | Was |
 |---|---|
-| `config.yml` | Produkte, Varianten, Intervalle, Webhook-Env-Namen (keine Secrets!) |
-| `state.json` | öffentlicher Bot-State (Preise, History, Message-IDs) — wird vom Workflow nach jedem Run zurückcommittet |
-| privates Gist | Order-State (Bestellungen, Cookies, on/off-Schalter `enabled`, verfolgte Sendungen unter `auto_tracking` / `manual_tracking`) |
+| `config.yml` | Produkte, Intervalle, Namen der Env-Variablen — keine Werte |
+| `state.json` | öffentlicher Stand: Preise, Verlauf, Message-IDs |
+| privates Gist | Bestellungen, Konten, Sendungen, Command-Wünsche |
 
-## Secrets (GitHub Actions)
+## Secrets
+
+Alles Geheime kommt aus GitHub-Secrets; in diesem Repo stehen nur deren Namen.
 
 | Secret | Zweck |
 |---|---|
-| `DISCORD_WEBHOOK_URL` | Status-Channel (Dashboard + Stats) |
-| `DISCORD_STOCK_WEBHOOK_URL` | Restock-/OOS-/PS-Alerts (Fallback: Haupt-Webhook) |
-| `DISCORD_UPDATES_WEBHOOK_URL` | Deploy-Karten + Fehler-Reports — nur noch Rückfallebene |
-| `DISCORD_BOT_TOKEN` | dasselbe, aber in den Channel, in dem zuletzt ein Command lief |
-| `DISCORD_FORUM_WEBHOOK_URL` | Forum-Posts (leer = Feature aus) |
-| `DISCORD_ORDER_WEBHOOK_URL` | Bestellstatus (leer = Feature aus) |
-| `GIST_TOKEN` / `GIST_ID` | privates Gist für den Order-State |
-| `BG_USERNAME[_2]` / `BG_PASSWORD[_2]` | Kundenkonto-Logins (Konto a/b) |
-| `DISCORDID` / `WEITERE_ID_HIER` | Discord-User-IDs für @-Pings |
+| `DISCORD_WEBHOOK_URL` | Dashboard + Stats |
+| `DISCORD_STOCK_WEBHOOK_URL` | Restock-/OOS-Alerts |
+| `DISCORD_ORDER_WEBHOOK_URL` | Bestellungen + Sendungen |
+| `DISCORD_FORUM_WEBHOOK_URL` | Forum-Beiträge |
+| `DISCORD_UPDATES_WEBHOOK_URL` | Deploy-Karten + Fehler-Reports |
+| `GIST_TOKEN` / `GIST_ID` | privates Gist |
+| `BG_USERNAME` / `BG_PASSWORD` | Kundenkonto |
+| `PING_USER_IDS` | wer bei Alerts gepingt wird |
 
-## Lokal ausführen
+Weitere Konten kommen nicht hierher, sondern per `/account add` — Zugangsdaten
+werden dabei verschlüsselt als Secret abgelegt, der Anzeigename ins private
+Gist.
+
+## Lokal
 
 ```bash
 pip install -r requirements.txt
-python -m playwright install chromium   # nur für Forum-/Order-Features
+python -m playwright install chromium
 
-python -m src.main                       # ein kompletter Bot-Run
-python -m src.bgpharma <url> [variante]  # einzelnes Produkt debuggen
-python -m src.playstation <url>          # einzelnes PS-Spiel debuggen
-python -m src.forum <search_url>         # Forum-Scrape debuggen
+python -m src.main                       # kompletter Lauf
+python -m src.bgpharma <url> [variante]  # ein Produkt
+python -m src.forum <url>                # Forum-Scrape
+
+python test_bot.py                       # Tests Bot
+node worker/test.mjs                     # Tests Worker
 ```
-
-Webhooks/IDs kommen aus env vars (Namen siehe `config.yml`) — das Repo ist
-öffentlich, deshalb stehen hier nirgends echte URLs, IDs oder Zugangsdaten.

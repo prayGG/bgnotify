@@ -56,21 +56,18 @@ def _fingerprint(messages: list[str]) -> str:
     return hashlib.sha1("\n".join(sorted(messages)).encode()).hexdigest()
 
 
-def report(state: dict, updates: "notify.UpdateTarget", collector: ErrorCollector) -> None:
+def report(state: dict, webhook: str, collector: ErrorCollector) -> None:
     """Fehlerbild des Runs melden bzw. Entwarnung geben.
 
     State-Felder (in state.json, nur Hash + Zeitstempel — keine Fehlertexte,
     das Repo ist öffentlich): `fingerprint`, `last_sent_at`, `active`.
-
-    `updates` sagt, WOHIN — in der Regel der Channel, in dem zuletzt ein Command
-    lief; siehe `notify.UpdateTarget`.
     """
     report_state = state.setdefault("error_report", {})
     messages = collector.messages
 
     if not messages:
         if report_state.get("active"):
-            if not updates or updates.send(build_recovery_embed()):
+            if not webhook or notify.send_update_announcement(webhook, build_recovery_embed()):
                 state["error_report"] = {"active": False}
         return
 
@@ -84,11 +81,10 @@ def report(state: dict, updates: "notify.UpdateTarget", collector: ErrorCollecto
                 return  # Fehlerbild flappt — Cooldown abwarten, alter Fingerprint bleibt
         except (ValueError, TypeError):
             pass
-    if not updates:
-        log.warning("%d Fehler im Run, aber es gibt kein Ziel für den Report "
-                    "(kein Channel gemerkt, kein Updates-Webhook)", len(messages))
+    if not webhook:
+        log.warning("%d Fehler im Run, aber Updates-Webhook ist leer", len(messages))
         return
-    if updates.send(build_error_embed(messages)):
+    if notify.send_update_announcement(webhook, build_error_embed(messages)):
         state["error_report"] = {
             "active": True,
             "fingerprint": fp,
