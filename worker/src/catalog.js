@@ -66,7 +66,7 @@ export const COMMANDS = [
       {
         name: "add",
         description: "Eigenes BG-Konto hinterlegen",
-        help: "Eigenes Konto hinterlegen — verschlüsselt, ohne das Passwort zu verschicken.",
+        help: "Eigenes Konto hinterlegen — verschlüsselt, und sofort eingeschaltet.",
       },
       {
         name: "remove",

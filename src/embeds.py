@@ -713,9 +713,9 @@ def build_account_check_embed(label: str, ok: bool, fehler: str = "") -> dict:
         return {
             "author": {"name": "✦⠀⠀konto⠀⠀✦"},
             "title": label,
-            "description": "✅⠀**Login erfolgreich**\n\nDer Bot ist drin. Ab jetzt kommen Bestellungen "
-                           "und Sendungen automatisch — sofern das Konto eingeschaltet ist "
-                           "(`/account enable`).",
+            "description": "✅⠀**Login erfolgreich**\n\nDer Bot ist drin. Das Konto ist "
+                           "eingeschaltet, Bestellungen und Sendungen kommen ab jetzt "
+                           "automatisch — Ruhe gibt `/account disable`.",
             "color": COLOR_IN_STOCK,
             "footer": {"text": "bgpharmadrugs.to"},
             "timestamp": datetime.now(timezone.utc).isoformat(),

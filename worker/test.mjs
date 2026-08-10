@@ -544,6 +544,12 @@ check("BG_USERNAME_3 entschlüsselt zum Original", entsiegelt(fake.secrets.BG_US
 check("DISCORDID_3 enthält die ID des Aufrufers", entsiegelt(fake.secrets.DISCORDID_3) === OTHER);
 
 check("bittet um Login-Prüfung", fake.commands.accounts["3"].verify === true);
+// Wer gerade seine Zugangsdaten eingetippt hat, hat damit schon gesagt, was er
+// will. Ihn danach noch `/account enable` tippen zu lassen, ist eine Huerde ohne
+// Zweck — und eine, die man erst bemerkt, wenn man merkt, dass nichts kommt.
+// (Konten aus config.yml starten weiterhin aus: die stehen dauerhaft drin.)
+check("ist sofort eingeschaltet", fake.commands.enabled?.s3 === "on", JSON.stringify(fake.commands.enabled));
+check("sagt das in der Antwort", fake.followUp.includes("eingeschaltet"), fake.followUp.split("\n")[0]);
 check("stößt dafür sofort einen Lauf an", fake.dispatched === 1, `${fake.dispatched} Dispatches`);
 check("sagt das auch", fake.followUp.includes("wird gerade geprüft"), fake.followUp.split("\n").pop());
 

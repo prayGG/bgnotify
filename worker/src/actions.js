@@ -186,6 +186,19 @@ export async function addAccount(env, state, slot, label, user, pass, discordId)
     // Spart eine Quittung über die Dateigrenze hinweg.
     verify: true,
   };
+
+  // Gleich AN. Konten aus `config.yml` starten bewusst aus — die stehen dort
+  // dauerhaft, und in Bestellpausen soll sich der Bot nicht ohne Grund
+  // einloggen. Für ein selbst hinterlegtes Konto gilt das nicht: Wer gerade
+  // seine Zugangsdaten eingetippt hat, hat damit schon gesagt, was er will.
+  // Ihn danach noch `/account enable` tippen zu lassen, ist eine Hürde ohne
+  // Zweck — und eine, die man nur bemerkt, wenn man merkt, dass nichts kommt.
+  //
+  // Der Preis ist gedeckelt: Bei offener Bestellung ein Login alle 4 Stunden,
+  // sonst einer pro Tag (`orders.check_interval_minutes` / `idle_…`).
+  // Ausschalten geht jederzeit mit `/account disable`.
+  state.enabled ||= {};
+  state.enabled[`s${slot}`] = "on";
   await saveState(env, state);
 }
 
