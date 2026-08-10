@@ -294,7 +294,7 @@ async function runAccountAdd(interaction, env, state, werte) {
     await editOriginalResponse(
       interaction,
       [
-        `**${werte.label}** ist hinterlegt (Platz ${slot}).`,
+        `**${werte.label}** ist hinterlegt (Platz ${slot}) und **eingeschaltet**.`,
         "",
         "Die Zugangsdaten sind verschlüsselt als GitHub-Secret abgelegt — im Gist stehen nur",
         "der Anzeigename und die Platznummer.",
