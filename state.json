@@ -1,11 +1,11 @@
 {
   "bot_stats": {
     "first_check_at": "2026-05-20T18:50:44.075159+00:00",
-    "last_check_at": "2026-08-10T23:10:37.158654+00:00",
-    "total_checks": 11779,
+    "last_check_at": "2026-08-10T23:20:48.777764+00:00",
+    "total_checks": 11780,
     "total_restocks": 3
   },
-  "dashboard_message_id": "1510095616322175107",
+  "dashboard_message_id": "1536514748068266027",
   "dashboard_names": [
     "GHK CU",
     "Tirzepatide",
@@ -65,7 +65,9 @@
     }
   ],
   "error_report": {
-    "active": false
+    "active": true,
+    "fingerprint": "b0e31943539e35d6081206dc6857f947f762b79a",
+    "last_sent_at": "2026-08-10T23:21:03.688621+00:00"
   },
   "forum": {
     "last_check_at": "2026-08-10T22:01:01.860033+00:00",
@@ -142,7 +144,7 @@
       "3888239"
     ]
   },
-  "last_deploy_sha": "78a398dbf26e8cc97936893765693ce430190afa",
+  "last_deploy_sha": "53c163edb1b271c75209215694f3f15cac777125",
   "playstation": {},
   "products": {
     "https://bgpharmadrugs.to/product/minoxytop-5-mg-minoxidil-tablets-ip/": {
@@ -611,5 +613,5 @@
       }
     }
   },
-  "stats_message_id": "1510095614577344647"
+  "stats_message_id": "1536514746805653547"
 }
