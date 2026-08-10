@@ -702,6 +702,25 @@ def build_recovery_embed() -> dict:
     }
 
 
+def build_account_idle_embed(label: str) -> dict:
+    """Konto hat sich nach der Zustellung selbst abgeschaltet.
+
+    Ohne diese Karte wäre das Abschalten unsichtbar — und beim nächsten Blick
+    auf `/account list` stünde „aus", ohne dass jemand es ausgeschaltet hätte.
+    Genau die Sorte Zustand, die man dem Bot dann nicht mehr glaubt.
+    """
+    return {
+        "author": {"name": "✦⠀⠀konto⠀⠀✦"},
+        "title": label,
+        "description": "💤⠀**Alles zugestellt — Konto ruht wieder**\n\nDer Bot loggt sich "
+                       "nicht mehr ein. Vor der nächsten Bestellung einmal "
+                       "`/account enable`.",
+        "color": COLOR_OUT,
+        "footer": {"text": "bgpharmadrugs.to"},
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }
+
+
 def build_account_check_embed(label: str, ok: bool, fehler: str = "") -> dict:
     """Ergebnis der ersten Login-Prüfung eines per `/account add` hinterlegten Kontos.
 
@@ -713,9 +732,9 @@ def build_account_check_embed(label: str, ok: bool, fehler: str = "") -> dict:
         return {
             "author": {"name": "✦⠀⠀konto⠀⠀✦"},
             "title": label,
-            "description": "✅⠀**Login erfolgreich**\n\nDer Bot ist drin. Das Konto ist "
-                           "eingeschaltet, Bestellungen und Sendungen kommen ab jetzt "
-                           "automatisch — Ruhe gibt `/account disable`.",
+            "description": "✅⠀**Login erfolgreich**\n\nDer Bot ist drin. Einschalten mit "
+                           "`/account enable`, sobald du bestellt hast — nach der Zustellung "
+                           "schaltet er von selbst wieder ab.",
             "color": COLOR_IN_STOCK,
             "footer": {"text": "bgpharmadrugs.to"},
             "timestamp": datetime.now(timezone.utc).isoformat(),

@@ -11,10 +11,11 @@ import os
 import random
 from datetime import datetime, timezone
 
-from . import commands, notify, orders
+from . import commands, hermes, notify, orders
 from .config import parse_ids
 from .embeds import (
     build_account_check_embed,
+    build_account_idle_embed,
     build_order_status_embed,
     build_order_tracking_embed,
 )
@@ -31,12 +32,61 @@ _TERMINAL_STATUS = {"completed", "cancelled", "refunded", "failed"}
 # Grenze würde die halbe Bestellhistorie nochmal durch die Sendungsverfolgung
 # laufen.
 _BACKFILL_MAX_AGE_DAYS = 30
+# So viele aufeinanderfolgende Abrufe muss „alles erledigt" gelten, bevor sich
+# ein Konto selbst abschaltet.
+#
+# Einer reicht nicht, und das ist der ganze Grund für diese Zahl: Man schaltet
+# das Konto ein, WEIL man gerade bestellt hat — im Shop steht die Bestellung
+# dann aber oft noch gar nicht. Beim ersten Abruf sähe alles „erledigt" aus,
+# das Konto schliefe sofort wieder ein und bekäme die eigene Bestellung nie zu
+# sehen. Mit zwei Abrufen liegt zwischen Einschalten und Aufgeben mindestens
+# ein voller Ruhe-Takt (24 h) — genug Zeit für jede Bestellung, aufzutauchen.
+_SETTLED_RUNS_BEFORE_IDLE = 2
 
 
 def _truthy(v) -> bool:
     if isinstance(v, bool):
         return v
     return str(v).strip().lower() in ("on", "an", "true", "yes", "y", "ja", "1")
+
+
+def _account_settled(acct: dict, st: dict, name: str) -> bool:
+    """Ist bei diesem Konto alles durch — Bestellungen fertig, nichts unterwegs?
+
+    Dann gibt es aus dem Kundenkonto nichts mehr zu erfahren, und der Bot kann
+    sich das Einloggen sparen, bis wieder bestellt wird. Drei Bedingungen, jede
+    aus einem eigenen Grund:
+
+    1. Es gab überhaupt schon Bestellungen. Ein Konto, das noch nie etwas
+       gesehen hat, ist nicht „fertig" — es ist ungeprüft.
+    2. Jede Bestellung steht auf einem Endzustand.
+    3. Zu keiner ist noch ein Tracking-Link offen. „completed" heißt nicht, dass
+       der Link schon eingesammelt wurde — und nach dem Abschalten käme niemand
+       mehr an ihn heran.
+
+    Die Sendung selbst hält das Konto NICHT wach: `hermes_watch` verfolgt sie
+    ohne Login weiter. Trotzdem wird unten auf sie gewartet, damit „aus" auch
+    das heißt, wonach es aussieht — nämlich dass die Sache erledigt ist.
+    """
+    bestellungen = list((acct.get("orders") or {}).values())
+    if not bestellungen:
+        return False
+    for o in bestellungen:
+        if o.get("status") not in _TERMINAL_STATUS:
+            return False
+        if o.get("status") in _TRACKABLE_STATUS and not o.get("tracking_registered"):
+            return False
+
+    # Sendungen dieses Kontos, die noch laufen. Einträge ohne `account` stammen
+    # aus der Zeit vor diesem Feld — die halten nichts auf, sonst bliebe ein
+    # Konto wegen einer längst zugestellten Altsendung für immer an.
+    zustaende = st.get("manual_tracking_state") or {}
+    for label, eintrag in (st.get("auto_tracking") or {}).items():
+        if (eintrag or {}).get("account") != name:
+            continue
+        if not hermes.is_terminal((zustaende.get(label) or {}).get("status", "")):
+            return False
+    return True
 
 
 def _order_enabled(st: dict, name: str, cmds: dict | None = None) -> bool:
@@ -53,6 +103,12 @@ def _order_enabled(st: dict, name: str, cmds: dict | None = None) -> bool:
     `/account enable|disable` in Discord schreibt denselben Schalter nach
     `commands.json`; der hat Vorrang, weil er das Neuere ist. So kann man das
     Konto vom Handy aus scharf schalten, ohne JSON zu tippen.
+
+    ACHTUNG: Das hier ist der WUNSCH, nicht der wirksame Zustand. Ist alles
+    zugestellt, legt der Bot `_auto_off` in seinen eigenen Stand und ruht,
+    obwohl hier noch „on" steht — er kann `commands.json` ja nicht
+    zurückschreiben, die gehört dem Worker. Aufgehoben wird das erst, wenn der
+    Wunsch von aus auf an wechselt, also beim nächsten `/account enable`.
     """
     per_command = commands.enabled_override(cmds or {}, name)
     if per_command is not None:
@@ -166,7 +222,7 @@ def _recent(order: dict, days: int = _BACKFILL_MAX_AGE_DAYS) -> bool:
 
 
 def _register_tracking(auto: dict, order_id: str, links: list[str],
-                       owner: str, ping_env: str) -> None:
+                       owner: str, ping_env: str, account: str = "") -> None:
     """Gefundene Tracking-Links in den Gist-Block `auto_tracking` schreiben.
 
     Damit übernimmt `hermes_watch` die Sendung ab dem nächsten Lauf von selbst:
@@ -182,6 +238,11 @@ def _register_tracking(auto: dict, order_id: str, links: list[str],
     for i, link in enumerate(links):
         label = base if i == 0 else f"{base} ({i + 1})"
         entry = {"url": link, "order_id": order_id}
+        if account:
+            # Der KONTOSCHLÜSSEL, nicht der Anzeigename: `_account_settled`
+            # fragt damit, ob von diesem Konto noch etwas unterwegs ist.
+            # Anzeigenamen sind frei wählbar und taugen nicht als Schlüssel.
+            entry["account"] = account
         if owner:
             entry["owner"] = owner   # Kartentitel: "pray" — wie bei den Bestellkarten
         if ping_env:
@@ -295,7 +356,7 @@ def _check_one_account(name: str, webhook: str, user: str, pw: str,
                 prev["tracking_posted"] = True
             # Ab hier übernimmt hermes_watch: Sendungsverlauf automatisch verfolgen.
             if auto_tracking is not None and not prev.get("tracking_registered"):
-                _register_tracking(auto_tracking, oid, detail["tracking"], owner, ping_env)
+                _register_tracking(auto_tracking, oid, detail["tracking"], owner, ping_env, name)
                 prev["tracking_registered"] = True
         elif detail and was_posted:
             # Nachrüst-Versuch, aber kein Link mehr auf der Seite — nichts zu
@@ -354,7 +415,13 @@ def check_orders(cfg: dict, default_webhook: str, default_ping_ids: list[str], r
 
     # An/Aus-Schalter: nur aktivierte Konten (Gist-Feld `enabled`) → in
     # Bestellpausen keine Logins. Standard = aus.
-    enabled_names = [a["name"] for a in cfg_accounts if _order_enabled(st, a["name"], cmds)]
+    #
+    # Zwei Ebenen, und die Reihenfolge ist wichtig: ERST der Wunsch (Gist +
+    # Discord), DANN das selbsttätige Abschalten. Die Unterscheidung braucht es,
+    # weil `_remember_enabled` den Wechsel aus→an erkennen muss — und den sähe
+    # es nie, wenn `_auto_off` schon vorher alles auf „aus" drückte. Das Konto
+    # ließe sich dann nie wieder einschalten.
+    wunsch_names = [a["name"] for a in cfg_accounts if _order_enabled(st, a["name"], cmds)]
 
     # Gerade eingeschaltet? Dann sofort prüfen statt bis zu 24 h Ruhe-Takt
     # abzuwarten — man legt den Schalter genau dann um, wenn man bestellt hat.
@@ -365,13 +432,24 @@ def check_orders(cfg: dict, default_webhook: str, default_ping_ids: list[str], r
     # greift es auch, wenn der Schalter von Hand im Gist umgelegt wurde. Der
     # Merker wird SOFORT gespeichert: Weiter unten gibt es mehrere Abbruchwege,
     # auf denen er sonst verlorenginge und das Einschalten nie erkannt würde.
-    switched_on, flags_changed = _remember_enabled(accounts_state, cfg_accounts, enabled_names)
+    switched_on, flags_changed = _remember_enabled(accounts_state, cfg_accounts, wunsch_names)
     for name in switched_on:
         accounts_state[name]["last_check_at"] = ""
+        # Frisch scharf geschaltet → ein etwaiges Auto-Aus der letzten Bestellung
+        # ist damit erledigt. Genau das macht `/account enable` zu einer Aussage
+        # über EINE Bestellung statt zu einem Dauerzustand, den man vergisst.
+        accounts_state[name].pop("_auto_off", None)
+        # Auch den Zähler: Wer gerade einschaltet, hat gerade bestellt. Ein alter
+        # Stand von „schon zweimal erledigt" würde sofort wieder abschalten.
+        accounts_state[name].pop("_settled_runs", None)
     if switched_on:
         log.info("orders: gerade eingeschaltet, wird sofort geprüft: %s", ", ".join(switched_on))
     if flags_changed:
         orders.save_order_state(token, gist_id, st)
+
+    # Der wirksame Zustand: gewünscht UND nicht selbsttätig abgeschaltet.
+    enabled_names = [n for n in wunsch_names
+                     if not accounts_state.get(n, {}).get("_auto_off")]
 
     # Frisch per `/account add` hinterlegte Konten müssen EINMAL geprüft werden,
     # auch wenn sie noch aus sind. Sie sind es nämlich immer: Neue Konten starten
@@ -384,6 +462,27 @@ def check_orders(cfg: dict, default_webhook: str, default_ping_ids: list[str], r
     # ersten `/account enable`.
     verify_names = [a["name"] for a in cfg_accounts
                     if _verify_pending(cmds, a["name"], accounts_state.get(a["name"], {}))]
+
+    # Karteileichen wegräumen. `/account remove` löscht den Eintrag in
+    # `commands.json`, kommt aber an diese Datei nicht heran — der Worker darf
+    # sie bewusst nicht anfassen, sonst gingen Änderungen des Bots verloren.
+    # Der Rest blieb deshalb für immer in `/account list` stehen, unter seinem
+    # rohen Schlüssel (`s3`), ohne je wieder geprüft zu werden. Aufräumen kann
+    # das nur, wem die Datei gehört: dieser Lauf hier.
+    #
+    # Die Bedingung `if cmds` ist die Absicherung, auf die es ankommt: Ist
+    # `commands.json` gerade nicht lesbar, kommt {} zurück — dann sähen ALLE
+    # selbst hinterlegten Konten wie Leichen aus, und ein Aussetzer beim Lesen
+    # würde ihren ganzen Bestellverlauf löschen.
+    if cmds:
+        bekannt = {a["name"] for a in cfg_accounts}
+        entfernt = [n for n in accounts_state if n not in bekannt]
+        for name in entfernt:
+            del accounts_state[name]
+            (st.get("enabled") or {}).pop(name, None)
+            log.info("orders: '%s' steht nirgends mehr — Reste entfernt", name)
+        if entfernt:
+            orders.save_order_state(token, gist_id, st)
 
     kandidaten = set(enabled_names) | set(verify_names)
     if not kandidaten:
@@ -441,11 +540,16 @@ def check_orders(cfg: dict, default_webhook: str, default_ping_ids: list[str], r
         fehler = str(e)
         log.error("orders[%s]: fetch fehlgeschlagen: %s", pick["name"], e)
 
+    # Wie der Abruf ausging, bei JEDEM Lauf festhalten — nicht nur beim ersten.
+    # `/account list` zeigte sonst „geprüft vor 5 min" und sah damit gleich aus,
+    # egal ob der Login stand oder das Passwort seit Wochen falsch ist. Genau
+    # das ist die Frage, die man an eine Kontoliste hat.
+    acct["login_ok"] = not fehler
+
     # Ergebnis der Erstprüfung melden — einmalig, danach steht `login_checked_at`
     # im eigenen Stand des Bots und `_verify_pending` greift nicht mehr.
     # Bewusst hier und nicht im Worker: Erst dieser Lauf weiß, ob der Login geht.
     if pruefung:
-        acct["login_ok"] = not fehler
         acct["login_checked_at"] = datetime.now(timezone.utc).isoformat()
         if pick["webhook"]:
             notify.send_order_update(
@@ -454,6 +558,32 @@ def check_orders(cfg: dict, default_webhook: str, default_ping_ids: list[str], r
                 pick["ping"], role_ids,
             )
         log.info("orders[%s]: Erstprüfung %s", pick["name"], "ok" if not fehler else "fehlgeschlagen")
+
+    # Alles zugestellt? Dann von selbst wieder ausschalten. Einschalten heißt
+    # damit „ich habe bestellt", nicht „ab jetzt für immer" — und niemand muss
+    # daran denken, es zurückzunehmen. Nur bei geglücktem Abruf: Nach einem
+    # Fehlschlag ist der Stand von eben womöglich unvollständig, und ein Konto
+    # wegen eines Netzfehlers stillzulegen wäre die falsche Schlussfolgerung.
+    if not fehler and not acct.get("_auto_off"):
+        if _account_settled(acct, st, pick["name"]):
+            acct["_settled_runs"] = int(acct.get("_settled_runs") or 0) + 1
+        else:
+            # Wieder etwas los → der Zähler fängt von vorn an. Sonst könnte ein
+            # halbes Jahr alter Ruhestand mit einem einzigen weiteren Abruf
+            # zuschlagen, mitten in einer laufenden Bestellung.
+            acct.pop("_settled_runs", None)
+    if (not fehler and not acct.get("_auto_off")
+            and int(acct.get("_settled_runs") or 0) >= _SETTLED_RUNS_BEFORE_IDLE):
+        acct["_auto_off"] = True
+        acct.pop("_settled_runs", None)
+        log.info("orders[%s]: alles zugestellt — Konto ruht bis zum nächsten "
+                 "/account enable", pick["name"])
+        if pick["webhook"]:
+            notify.send_order_update(
+                pick["webhook"],
+                build_account_idle_embed(pick.get("owner") or pick["name"]),
+                [], [],   # keine Pings: Das ist eine Quittung, keine Neuigkeit
+            )
     # Immer speichern: last_check_at (in _check_one_account vor dem Login gesetzt)
     # muss persistiert werden — auch bei Fehler → Backoff statt Hämmern.
     orders.save_order_state(token, gist_id, st)

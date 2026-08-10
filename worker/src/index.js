@@ -294,12 +294,15 @@ async function runAccountAdd(interaction, env, state, werte) {
     await editOriginalResponse(
       interaction,
       [
-        `**${werte.label}** ist hinterlegt (Platz ${slot}) und **eingeschaltet**.`,
+        `**${werte.label}** ist hinterlegt (Platz ${slot}).`,
         "",
         "Die Zugangsdaten sind verschlüsselt als GitHub-Secret abgelegt — im Gist stehen nur",
         "der Anzeigename und die Platznummer.",
         "",
         pruefung,
+        "",
+        "Das Konto ist noch **aus**. Schalt es mit `/account enable` an, sobald du bestellt "
+        + "hast — nach der Zustellung geht es von selbst wieder aus.",
       ].join("\n")
     );
   } catch (err) {
