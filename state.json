@@ -1,8 +1,8 @@
 {
   "bot_stats": {
     "first_check_at": "2026-05-20T18:50:44.075159+00:00",
-    "last_check_at": "2026-08-11T11:10:39.330072+00:00",
-    "total_checks": 11852,
+    "last_check_at": "2026-08-11T11:20:41.214278+00:00",
+    "total_checks": 11853,
     "total_restocks": 3
   },
   "dashboard_message_id": "1536515159437082797",
@@ -142,7 +142,7 @@
       "3888239"
     ]
   },
-  "last_deploy_sha": "bb64059fead3709267fd5213115b2093ef8fe709",
+  "last_deploy_sha": "13fe523e5796d460691cf0e9f7bb926cba6beedc",
   "products": {
     "https://bgpharmadrugs.to/product/minoxytop-5-mg-minoxidil-tablets-ip/": {
       "Minoxidil 5 mg": {
@@ -154,7 +154,6 @@
         "lowest_price_at": "2026-06-17T14:50:55.842568+00:00",
         "out_since": "2026-06-17T14:50:55.842568+00:00",
         "price_history": [
-          35.0,
           30.37,
           35.0,
           30.37,
@@ -183,7 +182,8 @@
           30.31,
           35.0,
           30.31,
-          35.0
+          35.0,
+          30.31
         ]
       }
     },
@@ -195,10 +195,9 @@
         "in_stock": true,
         "lowest_price": "€ 42.06",
         "lowest_price_at": "2026-05-31T01:40:41.606861+00:00",
-        "previous_price": "49.00$",
-        "price": "€ 42.44",
+        "previous_price": "€ 42.44",
+        "price": "49.00$",
         "price_history": [
-          42.52,
           49.0,
           42.52,
           49.0,
@@ -227,7 +226,8 @@
           42.52,
           42.44,
           49.0,
-          42.44
+          42.44,
+          49.0
         ]
       }
     },
@@ -459,10 +459,9 @@
             "start": "2026-06-13T20:10:46.910560+00:00"
           }
         ],
-        "previous_price": "€ 38.97",
-        "price": "45.00$",
+        "previous_price": "45.00$",
+        "price": "€ 38.97",
         "price_history": [
-          39.55,
           39.51,
           39.37,
           39.54,
@@ -491,7 +490,8 @@
           38.94,
           39.05,
           38.97,
-          45.0
+          45.0,
+          38.97
         ],
         "restock_count": 1
       }
