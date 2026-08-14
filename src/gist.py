@@ -30,11 +30,15 @@ _API = "https://api.github.com/gists"
 # `None` heißt „noch nicht geholt", ein leeres Dict „geholt, Gist ist leer".
 _cache: Optional[dict[str, str]] = None
 
+# Ist der Abruf gescheitert? Dann darf NICHTS geschrieben werden — siehe write().
+_failed = False
+
 
 def reset() -> None:
     """Zwischenspeicher leeren. Einmal zu Beginn eines Laufs aufrufen."""
-    global _cache
+    global _cache, _failed
     _cache = None
+    _failed = False
 
 
 def _headers(token: str) -> dict:
@@ -52,7 +56,7 @@ def _fetch(token: str, gist_id: str) -> dict[str, str]:
     wie vorher, nur ohne Bestellstand und ohne die per Discord gesetzten
     Wünsche. Lieber ein eingeschränkter Lauf als gar keiner.
     """
-    global _cache
+    global _cache, _failed
     if _cache is not None:
         return _cache
 
@@ -64,6 +68,7 @@ def _fetch(token: str, gist_id: str) -> dict[str, str]:
     except (requests.RequestException, ValueError) as e:
         log.error("Gist-Load fehlgeschlagen: %s", e)
         _cache = {}
+        _failed = True
     return _cache
 
 
@@ -82,8 +87,20 @@ def read(token: str, gist_id: str, dateiname: str) -> dict:
 
 
 def write(token: str, gist_id: str, dateiname: str, daten: dict) -> bool:
-    """Eine Datei schreiben. Der PATCH überträgt NUR sie, andere bleiben unberührt."""
+    """Eine Datei schreiben. Der PATCH überträgt NUR sie, andere bleiben unberührt.
+
+    **Nie schreiben, was wir nicht lesen konnten.** Ein gescheiterter Abruf gibt
+    `{}` zurück — für den Aufrufer sieht das aus wie ein leerer Stand, und er
+    baut auf dieser Grundlage einen neuen auf. Genau das ist der Weg, auf dem
+    ein einziger 503 von GitHub den kompletten Bestellstand ersetzt hätte:
+    Bestellungen, Session-Cookies und verfolgte Sendungen wären weg, alle Konten
+    auf „aus". Lieber ein Lauf, der nichts tut, als einer, der alles verliert.
+    """
     if not (token and gist_id):
+        return False
+    if _failed:
+        log.error("Gist war nicht lesbar — %s wird NICHT geschrieben "
+                  "(sonst überschriebe ein leerer Stand den echten)", dateiname)
         return False
     text = json.dumps(daten, indent=2, ensure_ascii=False)
     try:

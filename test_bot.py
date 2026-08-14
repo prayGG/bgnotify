@@ -486,6 +486,67 @@ with Lauf(cmds={"enabled": {"a": "on"}},
           l.state["accounts"]["a"].get("login_ok") is False, str(l.state["accounts"]["a"]))
 
 # --------------------------------------------------------------------------
+section("Gist: nie schreiben, was nicht lesbar war")
+# --------------------------------------------------------------------------
+# Ein gescheiterter Abruf gibt {} zurueck — fuer den Aufrufer sieht das aus wie
+# ein leerer Stand, und er baut darauf einen neuen auf. Ohne Deckel haette ein
+# einziger 503 von GitHub Bestellungen, Cookies und verfolgte Sendungen ersetzt.
+from src import gist as gistmod  # noqa: E402
+
+
+class _Antwort:
+    status_code = 200
+    def __init__(self, daten=None, kaputt=False):
+        self._d, self._kaputt = daten or {}, kaputt
+    def raise_for_status(self):
+        if self._kaputt:
+            raise requests.RequestException("503 Service Unavailable")
+    def json(self):
+        return self._d
+
+
+import requests  # noqa: E402
+
+_orig_get, _orig_patch = requests.get, requests.patch
+geschrieben: list = []
+try:
+    requests.patch = lambda *a, **k: (geschrieben.append(k.get("json")), _Antwort())[1]
+
+    requests.get = lambda *a, **k: _Antwort(kaputt=True)
+    gistmod.reset()
+    gistmod.read("t", "g", "order-state.json")
+    ok_block = gistmod.write("t", "g", "order-state.json", {"leer": True})
+    check("Lesen gescheitert → Schreiben blockiert", ok_block is False and not geschrieben, f"{len(geschrieben)} Schreibvorgänge")
+
+    requests.get = lambda *a, **k: _Antwort({"files": {"order-state.json": {"content": '{"a":1}'}}})
+    gistmod.reset(); geschrieben.clear()
+    check("Lesen ok → Schreiben erlaubt", gistmod.write("t", "g", "order-state.json", {"a": 2}) is True)
+
+    # Erstanlage: erreichbar, aber leer. Muss gehen, sonst kaeme nie etwas rein.
+    requests.get = lambda *a, **k: _Antwort({"files": {}})
+    gistmod.reset()
+    check("leeres Gist → Schreiben erlaubt", gistmod.write("t", "g", "order-state.json", {"neu": 1}) is True)
+
+    # Ein Abruf fuer beide Dateien, und ein Schreibvorgang ist danach sichtbar.
+    aufrufe = {"n": 0}
+    def zaehl(*a, **k):
+        aufrufe["n"] += 1
+        return _Antwort({"files": {"order-state.json": {"content": '{"a":1}'},
+                                   "commands.json": {"content": '{"b":2}'}}})
+    requests.get = zaehl
+    gistmod.reset()
+    for _ in range(4):
+        gistmod.read("t", "g", "order-state.json")
+        gistmod.read("t", "g", "commands.json")
+    check("8 Lesevorgänge → 1 HTTP-Abruf", aufrufe["n"] == 1, f"{aufrufe['n']} Abrufe")
+    gistmod.write("t", "g", "order-state.json", {"a": 99})
+    check("Schreiben ist danach sichtbar", gistmod.read("t", "g", "order-state.json") == {"a": 99})
+    check("andere Datei unberührt", gistmod.read("t", "g", "commands.json") == {"b": 2})
+finally:
+    requests.get, requests.patch = _orig_get, _orig_patch
+    gistmod.reset()
+
+# --------------------------------------------------------------------------
 section("Discord-Grenzen aller Karten")
 # --------------------------------------------------------------------------
 # Discord kuerzt nicht, es lehnt die ganze Nachricht mit HTTP 400 ab — und eine
