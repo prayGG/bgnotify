@@ -25,7 +25,7 @@ import logging
 import os
 import sys
 
-from . import commands, health, notify
+from . import commands, gist, health, notify
 from .config import (
     load_config,
     load_ping_role_ids,
@@ -79,6 +79,12 @@ def main() -> int:
     role_ids = load_ping_role_ids(cfg)
 
     try:
+        # Gist-Zwischenspeicher für diesen Lauf leeren. Ein Abruf liefert alle
+        # Dateien auf einmal und wird bis zum Ende des Laufs wiederverwendet —
+        # ohne Reset könnte ein langlebiger Prozess (Tests, lokales
+        # Ausprobieren) einen alten Stand weiterreichen.
+        gist.reset()
+
         # 0 — Per Command aufgenommene Produkte dazunehmen. Muss VOR dem
         # Stock-Check passieren, sonst wird das frisch aufgenommene Produkt
         # einen ganzen Lauf lang übersehen. Fällt der Gist aus, bleibt es bei

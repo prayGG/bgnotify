@@ -26,11 +26,11 @@ import json
 import logging
 from typing import Optional
 
-import requests
+
+from . import gist
 
 log = logging.getLogger(__name__)
 
-_GH_API = "https://api.github.com/gists"
 COMMANDS_FILE = "commands.json"
 
 _TRUE = ("on", "an", "true", "yes", "y", "ja", "1")
@@ -43,21 +43,7 @@ def load_commands(token: str, gist_id: str) -> dict:
     exakt wie vorher, nur eben ohne die per Discord gesetzten Wünsche. Das ist
     die richtige Rückfallebene — lieber der alte Stand als gar kein Lauf.
     """
-    if not (token and gist_id):
-        return {}
-    try:
-        r = requests.get(
-            f"{_GH_API}/{gist_id}",
-            headers={"Authorization": f"Bearer {token}",
-                     "Accept": "application/vnd.github+json"},
-            timeout=15,
-        )
-        r.raise_for_status()
-        content = (r.json().get("files", {}).get(COMMANDS_FILE, {}) or {}).get("content", "")
-        return json.loads(content) if content.strip() else {}
-    except (requests.RequestException, ValueError) as e:
-        log.warning("commands.json nicht lesbar (%s) — Wünsche werden ignoriert", e)
-        return {}
+    return gist.read(token, gist_id, COMMANDS_FILE)
 
 
 def enabled_override(cmds: dict, name: str) -> Optional[bool]:

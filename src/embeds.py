@@ -98,6 +98,35 @@ def _typical_oos_duration(periods: list) -> tuple:
     return _humanize_duration(_median(durations)), len(durations)
 
 
+# Discord deckelt die Beschreibung eines Embeds bei 4096 Zeichen und kürzt
+# NICHT — es lehnt die ganze Nachricht mit HTTP 400 ab. Etwas Luft lassen, damit
+# ein längerer Produktname am Rand nicht doch darüber schießt.
+_DESCRIPTION_LIMIT = 4000
+
+
+def _fit_blocks(blocks: list[str], limit: int = _DESCRIPTION_LIMIT) -> str:
+    """So viele Blöcke wie passen, dann ehrlich sagen, wie viele fehlen.
+
+    Dashboard und Stats wachsen mit jedem beobachteten Produkt — und seit
+    `/product add` kann das jeder aus Discord heraus. Ohne Deckel läge die
+    Karte ab etwa 40 Varianten still: Discord verwirft sie, und die Karte
+    bliebe einfach auf dem letzten Stand stehen, ohne dass irgendwo etwas
+    aufschlüge. Eine gekürzte Liste, die ihre Kürzung ausweist, ist das
+    deutlich kleinere Übel.
+    """
+    out: list[str] = []
+    laenge = 0
+    for i, b in enumerate(blocks):
+        # Platz für den Hinweis freihalten, falls danach noch etwas kommt.
+        reserve = 40 if i < len(blocks) - 1 else 0
+        if laenge + len(b) + 2 + reserve > limit:
+            out.append(f"_… und {len(blocks) - len(out)} weitere (Discord-Limit)_")
+            break
+        out.append(b)
+        laenge += len(b) + 2
+    return "\n\n".join(out)
+
+
 def _has_last_known_state(s: dict) -> bool:
     return bool(s.get("price")) or bool(s.get("in_stock")) or bool(s.get("out_since"))
 
@@ -290,7 +319,7 @@ def build_dashboard_embed(
     return {
         "author": {"name": "✦⠀⠀bgnotify · status⠀⠀✦"},
         "color": color,
-        "description": "\n\n".join(blocks) if blocks else "_keine Produkte konfiguriert_",
+        "description": _fit_blocks(blocks) if blocks else "_keine Produkte konfiguriert_",
         "footer": {"text": "Letzter Check"},
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }
@@ -419,7 +448,7 @@ def build_stats_embed(cfg: dict, state: dict, usd_eur: Optional[float] = None,
     return {
         "author": {"name": "✦⠀⠀bgnotify · stats⠀⠀✦"},
         "color": COLOR_BLURPLE,
-        "description": "\n\n".join(blocks),
+        "description": _fit_blocks(blocks),
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }
 
@@ -523,11 +552,27 @@ _ORDER_STATUS_HINT = {
 }
 
 
+# Artikelliste einer Bestellung. Der Rest der Karte (Status, Link, Tracking)
+# braucht Platz, deshalb deutlich unter der 4096er-Grenze für die ganze
+# Beschreibung. Eine Sammelbestellung mit 40 Positionen hat die Karte sonst
+# gesprengt — und Discord verwirft dann die ganze Meldung, statt sie zu kürzen.
+_ITEMS_LIMIT = 2500
+
+
 def _items_block(items: Optional[list[str]]) -> str:
     """Artikelzeilen für die Embed-Beschreibung (leer wenn keine bekannt)."""
     if not items:
         return ""
-    return "\n\n" + "\n".join(f"·⠀{it}" for it in items)
+    zeilen: list[str] = []
+    laenge = 0
+    for i, it in enumerate(items):
+        zeile = f"·⠀{it}"
+        if laenge + len(zeile) + 1 > _ITEMS_LIMIT:
+            zeilen.append(f"·⠀_… und {len(items) - i} weitere_")
+            break
+        zeilen.append(zeile)
+        laenge += len(zeile) + 1
+    return "\n\n" + "\n".join(zeilen)
 
 
 def _order_link(url: Optional[str]) -> str:

@@ -22,6 +22,8 @@ from urllib.parse import urljoin
 import requests
 from bs4 import BeautifulSoup
 
+from . import gist
+
 log = logging.getLogger(__name__)
 
 BASE = "https://bgpharmadrugs.to"
@@ -212,38 +214,14 @@ def _is_logged_in(html_text: str) -> bool:
 # Order-Stand: privates GitHub-Gist (state.json ist öffentlich → tabu)
 # --------------------------------------------------------------------------
 GIST_FILE = "order-state.json"
-_GH_API = "https://api.github.com/gists"
 
-
-def _gist_headers(token: str) -> dict:
-    return {
-        "Authorization": f"Bearer {token}",
-        "Accept": "application/vnd.github+json",
-        "X-GitHub-Api-Version": "2022-11-28",
-    }
 
 
 def load_order_state(token: str, gist_id: str) -> dict:
     """Order-Stand aus dem privaten Gist lesen. {} bei leer/Fehler."""
-    import json as _json
-    try:
-        r = requests.get(f"{_GH_API}/{gist_id}", headers=_gist_headers(token), timeout=15)
-        r.raise_for_status()
-        content = (r.json().get("files", {}).get(GIST_FILE, {}) or {}).get("content", "")
-        return _json.loads(content) if content.strip() else {}
-    except (requests.RequestException, ValueError) as e:
-        log.error("Gist-Load fehlgeschlagen: %s", e)
-        return {}
+    return gist.read(token, gist_id, GIST_FILE)
 
 
 def save_order_state(token: str, gist_id: str, state: dict) -> bool:
     """Order-Stand ins private Gist schreiben."""
-    import json as _json
-    payload = {"files": {GIST_FILE: {"content": _json.dumps(state, indent=2, ensure_ascii=False)}}}
-    try:
-        r = requests.patch(f"{_GH_API}/{gist_id}", headers=_gist_headers(token), json=payload, timeout=15)
-        r.raise_for_status()
-        return True
-    except requests.RequestException as e:
-        log.error("Gist-Save fehlgeschlagen: %s", e)
-        return False
+    return gist.write(token, gist_id, GIST_FILE, state)

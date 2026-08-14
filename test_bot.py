@@ -485,5 +485,81 @@ with Lauf(cmds={"enabled": {"a": "on"}},
     check("gescheiterter Abruf auch — bei JEDEM Lauf, nicht nur beim ersten",
           l.state["accounts"]["a"].get("login_ok") is False, str(l.state["accounts"]["a"]))
 
+# --------------------------------------------------------------------------
+section("Discord-Grenzen aller Karten")
+# --------------------------------------------------------------------------
+# Discord kuerzt nicht, es lehnt die ganze Nachricht mit HTTP 400 ab — und eine
+# Karte, die in place editiert wird, bleibt dann einfach auf dem alten Stand
+# stehen, ohne dass irgendwo etwas aufschlaegt. Genau so ist /panel schon einmal
+# liegengeblieben. Deshalb hier absichtlich unrealistisch viel Material.
+from src import embeds  # noqa: E402
+
+LIMITS = {"title": 256, "description": 4096}
+
+
+def embed_ok(name, e):
+    fehler = []
+    for feld, grenze in LIMITS.items():
+        if len(e.get(feld) or "") > grenze:
+            fehler.append(f"{feld}={len(e[feld])}>{grenze}")
+    for f in e.get("fields") or []:
+        if len(f.get("value") or "") > 1024:
+            fehler.append(f"field '{f['name'][:20]}'={len(f['value'])}>1024")
+        if len(f.get("name") or "") > 256:
+            fehler.append("field-name>256")
+    if len(e.get("fields") or []) > 25:
+        fehler.append("mehr als 25 fields")
+    gesamt = (len(e.get("title") or "") + len(e.get("description") or "")
+              + len((e.get("footer") or {}).get("text") or "")
+              + sum(len(f.get("name") or "") + len(f.get("value") or "") for f in e.get("fields") or []))
+    if gesamt > 6000:
+        fehler.append(f"gesamt={gesamt}>6000")
+    check(name, not fehler, ", ".join(fehler) or f"{gesamt} Zeichen")
+
+
+LANG = "Sehr langer Produktname der wirklich kein Ende nehmen will " * 3
+viele = [{"name": f"{LANG} {i}", "variant": f"{LANG} Variante {i}", "found": True,
+          "in_stock": i % 2 == 0, "price": "€ 1.234,56",
+          "product_url": f"https://bgpharmadrugs.to/product/x{i}/",
+          "deep_link": f"https://bgpharmadrugs.to/product/x{i}/?a=b"} for i in range(200)]
+
+embed_ok("Dashboard mit 200 Varianten", embeds.build_dashboard_embed(viele))
+
+# Die Stats-Karte liest ihre Produkte aus der CONFIG, den Zustand dazu aus dem
+# State. Wer nur eines von beiden füllt, testet nichts — genau das ist mir hier
+# beim ersten Anlauf passiert: 87 Zeichen Ausgabe und trotzdem „ok".
+cfg_viel = {"products": [{"name": f"{LANG} {i}", "url": f"https://x/{i}",
+                          "watch_variants": [f"{LANG} Variante {i}"]} for i in range(200)]}
+state_viel = {"products": {f"https://x/{i}": {f"{LANG} Variante {i}": {
+    "in_stock": True, "price": "€ 9,99", "price_history": [9.99, 12.5, 8.0] * 12, "found": True,
+    "lowest_price": "€ 8,00", "highest_price": "€ 19,99",
+    "oos_periods": [{"start": "2026-01-01T00:00:00+00:00", "end": "2026-01-05T00:00:00+00:00"}],
+}} for i in range(200)}, "bot_stats": {"total_checks": 99999, "total_restocks": 7,
+                                       "first_check_at": "2026-01-01T00:00:00+00:00"}}
+stats = embeds.build_stats_embed(cfg_viel, state_viel)
+check("Stats-Test greift wirklich", len(stats["description"]) > 500, f"{len(stats['description'])} Zeichen")
+embed_ok("Stats mit 200 Produkten", stats)
+
+embed_ok("Sendung mit 50 Ereignissen", embeds.build_shipment_embed(
+    LANG[:24],
+    {"number": "H" + "1" * 20, "summary": LANG,
+     "details": {f"Feld {i}": LANG for i in range(10)},
+     "events": [{"date": "01.01.2026", "time": "12:00", "text": LANG} for _ in range(50)]},
+    [{"date": "01.01.2026", "time": "12:00", "text": LANG} for _ in range(50)],
+    "https://tracking.hermesworld.com/?TrackID=" + "1" * 30, first=True))
+
+embed_ok("Produkt-Scan mit 200 Varianten", embeds.build_product_scan_embed(
+    "https://bgpharmadrugs.to/product/x/",
+    {"title": LANG, "simple": False, "variants": [f"{LANG} {i}" for i in range(200)]}))
+
+embed_ok("Bestellkarte", embeds.build_order_status_embed(
+    {"order_id": "1", "status": "processing", "status_text": LANG, "url": "https://x"},
+    fresh=True, items=[LANG] * 40, owner=LANG[:20]))
+
+embed_ok("Login-Fehlschlag", embeds.build_account_check_embed(LANG[:24], False, LANG * 5))
+embed_ok("Fehler-Report", embeds.build_error_embed([LANG] * 40))
+embed_ok("Restock", embeds.build_restock_embed(
+    {"name": LANG, "variant": LANG, "price": "€ 1,00", "deep_link": "https://x", "out_since": ""}))
+
 print(f"\n{failed} FEHLER" if failed else "\nALLES GRÜN")
 sys.exit(1 if failed else 0)
