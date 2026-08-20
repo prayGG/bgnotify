@@ -1,8 +1,8 @@
 {
   "bot_stats": {
     "first_check_at": "2026-05-20T18:50:44.075159+00:00",
-    "last_check_at": "2026-08-20T04:00:51.805283+00:00",
-    "total_checks": 13097,
+    "last_check_at": "2026-08-20T04:10:41.370983+00:00",
+    "total_checks": 13098,
     "total_restocks": 3
   },
   "dashboard_message_id": "1536515159437082797",
@@ -147,7 +147,7 @@
       "3897157"
     ]
   },
-  "last_deploy_sha": "cdfad31bed874c10b42b7c32918f8c53d576dba4",
+  "last_deploy_sha": "04f43aff5e14b97dbaae832d3fa27bafde1f9ef2",
   "products": {
     "https://bgpharmadrugs.to/product/minoxytop-5-mg-minoxidil-tablets-ip/": {
       "Minoxidil 5 mg": {
@@ -155,11 +155,10 @@
         "highest_price": "35.00$",
         "highest_price_at": "2026-08-04T03:10:47.204944+00:00",
         "in_stock": false,
-        "lowest_price": "€ 30.22",
-        "lowest_price_at": "2026-06-17T14:50:55.842568+00:00",
+        "lowest_price": "€ 29.96",
+        "lowest_price_at": "2026-08-20T04:10:43.352483+00:00",
         "out_since": "2026-06-17T14:50:55.842568+00:00",
         "price_history": [
-          35.0,
           30.35,
           30.25,
           35.0,
@@ -188,7 +187,8 @@
           35.0,
           30.23,
           35.0,
-          30.23
+          30.23,
+          29.96
         ]
       }
     },
@@ -363,8 +363,8 @@
         "highest_price_at": "2026-07-28T02:20:43.918411+00:00",
         "in_stock": false,
         "last_restock_at": "2026-07-03T21:40:45.261306+00:00",
-        "lowest_price": "€ 68.66",
-        "lowest_price_at": "2026-05-31T01:40:41.606830+00:00",
+        "lowest_price": "€ 68.48",
+        "lowest_price_at": "2026-08-20T04:10:43.352446+00:00",
         "oos_periods": [
           {
             "end": "2026-07-03T21:40:45.261306+00:00",
@@ -375,7 +375,6 @@
         "previous_price": "€ 69.23",
         "price": "€ 69.42",
         "price_history": [
-          68.79,
           68.66,
           68.86,
           69.45,
@@ -404,7 +403,8 @@
           69.36,
           69.23,
           69.42,
-          69.1
+          69.1,
+          68.48
         ],
         "restock_count": 1
       },
