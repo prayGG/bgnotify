@@ -1,8 +1,8 @@
 {
   "bot_stats": {
     "first_check_at": "2026-05-20T18:50:44.075159+00:00",
-    "last_check_at": "2026-08-21T19:10:39.388705+00:00",
-    "total_checks": 13332,
+    "last_check_at": "2026-08-21T19:20:37.218649+00:00",
+    "total_checks": 13333,
     "total_restocks": 3
   },
   "dashboard_message_id": "1536515159437082797",
@@ -50,6 +50,10 @@
     {
       "key": "0.025% 20 grams",
       "label": "Tretinoin 0.025% 20g"
+    },
+    {
+      "key": "0.05% 30 grams",
+      "label": "Tretinoin 0.05% 30g"
     },
     {
       "key": "Azelaic Acid 20% 30 gr cream",
@@ -143,7 +147,7 @@
       "3897157"
     ]
   },
-  "last_deploy_sha": "038e0dc5c623f1765b7e6b0cb525729648a47b2b",
+  "last_deploy_sha": "b4b8ace82838a5e4b31a6dbc405f3a144f9ce318",
   "products": {
     "https://bgpharmadrugs.to/product/minoxytop-5-mg-minoxidil-tablets-ip/": {
       "Minoxidil 5 mg": {
