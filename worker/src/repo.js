@@ -6,7 +6,7 @@
  * letzten Laufs (`state.json`) und die Anzeigenamen der Konten (`config.yml`).
  */
 
-const RAW = "https://raw.githubusercontent.com/prayGG/bgnotify/main";
+const RAW = "https://raw.githubusercontent.com/praygoated/bgnotify/main";
 
 /** `state.json` — Bot-Statistiken, Fehlerzustand. Leer statt Fehler, wenn nicht lesbar. */
 export async function loadRepoState() {

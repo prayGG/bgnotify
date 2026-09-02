@@ -15,7 +15,11 @@
 
 const API = "https://api.github.com";
 
-export const REPO = "prayGG/bgnotify";
+// Kontoname nach der Umbenennung von `prayGG`. GitHub leitet den alten Namen
+// zwar weiter, aber nur zuverlässig bei GET: Ein 301 auf ein POST macht die
+// Fetch-Spezifikation zu einem GET ohne Body — der Workflow-Dispatch käme also
+// nie an. Deshalb hier der aktuelle Name, nicht der weitergeleitete.
+export const REPO = "praygoated/bgnotify";
 const WORKFLOW = "main.yml";
 const BRANCH = "main";
 
