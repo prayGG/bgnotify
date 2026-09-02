@@ -88,23 +88,30 @@ orders:
 
 # Einzelne Artikel ausserhalb des Shops, die selten und ohne Ankuendigung
 # zurueckkommen. Gelesen werden die schema.org-Daten der Seite (siehe
-# src/retail.py) — funktioniert bei jedem Shop, der sie ausliefert, ohne
-# eigenen Parser pro Haendler.
+# src/retail.py) — das funktioniert bei jedem Shop, der sie ausliefert, ohne
+# einen eigenen Parser pro Haendler. Antwortet ein Shop nicht auf einen
+# normalen Request, holt der Bot die Seite mit echtem Chromium nach, genau wie
+# beim Forum.
+#
+# MEHRERE Quellen pro Artikel, weil ein Restock nicht ueberall gleichzeitig
+# ankommt und man vorher nicht weiss, wer zuerst liefert. Gemeldet wird der
+# ARTIKEL, nicht die Seite: Sobald irgendeine Quelle ihn fuehrt, kommt genau
+# eine Karte mit dem Link dorthin.
 #
 # Gemeldet wird NUR der Wechsel von "weg" auf "da". Ein neu eingetragener
 # Artikel wird still aufgenommen, auch wenn er gerade verfuegbar ist.
 retail:
   items:
-    # Die rote Original-Version. Bei Crocs selbst seit Laengerem ausverkauft;
-    # dort steht dann kein `availability` und kein Preis mehr im JSON-LD, was
-    # genau das Signal ist, auf das dieser Watcher wartet.
-    - name: "Crocs Lightning McQueen (Erwachsene)"
-      url: "https://www.crocs.eu/p/classic-clog-lightning-mcqueen/205759.html?cid=610"
+    - name: "Crocs Lightning McQueen"
       emoji: "🏎️"
-    # Die Dinoco-Farbe zum 20. Cars-Jubilaeum, Release 16.09.2026.
-    - name: "Crocs Lightning McQueen Dinoco"
-      url: "https://www.crocs.eu/p/disney-and-pixars-lightning-mcqueen-dinoco-crocband-clog/213582.html?cid=90H"
-      emoji: "🔵"
+      urls:
+        # Der EU-Shop antwortet auf einen normalen Request und liefert die
+        # Verfuegbarkeit im JSON-LD — nachgemessen: ausverkauft heisst dort
+        # `offers` ohne `availability` und ohne Preis.
+        - "https://www.crocs.eu/p/classic-clog-lightning-mcqueen/205759.html?cid=610"
+        # Der deutsche Shop sperrt nackte Requests aus; dafuer gibt es den
+        # Browser-Fallback. Kostet nur dann etwas, wenn er gebraucht wird.
+        - "https://www.crocs.de/p/classic-clog-lightning-mcqueen/205759.html?cid=610"
 
 notifications:
   # Discord User-IDs werden bei Restocks gepingt. Damit die IDs NICHT im

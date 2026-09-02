@@ -117,30 +117,92 @@ def parse(html: str) -> dict:
     return {"found": False, "name": "", "sku": "", "in_stock": False, "price": "", "currency": ""}
 
 
-def check(url: str, timeout: int = 20) -> dict:
+def _holen(url: str, timeout: int) -> str:
+    """Seite als einfacher HTTP-Client. Wirft bei Netz-/HTTP-Fehler."""
+    r = requests.get(url, headers={"User-Agent": _UA,
+                                   "Accept-Language": "de-DE,de;q=0.9,en;q=0.8"},
+                     timeout=timeout)
+    r.raise_for_status()
+    return r.text
+
+
+def _holen_im_browser(url: str) -> str:
+    """Dieselbe Seite, aber mit echtem Chromium.
+
+    Manche Shops beantworten einen nackten Request gar nicht oder schieben eine
+    JS-Abfrage davor — dieselbe Hürde wie beim Forum, und derselbe Weg daran
+    vorbei (siehe `src/forum.py`). Teurer als ein GET, deshalb wird das hier
+    NUR als zweiter Versuch benutzt.
+
+    `networkidle` statt `domcontentloaded` ist wichtig: Eine Zwischenseite
+    leitet per JS weiter, und bei `domcontentloaded` bekäme man den Inhalt der
+    Abfrage statt den der Produktseite.
+    """
+    from playwright.sync_api import sync_playwright  # noqa: WPS433
+
+    with sync_playwright() as p:
+        browser = p.chromium.launch(
+            headless=True,
+            args=["--disable-blink-features=AutomationControlled"],
+        )
+        try:
+            ctx = browser.new_context(
+                user_agent=_UA,
+                locale="de-DE",
+                timezone_id="Europe/Berlin",
+                viewport={"width": 1280, "height": 800},
+            )
+            ctx.add_init_script(
+                "Object.defineProperty(navigator, 'webdriver', {get: () => undefined});"
+            )
+            page = ctx.new_page()
+            page.goto(url, wait_until="networkidle", timeout=45000)
+            return page.content()
+        finally:
+            browser.close()
+
+
+def check(url: str, timeout: int = 20, allow_browser: bool = True) -> dict:
     """Eine Produktseite abfragen. Wirft nie — Fehler kommen als `error` zurück.
+
+    Zwei Stufen, und die Reihenfolge ist Absicht: erst der billige GET, und nur
+    wenn der nichts Verwertbares bringt, der Browser. Die meisten Shops liefern
+    ihr JSON-LD direkt aus; einen Chromium für jeden Artikel in jedem Lauf zu
+    starten wäre Verschwendung — und auffälliger als nötig.
 
     Ein Fehlschlag darf NICHT als „ausverkauft" durchgehen: Sonst löst der
     nächste geglückte Abruf einen Restock-Alarm aus, obwohl sich nichts geändert
     hat. Der Aufrufer erkennt das an `error` und lässt den Stand dann in Ruhe.
     """
-    try:
-        r = requests.get(url, headers={"User-Agent": _UA,
-                                       "Accept-Language": "de-DE,de;q=0.9,en;q=0.8"},
-                         timeout=timeout)
-        r.raise_for_status()
-    except requests.RequestException as e:
-        return {"url": url, "found": False, "in_stock": False, "price": "",
-                "currency": "", "name": "", "sku": "", "error": str(e)[:200]}
+    leer = {"url": url, "found": False, "in_stock": False, "price": "",
+            "currency": "", "name": "", "sku": ""}
 
-    daten = parse(r.text)
-    daten["url"] = url
-    daten["error"] = ""
+    fehler = ""
+    try:
+        html = _holen(url, timeout)
+        daten = parse(html)
+        if daten["found"]:
+            daten.update(url=url, error="")
+            return daten
+        fehler = "keine schema.org-Produktdaten auf der Seite"
+    except requests.RequestException as e:
+        fehler = str(e)[:200]
+
+    if not allow_browser:
+        return {**leer, "error": fehler}
+
+    # Zweiter Anlauf. Ein 403 oder eine Seite ohne Produktdaten heißt meistens
+    # „so lassen wir dich nicht rein", nicht „gibt es nicht".
+    log.info("retail: '%s' per Request nicht lesbar (%s) — zweiter Versuch im Browser",
+             url, fehler)
+    try:
+        daten = parse(_holen_im_browser(url))
+    except Exception as e:  # Playwright fehlt lokal / Seite bleibt zu
+        return {**leer, "error": f"{fehler} | Browser: {str(e)[:120]}"}
+
     if not daten["found"]:
-        # Kein Product im JSON-LD: Entweder liefert der Shop keins, oder wir
-        # sind auf einer Blockade-/Fehlerseite gelandet. Beides ist „unbekannt",
-        # nicht „ausverkauft" — deshalb als Fehler behandeln.
-        daten["error"] = "keine schema.org-Produktdaten auf der Seite"
+        return {**leer, "error": f"{fehler} | auch im Browser keine Produktdaten"}
+    daten.update(url=url, error="")
     return daten
 
 

@@ -661,52 +661,68 @@ check("PreOrder gilt NICHT als kaufbar", retail.parse(
 )["in_stock"] is False)
 
 CFG_RETAIL = {"retail": {"items": [
-    {"name": "McQueen", "url": "https://shop/x", "emoji": "🏎️"}]}}
+    {"name": "McQueen", "emoji": "🏎️", "urls": ["https://a/x", "https://b/x"]}]}}
+
+DA = {"found": True, "in_stock": True, "price": "74.99", "currency": "EUR",
+      "name": "McQueen Clog", "sku": "205759", "error": ""}
+WEG = dict(DA, in_stock=False, price="", currency="")
+KAPUTT = dict(WEG, found=False, error="HTTP 503")
 
 
-def lauf(state, seiten):
-    """Einen retail-Durchgang mit vorgegebener Seitenantwort fahren."""
+def lauf(state, antworten):
+    """Ein retail-Durchgang. `antworten` bildet URL → Antwort ab."""
     orig = retail.check
-    retail.check = lambda url, timeout=20: seiten
+    retail.check = lambda url, timeout=20: dict(antworten[url], url=url)
     try:
         return retail_watch.check_items(CFG_RETAIL, state)
     finally:
         retail.check = orig
 
 
-DA_ANTWORT = {"found": True, "in_stock": True, "price": "74.99", "currency": "EUR",
-              "name": "McQueen Clog", "sku": "205759", "error": "", "url": "https://shop/x"}
-WEG_ANTWORT = dict(DA_ANTWORT, in_stock=False, price="", currency="")
-FEHLER = dict(WEG_ANTWORT, found=False, error="HTTP 503")
+ALLE_WEG = {"https://a/x": WEG, "https://b/x": WEG}
+ALLE_DA = {"https://a/x": DA, "https://b/x": DA}
 
 # Erstsichtung ist still — sonst gaebe es beim Eintragen sofort einen Alarm
 # fuer etwas, das man gerade selbst hinzugefuegt hat.
 st = {}
-_, r = lauf(st, DA_ANTWORT)
+_, r = lauf(st, ALLE_DA)
 check("Erstsichtung meldet nichts", r == [], str(r))
-check("… merkt sich aber den Zustand", st["retail"]["https://shop/x"]["in_stock"] is True)
+check("… merkt sich aber den Zustand", st["retail"]["McQueen"]["in_stock"] is True)
 
 st = {}
-lauf(st, WEG_ANTWORT)
-_, r = lauf(st, DA_ANTWORT)
-check("weg → da meldet einen Restock", len(r) == 1 and r[0]["name"] == "McQueen", str(r))
+lauf(st, ALLE_WEG)
+_, r = lauf(st, ALLE_DA)
+check("weg → da meldet genau EINEN Restock", len(r) == 1 and r[0]["name"] == "McQueen", str(r))
 check("… mit Preis fuer die Karte", r[0]["price"] == "74.99")
 
-_, r = lauf(st, DA_ANTWORT)
+_, r = lauf(st, ALLE_DA)
 check("bleibt da → keine zweite Meldung", r == [], str(r))
-
-_, r = lauf(st, WEG_ANTWORT)
+_, r = lauf(st, ALLE_WEG)
 check("wieder weg → still", r == [], str(r))
 
-# Der Fall, der sonst still Fehlalarme baut: Ein Abbruch darf nicht als
-# "ausverkauft" gespeichert werden, sonst meldet der naechste geglueckte Abruf
+# Der Punkt an mehreren Quellen: EINE reicht, und die Karte zeigt genau die.
+# Zwei Karten fuer denselben Artikel waeren zweimal dieselbe Nachricht.
+st = {}
+lauf(st, ALLE_WEG)
+_, r = lauf(st, {"https://a/x": WEG, "https://b/x": DA})
+check("nur der zweite Shop hat sie → trotzdem eine Meldung", len(r) == 1, str(r))
+check("… und sie verlinkt genau diesen Shop", r[0]["url"] == "https://b/x", str(r[0]))
+
+# Der Fall, der sonst still Fehlalarme baut: Ist KEINE Quelle lesbar, darf das
+# nicht als "ausverkauft" gelten — sonst meldet der naechste geglueckte Abruf
 # einen Restock, obwohl sich nie etwas geaendert hat.
 st = {}
-lauf(st, DA_ANTWORT)                      # bekannt: verfuegbar
-_, r = lauf(st, FEHLER)                   # Abruf scheitert
-check("Fehler aendert den Zustand nicht", st["retail"]["https://shop/x"]["in_stock"] is True)
-_, r = lauf(st, DA_ANTWORT)
-check("… und loest danach KEINEN Fehlalarm aus", r == [], str(r))
+lauf(st, ALLE_DA)
+_, r = lauf(st, {"https://a/x": KAPUTT, "https://b/x": KAPUTT})
+check("keine Quelle lesbar → Zustand bleibt", st["retail"]["McQueen"]["in_stock"] is True)
+_, r = lauf(st, ALLE_DA)
+check("… und danach KEIN Fehlalarm", r == [], str(r))
+
+# Eine kaputte Quelle darf die heile nicht entwerten.
+st = {}
+lauf(st, ALLE_WEG)
+_, r = lauf(st, {"https://a/x": KAPUTT, "https://b/x": DA})
+check("eine Quelle kaputt, die andere hat sie → Meldung kommt", len(r) == 1, str(r))
 
 print(f"\n{failed} FEHLER" if failed else "\nALLES GRÜN")
 sys.exit(1 if failed else 0)
