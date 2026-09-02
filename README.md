@@ -10,6 +10,8 @@ Bestellstatus, bedient wird er per Slash-Command.
   Sendung automatisch weiterverfolgt: jede Hermes-Station als eigene Meldung,
   bis zur Zustellung
 - **Forum** — neue Beiträge eines bestimmten Autors
+- **Einzelartikel** — gehypte Sachen außerhalb des Shops (z. B. bestimmte
+  Sneaker/Clogs): meldet den Moment, in dem sie wieder bestellbar sind
 
 Der Bot läuft alle zehn Minuten. Was er dabei erfährt, landet je nach Sorte in
 einem anderen Channel; alles Persönliche (Bestellungen, Cookies, Konten) liegt
@@ -44,10 +46,12 @@ src/
 ├── forum.py         XenForo-Suche via Playwright
 ├── orders.py        Kundenkonto-Login + Order-Parsing
 ├── hermes.py        Sendungsverlauf
+├── retail.py        Verfügbarkeit beliebiger Shops über schema.org-Daten
 │
 │   Watcher — State führen, Änderungen erkennen:
 ├── stock_watch.py   Produkt-Checks inkl. Outage-Guard
 ├── forum_watch.py   neue Beiträge
+├── retail_watch.py  Einzelartikel: aus „weg" wird „da"
 ├── order_watch.py   Bestellungen, ein Konto pro Lauf
 ├── hermes_watch.py  Sendungen bis zur Zustellung
 ├── product_watch.py per Command aufgenommene Produkte
@@ -98,6 +102,7 @@ python -m playwright install chromium
 python -m src.main                       # kompletter Lauf
 python -m src.bgpharma <url> [variante]  # ein Produkt
 python -m src.forum <url>                # Forum-Scrape
+python -m src.retail <url>               # Verfügbarkeit einer Produktseite
 
 python test_bot.py                       # Tests Bot
 node worker/test.mjs                     # Tests Worker

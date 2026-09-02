@@ -472,6 +472,28 @@ def build_restock_embed(restock: dict, usd_eur: Optional[float] = None, labels: 
     }
 
 
+def build_retail_restock_embed(item: dict) -> dict:
+    """Ein Artikel außerhalb des Shops ist wieder da.
+
+    Bewusst dieselbe Sprache wie die Restock-Karte des Shops — für den, der es
+    im Channel sieht, ist es dasselbe Ereignis. Der Preis steht groß, weil er
+    bei genau diesen Artikeln der Grund ist, sofort zu klicken: Nachkaufen
+    kostet später ein Vielfaches.
+    """
+    preis = " ".join(x for x in (item.get("price", ""), item.get("currency", "")) if x)
+    kopf = f"### ⠀{preis}\n\n" if preis else ""
+    emoji = item.get("emoji") or ""
+    titel = f"{emoji}⠀{item['name']}" if emoji else item["name"]
+    return {
+        "author": {"name": "✦⠀⠀wieder da⠀⠀✦"},
+        "title": titel,
+        "description": kopf + f"**[→⠀⠀Zum Shop]({item['url']})**",
+        "color": COLOR_IN_STOCK,
+        "footer": {"text": item["url"].split("/")[2] if "/" in item["url"] else ""},
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }
+
+
 def build_oos_embed(item: dict, usd_eur: Optional[float] = None, labels: Optional[dict] = None) -> dict:
     """Embed for an in-stock -> out-of-stock transition. Quieter than the
     restock alert — gray accent, last seen price, no order button, no pings."""

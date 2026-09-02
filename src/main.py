@@ -5,6 +5,7 @@ Ablauf pro Run (GitHub Actions, `python -m src.main`):
 1. Shop-Produkte checken (`stock_watch`) → Statuses + Restock-/OOS-Transitions
 2. Deploy-Announcement, wenn HEAD sich bewegt hat (`deploy`)
 3. Neue BG-Forum-Posts (`forum_watch`, intervall-gegated)
+3b. Einzelartikel ausserhalb des Shops (`retail_watch`) — wieder verfuegbar?
 4. Bestellstatus + Tracking (`order_watch`, Stand im privaten Gist)
 5. Dashboard + Stats-Karte in place editieren, Alerts posten (`notify`)
 6. Fehler-Report in den Updates-Channel, wenn der Run Errors hatte (`health`)
@@ -41,10 +42,12 @@ from .embeds import (
     dashboard_variants,
     build_forum_embed,
     build_oos_embed,
+    build_retail_restock_embed,
     build_restock_embed,
     build_stats_embed,
 )
 from .forum_watch import check_forum
+from .retail_watch import check_items
 from .hermes_watch import check_shipments
 from .order_watch import check_orders
 from .pricing import fetch_usd_eur_rate
@@ -128,6 +131,16 @@ def main() -> int:
                 notify.send_forum_post(forum_webhook, build_forum_embed(post))
         elif new_forum_posts:
             log.info("forum: %d new post(s) but forum webhook is empty", len(new_forum_posts))
+
+        # 3b — Einzelartikel ausserhalb des Shops. Ein GET pro Stueck, also
+        # billig genug fuer jeden Lauf — und bei einem Drop zaehlt jede Minute.
+        # Landet im Restock-Channel: Fuer den, der es dort sieht, ist es
+        # dasselbe Ereignis wie ein Restock im Shop.
+        _, retail_restocks = check_items(cfg, state)
+        for r in retail_restocks:
+            notify.send_restock_alert(
+                stock_webhook, build_retail_restock_embed(r), user_ids, role_ids,
+            )
 
         # 4 — Bestellstatus (eigener Webhook, eigener Gist-Stand)
         check_orders(cfg, order_webhook, user_ids, role_ids)

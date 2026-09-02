@@ -622,5 +622,91 @@ embed_ok("Fehler-Report", embeds.build_error_embed([LANG] * 40))
 embed_ok("Restock", embeds.build_restock_embed(
     {"name": LANG, "variant": LANG, "price": "€ 1,00", "deep_link": "https://x", "out_since": ""}))
 
+# --------------------------------------------------------------------------
+section("Wieder-da-Melder (retail)")
+# --------------------------------------------------------------------------
+from src import retail, retail_watch  # noqa: E402
+
+# Genau so sieht es auf crocs.eu aus — nachgemessen an beiden echten Seiten.
+DA = """<script type="application/ld+json">
+{"@type":"Product","name":"Dinoco Clog","sku":"213582",
+ "offers":{"availability":"https://schema.org/InStock","price":74.99,"priceCurrency":"EUR"}}
+</script>"""
+WEG = """<script type="application/ld+json">
+{"@type":"Product","name":"McQueen Clog","sku":"205759","offers":{}}</script>"""
+
+check("verfuegbar wird erkannt", retail.parse(DA)["in_stock"] is True)
+check("… mit Preis und Waehrung", (retail.parse(DA)["price"], retail.parse(DA)["currency"]) == ("74.99", "EUR"))
+check("ausverkauft: kein availability → nicht verfuegbar", retail.parse(WEG)["in_stock"] is False)
+check("… aber die Seite gilt als gefunden", retail.parse(WEG)["found"] is True)
+
+# Die Woerter "Sold Out"/"Notify Me" stehen im Textbundle JEDER Seite, egal wie
+# der Zustand ist. Wer danach sucht, misst die Uebersetzung statt den Bestand.
+check("Textschnipsel taeuschen den Parser nicht",
+      retail.parse(DA + "<div>Sold Out</div><span>Notify Me</span>")["in_stock"] is True)
+
+# @graph und Angebotslisten kommen in freier Wildbahn vor.
+check("@graph wird ausgepackt", retail.parse(
+    '<script type="application/ld+json">{"@graph":[{"@type":"WebSite"},'
+    '{"@type":"Product","name":"X","offers":{"availability":"InStock","price":5}}]}</script>'
+)["in_stock"] is True)
+check("aus mehreren Angeboten zaehlt das kaufbare", retail.parse(
+    '<script type="application/ld+json">{"@type":"Product","name":"X","offers":['
+    '{"availability":"https://schema.org/OutOfStock"},'
+    '{"availability":"https://schema.org/InStock","price":9.5}]}</script>'
+)["in_stock"] is True)
+check("PreOrder gilt NICHT als kaufbar", retail.parse(
+    '<script type="application/ld+json">{"@type":"Product","name":"X",'
+    '"offers":{"availability":"https://schema.org/PreOrder","price":1}}</script>'
+)["in_stock"] is False)
+
+CFG_RETAIL = {"retail": {"items": [
+    {"name": "McQueen", "url": "https://shop/x", "emoji": "🏎️"}]}}
+
+
+def lauf(state, seiten):
+    """Einen retail-Durchgang mit vorgegebener Seitenantwort fahren."""
+    orig = retail.check
+    retail.check = lambda url, timeout=20: seiten
+    try:
+        return retail_watch.check_items(CFG_RETAIL, state)
+    finally:
+        retail.check = orig
+
+
+DA_ANTWORT = {"found": True, "in_stock": True, "price": "74.99", "currency": "EUR",
+              "name": "McQueen Clog", "sku": "205759", "error": "", "url": "https://shop/x"}
+WEG_ANTWORT = dict(DA_ANTWORT, in_stock=False, price="", currency="")
+FEHLER = dict(WEG_ANTWORT, found=False, error="HTTP 503")
+
+# Erstsichtung ist still — sonst gaebe es beim Eintragen sofort einen Alarm
+# fuer etwas, das man gerade selbst hinzugefuegt hat.
+st = {}
+_, r = lauf(st, DA_ANTWORT)
+check("Erstsichtung meldet nichts", r == [], str(r))
+check("… merkt sich aber den Zustand", st["retail"]["https://shop/x"]["in_stock"] is True)
+
+st = {}
+lauf(st, WEG_ANTWORT)
+_, r = lauf(st, DA_ANTWORT)
+check("weg → da meldet einen Restock", len(r) == 1 and r[0]["name"] == "McQueen", str(r))
+check("… mit Preis fuer die Karte", r[0]["price"] == "74.99")
+
+_, r = lauf(st, DA_ANTWORT)
+check("bleibt da → keine zweite Meldung", r == [], str(r))
+
+_, r = lauf(st, WEG_ANTWORT)
+check("wieder weg → still", r == [], str(r))
+
+# Der Fall, der sonst still Fehlalarme baut: Ein Abbruch darf nicht als
+# "ausverkauft" gespeichert werden, sonst meldet der naechste geglueckte Abruf
+# einen Restock, obwohl sich nie etwas geaendert hat.
+st = {}
+lauf(st, DA_ANTWORT)                      # bekannt: verfuegbar
+_, r = lauf(st, FEHLER)                   # Abruf scheitert
+check("Fehler aendert den Zustand nicht", st["retail"]["https://shop/x"]["in_stock"] is True)
+_, r = lauf(st, DA_ANTWORT)
+check("… und loest danach KEINEN Fehlalarm aus", r == [], str(r))
+
 print(f"\n{failed} FEHLER" if failed else "\nALLES GRÜN")
 sys.exit(1 if failed else 0)

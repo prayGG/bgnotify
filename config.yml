@@ -86,6 +86,26 @@ orders:
       password_env: BG_PASSWORD
       ping_env: DISCORDID            # Secret mit der Discord-User-ID für Konto a
 
+# Einzelne Artikel ausserhalb des Shops, die selten und ohne Ankuendigung
+# zurueckkommen. Gelesen werden die schema.org-Daten der Seite (siehe
+# src/retail.py) — funktioniert bei jedem Shop, der sie ausliefert, ohne
+# eigenen Parser pro Haendler.
+#
+# Gemeldet wird NUR der Wechsel von "weg" auf "da". Ein neu eingetragener
+# Artikel wird still aufgenommen, auch wenn er gerade verfuegbar ist.
+retail:
+  items:
+    # Die rote Original-Version. Bei Crocs selbst seit Laengerem ausverkauft;
+    # dort steht dann kein `availability` und kein Preis mehr im JSON-LD, was
+    # genau das Signal ist, auf das dieser Watcher wartet.
+    - name: "Crocs Lightning McQueen (Erwachsene)"
+      url: "https://www.crocs.eu/p/classic-clog-lightning-mcqueen/205759.html?cid=610"
+      emoji: "🏎️"
+    # Die Dinoco-Farbe zum 20. Cars-Jubilaeum, Release 16.09.2026.
+    - name: "Crocs Lightning McQueen Dinoco"
+      url: "https://www.crocs.eu/p/disney-and-pixars-lightning-mcqueen-dinoco-crocband-clog/213582.html?cid=90H"
+      emoji: "🔵"
+
 notifications:
   # Discord User-IDs werden bei Restocks gepingt. Damit die IDs NICHT im
   # public Repo stehen, kommen sie über env var `PING_USER_IDS`
