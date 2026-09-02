@@ -1,8 +1,8 @@
 {
   "bot_stats": {
     "first_check_at": "2026-05-20T18:50:44.075159+00:00",
-    "last_check_at": "2026-09-02T09:37:59.158365+00:00",
-    "total_checks": 13558,
+    "last_check_at": "2026-09-02T10:03:20.989813+00:00",
+    "total_checks": 13559,
     "total_restocks": 4
   },
   "dashboard_message_id": "1536515159437082797",
@@ -16,7 +16,8 @@
     "Minoxidil 5 mg",
     "Tretinoin",
     "Azelaic Acid 20% 30g",
-    "Tazarotene 0.1% 60g"
+    "Tazarotene 0.1% 60g",
+    "Crocs Lightning McQueen"
   ],
   "dashboard_variants": [
     {
@@ -62,6 +63,10 @@
     {
       "key": "Tazarotene cream/gel 0.1% (60 G/ box)",
       "label": "Tazarotene 0.1% 60g"
+    },
+    {
+      "key": "Crocs Lightning McQueen",
+      "label": "Crocs Lightning McQueen"
     }
   ],
   "error_report": {
@@ -148,7 +153,7 @@
       "3908445"
     ]
   },
-  "last_deploy_sha": "09866fe181360edf131d06c4818c2484c9139916",
+  "last_deploy_sha": "1904a10095f1033762007a9788d0f69c9b838292",
   "products": {
     "https://bgpharmadrugs.to/product/minoxytop-5-mg-minoxidil-tablets-ip/": {
       "Minoxidil 5 mg": {
@@ -631,6 +636,15 @@
           21.51
         ]
       }
+    }
+  },
+  "retail": {
+    "Crocs Lightning McQueen": {
+      "currency": "",
+      "in_stock": false,
+      "last_check_at": "2026-09-02T10:03:28.073734+00:00",
+      "price": "",
+      "source": ""
     }
   },
   "stats_message_id": "1536515157574815877"
