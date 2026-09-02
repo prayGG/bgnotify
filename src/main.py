@@ -136,7 +136,11 @@ def main() -> int:
         # billig genug fuer jeden Lauf — und bei einem Drop zaehlt jede Minute.
         # Landet im Restock-Channel: Fuer den, der es dort sieht, ist es
         # dasselbe Ereignis wie ein Restock im Shop.
-        _, retail_restocks = check_items(cfg, state)
+        retail_statuses, retail_restocks = check_items(cfg, state)
+        # Mit aufs Status-Board: Auch wenn nichts passiert, will man sehen, DASS
+        # beobachtet wird — sonst ist ein stiller Watcher nicht von einem
+        # kaputten zu unterscheiden.
+        statuses.extend(retail_statuses)
         for r in retail_restocks:
             notify.send_restock_alert(
                 stock_webhook, build_retail_restock_embed(r), user_ids, role_ids,

@@ -32,6 +32,20 @@ def _quellen(item: dict) -> list[str]:
     return [str(u).strip() for u in roh if str(u).strip()]
 
 
+def _anzeige_preis(treffer: dict | None) -> str:
+    """Preis so, wie `pricing.display_price` ihn versteht.
+
+    Der Shop rechnet in USD, diese Artikel meist in EUR. `display_price` erkennt
+    USD am Dollarzeichen und rechnet dann um — eine nackte Zahl gilt als Euro.
+    Ohne diese Unterscheidung stuende ein US-Preis unumgerechnet als Euro da,
+    also deutlich zu niedrig.
+    """
+    if not treffer or not treffer.get("price"):
+        return ""
+    preis = str(treffer["price"])
+    return f"${preis}" if treffer.get("currency", "").upper() == "USD" else preis
+
+
 def check_items(cfg: dict, state: dict) -> tuple[list[dict], list[dict]]:
     """(Statuses, Restocks) für alle konfigurierten Artikel.
 
@@ -87,8 +101,13 @@ def check_items(cfg: dict, state: dict) -> tuple[list[dict], list[dict]]:
             for f in fehler:
                 log.warning("retail: %s", f)
             log.warning("retail: '%s' — keine Quelle lesbar, Stand bleibt", name)
-            statuses.append({"name": name, "in_stock": bool(vorher.get("in_stock")),
-                             "error": "; ".join(fehler)[:300]})
+            statuses.append({
+                "variant": name, "product_name": name,
+                "in_stock": bool(vorher.get("in_stock")), "found": False,
+                "price": vorher.get("price") or "",
+                "product_url": quellen[0],
+                "error": "; ".join(fehler)[:300],
+            })
             continue
 
         # Einzelne kaputte Quellen sind kein Drama, solange eine geantwortet hat.
@@ -122,9 +141,14 @@ def check_items(cfg: dict, state: dict) -> tuple[list[dict], list[dict]]:
             "source": treffer["url"] if treffer else "",
             "last_check_at": datetime.now(timezone.utc).isoformat(),
         }
-        statuses.append({"name": name, "in_stock": jetzt_da,
-                         "price": treffer["price"] if treffer else "",
-                         "currency": treffer["currency"] if treffer else "",
-                         "error": ""})
+        # In der Form des Shop-Watchers, damit die Artikel ohne Sonderweg mit
+        # aufs Status-Board kommen — eine Zeile wie jedes andere Produkt.
+        statuses.append({
+            "variant": name, "product_name": name,
+            "in_stock": jetzt_da, "found": True,
+            "price": _anzeige_preis(treffer),
+            "product_url": treffer["url"] if treffer else quellen[0],
+            "error": "",
+        })
 
     return statuses, restocks

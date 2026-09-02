@@ -718,6 +718,24 @@ check("keine Quelle lesbar → Zustand bleibt", st["retail"]["McQueen"]["in_stoc
 _, r = lauf(st, ALLE_DA)
 check("… und danach KEIN Fehlalarm", r == [], str(r))
 
+# Die Artikel gehoeren aufs Status-Board — ein stiller Watcher ist sonst nicht
+# von einem kaputten zu unterscheiden. Dafuer muessen die Statuses die Form des
+# Shop-Watchers haben.
+st = {}
+lage, _ = lauf(st, ALLE_DA)
+check("Status hat die Form des Dashboards",
+      {"variant", "product_name", "in_stock", "found", "price", "product_url"} <= set(lage[0]),
+      str(sorted(lage[0])))
+from src.embeds import build_dashboard_embed  # noqa: E402
+karte = build_dashboard_embed(lage)["description"]
+check("… und landet sichtbar auf dem Board", "McQueen" in karte, karte)
+
+# Shop-Preise sind USD, diese hier meist EUR. Ohne Unterscheidung stuende ein
+# US-Preis unumgerechnet als Euro da, also viel zu niedrig.
+lage_usd, _ = lauf({}, {"https://a/x": dict(DA, currency="USD"), "https://b/x": WEG})
+check("EUR bleibt nackt", lauf({}, ALLE_DA)[0][0]["price"] == "74.99")
+check("USD bekommt ein Dollarzeichen", lage_usd[0]["price"] == "$74.99", lage_usd[0]["price"])
+
 # Eine kaputte Quelle darf die heile nicht entwerten.
 st = {}
 lauf(st, ALLE_WEG)
